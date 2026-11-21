@@ -180,9 +180,18 @@ if [[ -f "$appcast" ]]; then
   fi
 fi
 
-# The DMG: the app and a link to Applications, LZMA-compressed (ULMO). A DMG from an earlier run is kept when it
-# holds this same app, so a run after a failure uploads the same file.
+# The DMG: the app and a link to Applications in a styled window (Config/dmg-settings.py, with the background from
+# Scripts/render-dmg-background.swift), LZMA-compressed (ULMO). dmgbuild writes the window's layout itself, without
+# driving Finder; it lives in a venv under build/. A DMG from an earlier run is kept when it holds this same app,
+# so a run after a failure uploads the same file.
 mkdir -p "$dist"
+dmgbuild_venv="$root/build/dmgbuild"
+if [[ ! -x "$dmgbuild_venv/bin/dmgbuild" ]]; then
+  python="${PYTHON:-$(command -v python3.13 || command -v python3 || true)}"
+  [[ -n "$python" ]] || fail "making the DMG needs Python 3 for dmgbuild. Set PYTHON to one."
+  "$python" -m venv "$dmgbuild_venv" || fail "couldn't make a venv for dmgbuild at $dmgbuild_venv"
+  "$dmgbuild_venv/bin/python" -m pip install --quiet --upgrade dmgbuild || fail "couldn't install dmgbuild"
+fi
 if [[ -f "$dmg" ]]; then
   diskutil image attach --readOnly --nobrowse --mountPoint "$mount" "$dmg" >/dev/null
   dmg_hash="$(cdhash "$mount/Encore.app")"
@@ -192,11 +201,16 @@ fi
 if [[ -f "$dmg" ]]; then
   echo "dist/$dmg_name already holds this app."
 else
-  stage="$work/dmg"
-  mkdir "$stage"
-  ditto "$app" "$stage/Encore.app"
-  ln -s /Applications "$stage/Applications"
-  hdiutil create -quiet -volname Encore -srcfolder "$stage" -fs HFS+ -format ULMO "$dmg"
+  "$dmgbuild_venv/bin/dmgbuild" -s "$root/Config/dmg-settings.py" \
+    -D app="$app" -D background="$root/Config/dmg-background.tiff" Encore "$dmg" >/dev/null ||
+    fail "dmgbuild couldn't make dist/$dmg_name"
+  # The copy in the DMG is the one people install: it must still be signed and carry the notarization ticket.
+  diskutil image attach --readOnly --nobrowse --mountPoint "$mount" "$dmg" >/dev/null
+  dmg_ok=1
+  codesign --verify --deep --strict "$mount/Encore.app" 2>/dev/null && xcrun stapler validate -q "$mount/Encore.app" ||
+    dmg_ok=0
+  hdiutil detach -quiet "$mount"
+  [[ "$dmg_ok" == 1 ]] || { rm -f "$dmg"; fail "the app in the new DMG isn't signed or stapled like Encore.app"; }
   echo "Made dist/$dmg_name."
 fi
 

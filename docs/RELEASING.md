@@ -30,6 +30,16 @@ packages, and publishes it.
 - **Sparkle**, linked through the `EncoreUpdates` product of `Packages/EncoreCore`. Xcode's export signs its
   helpers with Developer ID.
 
+## The DMG
+
+The DMG opens a styled window: "Places, please." over Encore's dark ground, Encore and Applications side by side,
+and a lit arrow between them. [dmgbuild](https://dmgbuild.readthedocs.io) writes the window's layout from
+`Config/dmg-settings.py`, without driving Finder; `publish-release.sh` installs it in a venv under `build/` the first
+time, so a Python 3 must be on `PATH` (or in `PYTHON`). The background is `Config/dmg-background.tiff`, rendered by
+`swift Scripts/render-dmg-background.swift`. The two files share the window size and the icon positions; change
+them together, and render again after changing the script. Finder draws the names black in light mode and white in
+dark mode, so they sit on mid-tone capsules that read in both.
+
 ## One-time setup
 
 1. **Developer ID Application certificate** in the login Keychain: Xcode ▸ Settings ▸ Accounts ▸ the team ▸
