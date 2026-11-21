@@ -6,6 +6,7 @@ import SwiftUI
 ///     Encore --snapshot <dir>                         every section + the gallery
 ///     Encore --snapshot <dir> --snapshot-only Studio  one (or a comma list: Studio,Voices)
 ///     Encore --snapshot <dir> --full                  also write <Name>-full.png per section
+///     Encore --snapshot <dir> --as-shipped            leave out DEBUG-only chrome (the rail's Gallery item), for README images
 ///
 /// Each target is written as `<dir>/<Name>.png`: the whole window (rail, stage, dock) at the
 /// default window size, at 2x. `<Name>-full.png` is the screen alone, at the stage width and
@@ -197,6 +198,7 @@ private final class SnapshotDelegate: NSObject, NSApplicationDelegate {
     private func write(_ view: some View, size: CGSize, name: String) async -> Bool {
         let root = view
             .environment(\.isSnapshotting, true)
+            .environment(\.hidesDebugChrome, CommandLine.arguments.contains("--as-shipped"))
             .preferredColorScheme(.dark)
             .frame(width: size.width, height: size.height)
         let hosting = NSHostingView(rootView: root)

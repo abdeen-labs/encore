@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The one way every generation screen starts, watches and cancels a job.
 ///
-/// Idle: the primary action (⌘↩), plus a note on why it can't run yet or how the last job went.
+/// Idle: the primary action (⌘↩ unless something else on the screen has that key), plus a note on why it
+/// can't run yet or how the last job went.
 /// Waiting: queue position and what is running ahead. Running: stage, progress, elapsed time, Cancel (⌘.).
 /// Memory warning: a title, one sentence, the bar and its numbers, and "Run anyway" / "Not now".
 ///
@@ -17,6 +18,11 @@ struct RunSurface: View {
     var blockedReason: String?
     /// Idle note shown when nothing else needs saying: one short sentence, one line.
     var idleNote: String?
+    /// One owner per key on a screen. False while something else has ⌘↩ (a save form), or for a second
+    /// run surface beside the screen's own.
+    var runShortcut = true
+    /// False for a second run surface on a screen, so ⌘. cancels the screen's own job.
+    var cancelShortcut = true
     let action: () -> Void
 
     @Environment(RuntimeStatus.self) private var status
@@ -26,7 +32,8 @@ struct RunSurface: View {
             switch runner.phase {
             case .idle, .checkingMemory: idle
             case .confirmMemory(let a): MemoryWarning(assessment: a, modelName: runner.identity?.modelName ?? "This model",
-                                                      onRun: runner.runAnyway, onCancel: runner.dismissMemoryWarning)
+                                                      onRun: runner.runAnyway, onCancel: runner.dismissMemoryWarning,
+                                                      runShortcut: runShortcut, cancelShortcut: cancelShortcut)
             case .running: running
             }
         }
@@ -40,9 +47,9 @@ struct RunSurface: View {
             Button(title, systemImage: systemImage, action: action)
                 .buttonStyle(.primary)
                 .controlSize(.large)
-                .keyboardShortcut(.return, modifiers: .command)
+                .keyboardShortcut(runShortcut ? KeyboardShortcut(.return, modifiers: .command) : nil)
                 .disabled(blockedReason != nil || runner.phase == .checkingMemory)
-                .help("\(title) (⌘↩)")
+                .help(runShortcut ? "\(title) (⌘↩)" : title)
             VStack(alignment: .leading, spacing: 2) {
                 if runner.phase == .checkingMemory {
                     Text("Checking memory…").textRole(.caption)
@@ -59,7 +66,7 @@ struct RunSurface: View {
             }
             Spacer(minLength: 0)
             Text("⌘↩").textRole(.monoSmall, color: .textTertiary)
-                .opacity(blockedReason == nil ? 1 : 0)
+                .opacity(blockedReason == nil && runShortcut ? 1 : 0)
                 .accessibilityHidden(true)
         }
         .frame(minHeight: Theme.ControlHeight.large)
@@ -97,8 +104,8 @@ struct RunSurface: View {
             }
             Button("Cancel", systemImage: "stop.fill", action: runner.cancel)
                 .buttonStyle(.secondary)
-                .keyboardShortcut(".", modifiers: .command)
-                .help("Cancel (⌘.)")
+                .keyboardShortcut(cancelShortcut ? KeyboardShortcut(".", modifiers: .command) : nil)
+                .help(cancelShortcut ? "Cancel (⌘.)" : "Cancel")
         }
         .frame(minHeight: Theme.ControlHeight.large)
     }
@@ -146,6 +153,8 @@ struct MemoryWarning: View {
     let modelName: String
     let onRun: () -> Void
     let onCancel: () -> Void
+    var runShortcut = true
+    var cancelShortcut = true
 
     private var wontFit: Bool { assessment.verdict == .wontFit }
 
@@ -178,10 +187,10 @@ struct MemoryWarning: View {
                 Spacer(minLength: 0)
                 Button("Not now", action: onCancel)
                     .buttonStyle(.ghost)
-                    .keyboardShortcut(".", modifiers: .command)
+                    .keyboardShortcut(cancelShortcut ? KeyboardShortcut(".", modifiers: .command) : nil)
                 Button(wontFit ? "Try anyway" : "Run anyway", systemImage: "play.fill", action: onRun)
                     .buttonStyle(wontFit ? .destructive : .secondary)
-                    .keyboardShortcut(.return, modifiers: .command)
+                    .keyboardShortcut(runShortcut ? KeyboardShortcut(.return, modifiers: .command) : nil)
             }
         }
         .padding(Theme.Space.l)

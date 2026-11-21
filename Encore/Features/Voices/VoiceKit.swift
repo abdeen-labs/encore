@@ -332,6 +332,9 @@ struct VoiceTryoutPanel: View {
     @Bindable var tryout: VoiceTryout
     var onAnother: (() -> Void)?
     var anotherTitle = "Make another"
+    /// False where the panel sits beside a screen's own run button, which keeps ⌘↩ and ⌘. for itself.
+    /// Return in the line field still performs.
+    var ownsShortcuts = true
 
     @Environment(AppDependencies.self) private var deps
     @Environment(ToastCenter.self) private var toasts
@@ -353,7 +356,8 @@ struct VoiceTryoutPanel: View {
                 ModelPicker(task: .tts, requires: .cloning, feature: .cloning, selection: $tryout.choice)
             }
             RunSurface(runner: tryout.runner, title: "Perform", systemImage: "waveform",
-                       blockedReason: tryout.runner.error == nil ? tryout.blockedReason : nil, action: tryout.speak)
+                       blockedReason: tryout.runner.error == nil ? tryout.blockedReason : nil,
+                       runShortcut: ownsShortcuts, cancelShortcut: ownsShortcuts, action: tryout.speak)
             if let error = tryout.runner.error {
                 ServiceErrorBanner(error: error, onDismiss: { tryout.runner.error = nil }, onRetry: tryout.speak)
             }

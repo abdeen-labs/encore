@@ -221,7 +221,9 @@ private final class PlaybackEngine: @unchecked Sendable {
     private var format: AVAudioFormat?
     private var source: Source?
     private let offline: Bool
-    private let queue = DispatchQueue(label: "Encore.AudioPlayer.engine", qos: .userInitiated)
+    /// Default priority, the same as the engine's own thread that `node.stop()` waits on. A higher one makes
+    /// this queue wait on a lower-priority thread, which Xcode reports as a hang risk.
+    private let queue = DispatchQueue(label: "Encore.AudioPlayer.engine", qos: .default)
 
     init(offline: Bool) {
         self.offline = offline

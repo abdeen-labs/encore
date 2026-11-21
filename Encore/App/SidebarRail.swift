@@ -7,6 +7,7 @@ struct SidebarRail: View {
     @Environment(Router.self) private var router
     @Environment(RuntimeStatus.self) private var status
     @Environment(\.forcesShortcutHints) private var forcesHints
+    @Environment(\.hidesDebugChrome) private var hidesDebugChrome
     @Environment(\.isSnapshotting) private var isSnapshotting
     @Namespace private var spotlight
     @State private var hints = ShortcutHintMonitor()
@@ -60,7 +61,7 @@ struct SidebarRail: View {
 
             #if DEBUG
             // The gallery steps aside for the activity card when the window is too short for both (⇧⌘G still opens it).
-            if !(tight && status.isBusy) {
+            if !(tight && status.isBusy), !hidesDebugChrome {
                 RailItem(title: "Gallery", symbol: "square.grid.2x2", shortcut: "⇧⌘G", key: "⇧G", showsKey: showsHints,
                          isSelected: router.isShowingGallery, spotlight: spotlight) {
                     router.showGallery()

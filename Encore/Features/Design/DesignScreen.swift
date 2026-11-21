@@ -249,8 +249,9 @@ private struct BriefFooter: View {
                         .buttonStyle(.secondary).controlSize(.small)
                 }
             }
+            // While an audition is being named, ⌘↩ belongs to its "Save to library".
             RunSurface(runner: model.runner, title: "Audition", systemImage: "wand.and.stars",
-                       blockedReason: blockedReason, idleNote: nil, action: model.run)
+                       blockedReason: blockedReason, idleNote: nil, runShortcut: model.keeping == nil, action: model.run)
         }
     }
 
@@ -394,7 +395,7 @@ private struct AuditionCard: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
             if audition.savedVoice != nil, model.tryoutFor == audition.id {
-                VoiceTryoutPanel(tryout: model.tryout)
+                VoiceTryoutPanel(tryout: model.tryout, ownsShortcuts: false)
                     .padding(Theme.Space.l)
                     .surface(.card)
                     .padding(.top, Theme.Space.xs)
@@ -439,6 +440,7 @@ private struct AuditionCard: View {
                     .buttonStyle(.primary)
                     .disabled(model.isSaving)
                     .keyboardShortcut(.return, modifiers: .command)
+                    .help("Save to library (⌘↩)")
                 Button("Cancel") { withStageAnimation { model.keeping = nil } }.buttonStyle(.ghost)
             }
         }

@@ -116,7 +116,7 @@ final class DesignModel {
     var cloningModels: [ModelManifest] { tryout.cloningModels() }
 
     var blockedReason: String? {
-        guard let m = manifest else { return "Choose a model that designs voices." }
+        guard manifest != nil else { return "Choose a model that designs voices." }
         if shelf.hasScanned, !isDownloaded { return "Download the model first." }
         if description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Describe the voice first." }
         if descriptionProblem != nil { return "OmniVoice needs attributes, not a description." }

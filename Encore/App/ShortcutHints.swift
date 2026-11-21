@@ -111,4 +111,6 @@ struct KeycapBadge: View {
 extension EnvironmentValues {
     /// Snapshot fixtures: draw the rail's shortcut badges as if Command were held.
     @Entry var forcesShortcutHints: Bool = false
+    /// Snapshots with `--as-shipped`: DEBUG-only chrome (the rail's Gallery item) is left out, so images show the app as it ships.
+    @Entry var hidesDebugChrome: Bool = false
 }
