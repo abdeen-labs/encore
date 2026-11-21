@@ -144,11 +144,11 @@ struct ExportProgressCard: View {
         HStack(spacing: Theme.Space.m) {
             Image(systemName: "square.and.arrow.up")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.tungsten)
+                .foregroundStyle(Color.textSecondary)
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
                     Text("Exporting “\(job.title)”")
-                        .font(.ui(12.5, weight: .medium)).foregroundStyle(.textPrimary)
+                        .textRole(.label, color: .textPrimary)
                         .lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: Theme.Space.s)
                     Text(job.fraction.formatted(.percent.precision(.fractionLength(0))))

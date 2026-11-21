@@ -2,8 +2,9 @@ import EncoreCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Voice cloning: one guided flow from a recording to a saved voice, laid out as a cue sheet —
-/// Q1 source, Q2 trim, Q3 the words, Q4 credits, Q5 consent — and then the voice's first words.
+/// Voice cloning: one form from a recording to a saved voice. First the source (a dropped file or a
+/// recording), then the trimmer, the words, the voice's name and tags, and a pinned save bar with the
+/// consent check. After saving, the voice's first words.
 struct CloneScreen: View {
     @Environment(AppDependencies.self) private var deps
 
@@ -21,32 +22,38 @@ enum CloneMedia {
 
 struct CloneStage: View {
     @Bindable var model: CloneModel
-    @Environment(Router.self) private var router
-    @State private var width: CGFloat = 900
+    @Environment(\.scaffoldScrolls) private var scrolls
+    @State private var width: CGFloat = 880
     @State private var choosingSource = false
 
-    private var wide: Bool { width >= 800 }
+    /// Two columns from here up; below it (the minimum window) they stack.
+    private var wide: Bool { width >= 760 }
+    private var isWorking: Bool { model.source != nil && model.saved == nil }
 
     var body: some View {
-        ScreenScaffold(.clone) {
-            CueSheet(step: model.currentStep, hasSource: model.source != nil)
-            Group {
-                if let saved = model.saved {
-                    SavedStage(model: model, voice: saved, wide: wide)
-                } else if model.source == nil {
-                    SourceStage(model: model, wide: wide)
-                } else {
-                    workbench
+        ScreenScaffold(.clone, scrolls: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                scrolling {
+                    Group {
+                        if let saved = model.saved {
+                            SavedStage(model: model, voice: saved, wide: wide)
+                        } else if model.source == nil {
+                            SourceStage(model: model, wide: wide)
+                        } else {
+                            workbench
+                        }
+                    }
+                    .transition(.opacity)
+                }
+                if isWorking {
+                    SaveBar(model: model, wide: wide)
                 }
             }
-            .transition(.opacity)
         } actions: {
-            if model.source != nil, model.saved == nil {
+            if isWorking {
                 Button("Use another recording…", systemImage: "arrow.triangle.2.circlepath") { choosingSource = true }
                     .buttonStyle(.ghost)
-            }
-            if model.source != nil || model.saved != nil {
-                Button(model.saved == nil ? "Start over" : "Clone another", systemImage: "arrow.counterclockwise") {
+                Button("Start over", systemImage: "arrow.counterclockwise") {
                     withStageAnimation { model.startOver() }
                 }
                 .buttonStyle(.ghost)
@@ -61,37 +68,52 @@ struct CloneStage: View {
         .stageAnimation(Theme.Motion.entrance, value: model.saved?.id)
     }
 
+    /// The form scrolls above the pinned save bar. Full-height snapshots (`scaffoldScrolls == false`) lay it out whole.
+    @ViewBuilder private func scrolling<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        if scrolls {
+            ScrollView {
+                content()
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(.bottom, Theme.Space.l)
+            }
+            .scrollIndicators(.automatic)
+            .scrollContentBackground(.hidden)
+            .frame(maxHeight: .infinity, alignment: .top)
+        } else {
+            content()
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(.bottom, Theme.Space.l)
+        }
+    }
+
     // MARK: Workbench
 
     @ViewBuilder private var workbench: some View {
         if wide {
             HStack(alignment: .top, spacing: Theme.Space.xl) {
-                VStack(alignment: .leading, spacing: Theme.Space.l) {
+                VStack(alignment: .leading, spacing: Theme.Space.xl) {
                     trimSection
-                    TranscriptWell(model: model)
+                    TranscriptSection(model: model)
                 }
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity)
-                VStack(alignment: .leading, spacing: Theme.Space.l) {
-                    CreditsCard(model: model)
-                    ConsentAndSave(model: model)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(width: 318)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                DetailsSection(model: model)
+                    .frame(width: 318)
             }
         } else {
-            trimSection
-            TranscriptWell(model: model)
-            CreditsCard(model: model)
-            ConsentAndSave(model: model)
+            VStack(alignment: .leading, spacing: Theme.Space.xl) {
+                trimSection
+                TranscriptSection(model: model)
+                DetailsSection(model: model)
+            }
         }
     }
 
     @ViewBuilder private var trimSection: some View {
         if let source = model.source {
-            VStack(alignment: .leading, spacing: Theme.Space.s) {
-                CueLabel(number: 2, title: "Trim to the best stretch", detail: trimDetail(source))
-                trimmer(source)
+            VStack(alignment: .leading, spacing: Theme.Space.m) {
+                SectionHeader("Trim to the best stretch", subtitle: trimCaption(source))
+                WaveformTrimmer(url: source.url, selection: model.trimmerSelection, target: model.target, title: source.name,
+                                suggestsSelection: !model.hasChosenSelection, wholeFileRange: model.wholeFileRange)
             }
             .dropDestination(for: URL.self) { urls, _ in
                 guard let url = urls.first else { return false }
@@ -101,85 +123,14 @@ struct CloneStage: View {
         }
     }
 
-    private func trimDetail(_ source: CloneModel.Source) -> String {
-        let keep = "keep \(Int(model.target.lowerBound))–\(Int(model.target.upperBound)) seconds of one voice, clean, no music."
-        if source.kind == .recording { return "Your recording. Now " + keep }
-        let lead = source.duration > 60 ? "A long file is fine — " : "Any length is fine — "
-        return lead + keep + (source.hasVideo ? " Only the video's sound is used." : "")
-    }
-
-    private func trimmer(_ source: CloneModel.Source) -> some View {
-        WaveformTrimmer(url: source.url, selection: model.trimmerSelection, target: model.target, title: source.name,
-                        suggestsSelection: !model.hasChosenSelection, wholeFileRange: model.wholeFileRange)
+    /// One line; the trimmer itself says whether the length is right.
+    private func trimCaption(_ source: CloneModel.Source) -> String {
+        if source.hasVideo { return "Only the selection is kept, and only the video's sound." }
+        return source.kind == .recording ? "Only the selection of your recording is kept." : "Only the selection is kept, so a long file is fine."
     }
 }
 
-// MARK: - Cue sheet
-
-/// The flow at a glance: five numbered cues, done ones ticked, the current one lit.
-private struct CueSheet: View {
-    let step: Int
-    let hasSource: Bool
-
-    private static let cues = ["Source", "Trim", "Words", "Credits", "Consent"]
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(Self.cues.enumerated()), id: \.offset) { i, title in
-                let done = i < step || step == 5
-                let current = i == step || (step == 4 && i >= 2 && i <= 4 && hasSource && !done)
-                HStack(spacing: 7) {
-                    ZStack {
-                        Circle().fill(done ? Color.mint.opacity(0.14) : (current ? Color.tungsten.opacity(0.16) : Color.surfaceSunken))
-                        Circle().strokeBorder(done ? Color.mint.opacity(0.6) : (current ? Color.tungsten : Color.hairlineStrong), lineWidth: 1)
-                        if done {
-                            Image(systemName: "checkmark").font(.system(size: 8.5, weight: .heavy)).foregroundStyle(Color.mint)
-                        } else {
-                            Text("Q\(i + 1)").font(.mono(8.5, weight: .semibold))
-                                .foregroundStyle(current ? Color.tungsten : .textTertiary)
-                        }
-                    }
-                    .frame(width: 22, height: 22)
-                    .glow(current ? .tungsten : .clear, radius: 6, intensity: 0.35)
-                    Text(title)
-                        .font(.ui(12, weight: current ? .semibold : .medium))
-                        .foregroundStyle(current ? Color.textPrimary : (done ? .textSecondary : .textTertiary))
-                        .lineLimit(1)
-                        .fixedSize()
-                }
-                if i < Self.cues.count - 1 {
-                    Rectangle()
-                        .fill(i < step ? Color.mint.opacity(0.35) : Color.hairlineStrong)
-                        .frame(height: 1)
-                        .frame(minWidth: 10, maxWidth: .infinity)
-                        .padding(.horizontal, 8)
-                }
-            }
-        }
-        .padding(.bottom, Theme.Space.xs)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Step \(min(step, 4) + 1) of 5")
-    }
-}
-
-/// "Q2 · Trim to the best stretch" above a section, with one line of guidance.
-struct CueLabel: View {
-    let number: Int
-    let title: String
-    var detail: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Q\(number)").font(.mono(11, weight: .semibold)).foregroundStyle(Color.tungsten.opacity(0.85))
-                Text(title).textRole(.heading)
-            }
-            if let detail { Text(detail).textRole(.caption).fixedSize(horizontal: false, vertical: true) }
-        }
-    }
-}
-
-// MARK: - Q1 Source
+// MARK: - Source
 
 private struct SourceStage: View {
     @Bindable var model: CloneModel
@@ -188,18 +139,15 @@ private struct SourceStage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.l) {
-            CueLabel(number: 1, title: "Bring in the voice",
-                     detail: model.mode == .record
-                        ? "Record the speaker reading a few natural sentences. Go longer if you like; you'll pick the best few seconds next."
-                        : "Drop any recording or video of the speaker — an interview, a voice memo, a whole podcast. Length doesn't matter; you'll pick the best few seconds next.")
             if model.mode == .record {
                 recordPanel
             } else {
                 DropZone(symbol: "waveform.badge.plus", title: "Drop a recording of the voice",
-                         message: "Audio or video, any length · WAV, MP3, M4A, FLAC, MOV, MP4…",
-                         allowedTypes: CloneMedia.types, minHeight: wide ? 210 : 170) { urls in
+                         message: "Audio or video of any length",
+                         allowedTypes: CloneMedia.types, minHeight: wide ? 220 : 170) { urls in
                     if let url = urls.first { Task { await model.load(url) } }
                 }
+                .help("WAV, MP3, M4A, FLAC, MOV, MP4 and more")
                 .overlay {
                     if model.isLoadingSource {
                         RoundedRectangle(cornerRadius: Theme.Radius.l).fill(Color.backdrop.opacity(0.7))
@@ -211,14 +159,28 @@ private struct SourceStage: View {
             if let error = model.sourceError {
                 Banner(.danger, title: "That file didn't open", message: error, onDismiss: { model.sourceError = nil })
             }
-            Hints(wide: wide)
+            Text(guidance).textRole(.caption).fixedSize(horizontal: false, vertical: true)
             if model.isPrepared, model.tryout.cloningModels().isEmpty {
-                Banner(.neutral, title: "No cloning model on this Mac yet",
-                       message: "You can make and save the voice now. To hear it speak, download a model that clones, such as Qwen3-TTS Base or Chatterbox Turbo.") {
-                    Button("Open Models") { deps.router.go(.models) }.buttonStyle(.secondary).controlSize(.small)
+                HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
+                    Text("No cloning model on this Mac yet. You can save the voice now and hear it once you have one.")
+                        .textRole(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Open Models") { deps.router.go(.models) }
+                        .buttonStyle(.ghost)
+                        .controlSize(.small)
+                        .fixedSize()
+                        .help("Models that clone include Qwen3-TTS Base and Chatterbox Turbo.")
                 }
             }
         }
+    }
+
+    private var guidance: String {
+        let lo = Int(model.target.lowerBound), hi = Int(model.target.upperBound)
+        if model.mode == .record {
+            return "Read a few natural sentences; longer is fine, you'll keep the best \(lo) to \(hi) seconds. Only record with the speaker's permission."
+        }
+        return "One voice, \(lo) to \(hi) seconds of natural speech (you'll pick the stretch next), and only with the speaker's permission."
     }
 
     private var recordInstead: some View {
@@ -226,15 +188,15 @@ private struct SourceStage: View {
             withStageAnimation { model.mode = .record }
         } label: {
             HStack(spacing: Theme.Space.m) {
-                Image(systemName: "mic.fill")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.velvet)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(Color.velvet.opacity(0.12)))
-                    .overlay(Circle().strokeBorder(Color.velvet.opacity(0.4), lineWidth: 1))
+                Image(systemName: "mic")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.textSecondary)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(Color.surfaceRaised))
+                    .overlay(Circle().strokeBorder(Color.hairline, lineWidth: 1))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Or record it now").textRole(.headline)
-                    Text("Use this Mac's microphone. Read a few natural sentences; longer takes are fine.").textRole(.caption)
+                    Text("Use this Mac's microphone.").textRole(.caption)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(.textTertiary)
@@ -247,6 +209,7 @@ private struct SourceStage: View {
         .buttonStyle(.plain)
     }
 
+    /// The recorder only opens the microphone when its Record button is pressed; showing it never does.
     @ViewBuilder private var recordPanel: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
             #if DEBUG
@@ -265,58 +228,17 @@ private struct SourceStage: View {
     }
 }
 
-/// Three short notes on what makes a good reference.
-private struct Hints: View {
-    let wide: Bool
+// MARK: - Transcript
 
-    var body: some View {
-        let items: [(String, String, String)] = [
-            ("person.wave.2", "One voice", "No music, no second speaker, little room echo."),
-            ("timer", "A few seconds", "5–15 s of natural speech clones best. You choose the stretch."),
-            ("checkmark.shield", "Their permission", "Clone only voices you have the speaker's consent to use."),
-        ]
-        let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: Theme.Space.m))
-                          : AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Space.s))
-        layout {
-            ForEach(items, id: \.1) { symbol, title, text in
-                HStack(alignment: .top, spacing: Theme.Space.s) {
-                    Image(systemName: symbol).font(.system(size: 12, weight: .medium)).foregroundStyle(Color.tungsten.opacity(0.8))
-                        .frame(width: 18).padding(.top, 1)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title).textRole(.label)
-                        Text(text).textRole(.caption, color: .textTertiary).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(.top, Theme.Space.xs)
-    }
-}
-
-// MARK: - Q3 Transcript
-
-private struct TranscriptWell: View {
+private struct TranscriptSection: View {
     @Bindable var model: CloneModel
     @Environment(Router.self) private var router
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s) {
-            CueLabel(number: 3, title: "The words", detail: detail)
-            ZStack(alignment: .topTrailing) {
-                ScriptEditor(text: $model.transcript, placeholder: placeholder, minHeight: 92, showsStats: false)
-                    .opacity(isWorking && model.transcript.isEmpty ? 0.55 : 1)
-                if isWorking {
-                    HStack(spacing: 6) {
-                        ActivityIndicator(size: 12)
-                        Text(workingText).font(.ui(11, weight: .medium)).foregroundStyle(Color.tungsten)
-                    }
-                    .padding(.horizontal, 10).frame(height: 24)
-                    .background(Capsule().fill(Color.surfaceRaised).overlay(Capsule().strokeBorder(Color.tungsten.opacity(0.3))))
-                    .padding(8)
-                    .transition(.opacity)
-                }
-            }
+        VStack(alignment: .leading, spacing: Theme.Space.m) {
+            SectionHeader("What's said in the clip", subtitle: caption)
+            ScriptEditor(text: $model.transcript, placeholder: "Type exactly what's said in the clip…", minHeight: 92, showsStats: false)
+                .opacity(isWorking && model.transcript.isEmpty ? 0.55 : 1)
             status
         }
         .stageAnimation(Theme.Motion.quick, value: isWorking)
@@ -329,32 +251,28 @@ private struct TranscriptWell: View {
         }
     }
 
-    private var workingText: String {
-        if case .transcribing(let r) = model.transcriptState {
-            return "Transcribing \(Timecode.string(r.lowerBound))–\(Timecode.string(r.upperBound))…"
+    private var caption: String {
+        if let m = model.modelManifest, m.reference?.transcript == .unused {
+            return "\(m.name) doesn't need it, but it's kept for models that do."
         }
-        return "Transcribing…"
-    }
-
-    private var placeholder: String {
-        switch model.transcriptState {
-        case .pending, .transcribing: "Listening to the clip…"
-        default: "Type exactly what's said in the clip…"
-        }
-    }
-
-    private var detail: String {
-        let m = model.modelManifest
-        if m?.reference?.transcript == .unused {
-            return "Exactly what's said in the clip. \(m!.name) doesn't need it, but it's kept with the voice for models that do."
-        }
-        return "Exactly what's said in the clip, so the model can read along. Transcribed on this Mac; fix anything it misheard."
+        return "So the model can read along. Fix anything it misheard."
     }
 
     @ViewBuilder private var status: some View {
         switch model.transcriptState {
+        case .pending, .transcribing:
+            HStack(spacing: 6) {
+                ActivityIndicator(tone: .neutral, size: 12)
+                Text("Transcribing the selection on this Mac…").textRole(.caption)
+            }
+            .transition(.opacity)
         case .ready(_, let name):
-            statusLine("checkmark.circle.fill", .mint, "Transcribed on this Mac by \(name).")
+            if model.hasTranscript {
+                statusLine("checkmark.circle.fill", .mint, "Transcribed on this Mac.")
+                    .help("Transcribed by \(name)")
+            } else {
+                noTranscript
+            }
         case .stale:
             HStack(spacing: Theme.Space.s) {
                 statusLine("exclamationmark.triangle.fill", .footlight, "The selection moved after you edited this.")
@@ -363,9 +281,12 @@ private struct TranscriptWell: View {
                     .buttonStyle(.secondary).controlSize(.small)
             }
         case .noModel:
-            Banner(.warning, title: "No transcription model on this Mac",
-                   message: "Type what's said in the clip, or download Whisper or Parakeet to fill it in automatically.") {
-                Button("Get one in Models") { router.go(.models) }.buttonStyle(.secondary).controlSize(.small)
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
+                statusLine("exclamationmark.triangle.fill", .footlight, "No transcription model on this Mac. Type it, or get one to fill it in.")
+                Spacer(minLength: 0)
+                Button("Open Models") { router.go(.models) }
+                    .buttonStyle(.ghost).controlSize(.small).fixedSize()
+                    .help("Whisper and Parakeet transcribe on this Mac.")
             }
         case .failed(let message):
             Banner(.danger, title: "Couldn't transcribe the clip", message: message) {
@@ -373,9 +294,15 @@ private struct TranscriptWell: View {
             }
         case .idle where model.lengthVerdict == .tooLong:
             statusLine("scissors", .textTertiary, "Trim the clip and it's transcribed automatically.")
+        case .idle where !model.hasTranscript && model.lengthVerdict != .tooShort:
+            noTranscript
         default:
             EmptyView()
         }
+    }
+
+    private var noTranscript: some View {
+        statusLine("exclamationmark.triangle.fill", .footlight, "No transcript yet: models that read along will clone less closely.")
     }
 
     private func statusLine(_ symbol: String, _ color: Color, _ text: String) -> some View {
@@ -386,95 +313,116 @@ private struct TranscriptWell: View {
     }
 }
 
-// MARK: - Q4 Credits
+// MARK: - Name and tags
 
-private struct CreditsCard: View {
+private struct DetailsSection: View {
     @Bindable var model: CloneModel
     @Environment(VoiceLibrary.self) private var library
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
-            CueLabel(number: 4, title: "Credits")
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Name").textRole(.label, color: .textSecondary)
-                TextField(model.suggestedName, text: $model.name, prompt: Text(model.suggestedName).foregroundStyle(Color.textTertiary))
-                    .textFieldStyle(.plain)
-                    .font(.display(21))
-                    .foregroundStyle(.textPrimary)
-                    .padding(.horizontal, 12)
-                    .frame(height: 40)
-                    .surface(.sunken, radius: Theme.Radius.s)
+            SectionHeader("Name and tags", subtitle: "How the voice is listed in Voices.")
+            VStack(alignment: .leading, spacing: Theme.Space.m) {
+                field("Name") {
+                    TextField(model.suggestedName, text: $model.name, prompt: Text(model.suggestedName).foregroundStyle(Color.textTertiary))
+                        .textFieldStyle(.plain)
+                        .textRole(.heading)
+                        .padding(.horizontal, 12)
+                        .frame(height: 40)
+                        .surface(.sunken, radius: Theme.Radius.s)
+                }
+                field("Tags") {
+                    TagEditor(tags: $model.tags, suggestions: library.allTags)
+                }
+                VoiceLanguageMenu(language: $model.language)
+                field("Made for") {
+                    ModelPicker(task: .tts, requires: .cloning, feature: .cloning, selection: $model.modelChoice, panelWidth: 400)
+                    Text("Sets the length to aim for. Any cloning model can use the voice later.")
+                        .textRole(.caption, color: .textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .help(madeForHelp)
+                }
+                AdvancedDisclosure("Notes") {
+                    ScriptEditor(text: $model.notes, placeholder: "Where it's from, how to direct it…", minHeight: 60, showsStats: false)
+                }
             }
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Tags").textRole(.label, color: .textSecondary)
-                TagEditor(tags: $model.tags, suggestions: library.allTags)
-            }
-            VoiceLanguageMenu(language: $model.language)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Made for").textRole(.label, color: .textSecondary)
-                ModelPicker(task: .tts, requires: .cloning, feature: .cloning, selection: $model.modelChoice, panelWidth: 400)
-                Text(madeForCaption).textRole(.caption, color: .textTertiary).fixedSize(horizontal: false, vertical: true)
-            }
-            AdvancedDisclosure("Notes") {
-                ScriptEditor(text: $model.notes, placeholder: "Where it's from, how to direct it…", minHeight: 60, showsStats: false)
-            }
+            .padding(Theme.Space.l)
+            .surface(.card)
         }
-        .padding(Theme.Space.l)
-        .surface(.card)
     }
 
-    private var madeForCaption: String {
+    private func field<Content: View>(_ label: String, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).textRole(.label, color: .textSecondary)
+            content()
+        }
+    }
+
+    private var madeForHelp: String {
         if let m = model.modelManifest, let r = m.reference {
-            return "\(m.name) likes \(Int(r.minSeconds))–\(Int(r.maxSeconds)) s of reference. Any cloning model can use the voice later."
+            return "\(m.name) works best with \(Int(r.minSeconds)) to \(Int(r.maxSeconds)) seconds of reference."
         }
         return "The voice works with any model that clones."
     }
 }
 
-// MARK: - Q5 Consent and save
+// MARK: - Save bar
 
-private struct ConsentAndSave: View {
+/// Pinned below the scrolling form: the consent check, what will be kept, and Save.
+private struct SaveBar: View {
     @Bindable var model: CloneModel
+    let wide: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
-            CueLabel(number: 5, title: "Consent")
-            ConsentCheck(isOn: $model.consent, statement: ConsentCheck.cloneStatement(), detail: ConsentCheck.cloneDetail)
-            PerforatedDivider(bleed: Theme.Space.l)
-            HStack(spacing: Theme.Space.m) {
-                Button(model.isSaving ? "Saving…" : "Save voice", systemImage: "person.crop.circle.badge.plus") {
-                    Task { await model.save() }
-                }
-                .buttonStyle(.primary)
-                .controlSize(.large)
-                .disabled(model.blockedReason != nil)
-                .keyboardShortcut(.return, modifiers: .command)
-                VStack(alignment: .leading, spacing: 2) {
-                    if let reason = model.blockedReason {
-                        Text(reason).textRole(.caption, color: .textSecondary).fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        Text("\(Timecode.string(model.length)) of \(model.source?.name ?? "the recording") will be kept.")
-                            .textRole(.caption).fixedSize(horizontal: false, vertical: true)
-                        if model.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Text("No transcript: models that read along will clone less closely.")
-                                .textRole(.caption, color: .footlight).fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-            }
+            Hairline()
             if let error = model.saveError {
                 Banner(.danger, title: "The voice wasn't saved", message: error, onDismiss: { model.saveError = nil })
             }
+            if wide {
+                HStack(alignment: .center, spacing: Theme.Space.xl) {
+                    ConsentCheck(isOn: $model.consent, statement: ConsentCheck.cloneStatement(), detail: ConsentCheck.cloneDetail)
+                    note
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: 240, alignment: .trailing)
+                    saveButton
+                }
+            } else {
+                ConsentCheck(isOn: $model.consent, statement: ConsentCheck.cloneStatement(), detail: nil)
+                    .help(ConsentCheck.cloneDetail)
+                HStack(spacing: Theme.Space.m) {
+                    note.frame(maxWidth: .infinity, alignment: .leading)
+                    saveButton
+                }
+            }
         }
-        .padding(Theme.Space.l)
-        .background {
-            let shape = RoundedRectangle(cornerRadius: Theme.Radius.l, style: .continuous)
-            shape.fill(Color.surface)
-                .overlay(shape.fill(LinearGradient(colors: [(model.consent ? Color.mint : .velvet).opacity(0.07), .clear],
-                                                   startPoint: .top, endPoint: .bottom)))
-                .overlay(shape.strokeBorder((model.consent ? Color.mint : Color.velvet).opacity(0.22), lineWidth: 1))
+        .padding(.top, Theme.Space.xs)
+    }
+
+    /// What will be kept, or what still stands in the way (the consent check asks for the tick itself).
+    private var note: some View {
+        Group {
+            if let reason = model.blockedReasonBesidesConsent {
+                Text(reason).textRole(.caption)
+            } else {
+                Text("Keeps \(CloneModel.seconds(model.length)) of \(model.source?.name ?? "the recording").")
+                    .textRole(.caption)
+                    .truncationMode(.middle)
+            }
         }
-        .stageAnimation(Theme.Motion.standard, value: model.consent)
+        .lineLimit(2)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var saveButton: some View {
+        Button(model.isSaving ? "Saving…" : "Save voice", systemImage: "person.crop.circle.badge.plus") {
+            Task { await model.save() }
+        }
+        .buttonStyle(.primary)
+        .controlSize(.large)
+        .fixedSize()
+        .disabled(model.blockedReason != nil)
+        .keyboardShortcut(.return, modifiers: .command)
     }
 }
 
@@ -488,14 +436,11 @@ private struct SavedStage: View {
 
     var body: some View {
         let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: Theme.Space.xl))
-                          : AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Space.l))
+                          : AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Space.xl))
         layout {
             VStack(alignment: .leading, spacing: Theme.Space.m) {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.seal.fill").foregroundStyle(Color.mint).glow(.mint, radius: 6, intensity: 0.4)
-                    Text("Joined the company").textRole(.eyebrow, color: .mint)
-                }
-                Text(voice.name).font(.display(34)).foregroundStyle(.textPrimary).lineLimit(2)
+                StatusBadge("Saved to Voices", tone: .success)
+                Text(voice.name).textRole(.title).lineLimit(2)
                 if !voice.tags.isEmpty {
                     FlowRow { ForEach(voice.tags, id: \.self) { Chip($0) } }
                 }
@@ -504,8 +449,7 @@ private struct SavedStage: View {
                 }
                 if !voice.transcript.isEmpty {
                     Text("“\(voice.transcript)”")
-                        .font(.display(15, italic: true)).foregroundStyle(.textSecondary)
-                        .lineSpacing(3)
+                        .textRole(.body, color: .textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let at = voice.consentConfirmedAt {
@@ -514,7 +458,7 @@ private struct SavedStage: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            VoiceTryoutPanel(tryout: model.tryout)
+            VoiceTryoutPanel(tryout: model.tryout, onAnother: { withStageAnimation { model.startOver() } }, anotherTitle: "Clone another")
                 .padding(Theme.Space.l)
                 .surface(.card)
                 .frame(maxWidth: wide ? 420 : .infinity)

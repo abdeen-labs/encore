@@ -117,7 +117,7 @@ final class DesignModel {
 
     var blockedReason: String? {
         guard let m = manifest else { return "Choose a model that designs voices." }
-        if shelf.hasScanned, !isDownloaded { return "\(m.name) isn't downloaded yet." }
+        if shelf.hasScanned, !isDownloaded { return "Download the model first." }
         if description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Describe the voice first." }
         if descriptionProblem != nil { return "OmniVoice needs attributes, not a description." }
         if sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Give the auditions a line to say." }

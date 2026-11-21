@@ -6,7 +6,7 @@ import SwiftUI
 ///
 ///     PresetsMenu(manifest: manifest, parameters: $parameters, post: $post)
 ///
-/// The trigger names the preset that matches the current settings exactly, if any.
+/// The trigger is a neutral pill naming the preset that matches the current settings exactly, if any.
 struct PresetsMenu: View {
     let manifest: ModelManifest
     @Binding var parameters: ParamValues
@@ -62,15 +62,18 @@ struct PresetsMenu: View {
             }
         } label: {
             HStack(spacing: 5) {
-                Image(systemName: "bookmark").font(.system(size: 10.5, weight: .semibold))
-                Text(matching?.name ?? "Presets").font(.ui(12, weight: .medium)).lineLimit(1)
+                Image(systemName: matching != nil ? "bookmark.fill" : "bookmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.textTertiary)
+                Text(matching?.name ?? "Presets")
+                    .textRole(.label, color: matching != nil || isHovered ? .textPrimary : .textSecondary)
+                    .lineLimit(1)
                 Image(systemName: "chevron.down").font(.system(size: 7.5, weight: .bold)).foregroundStyle(.textTertiary)
             }
-            .foregroundStyle(matching != nil ? Color.tungsten : (isHovered ? .textPrimary : .textSecondary))
             .padding(.horizontal, 9)
             .frame(height: Theme.ControlHeight.small)
-            .background(Capsule().fill(matching != nil ? Color.tungsten.opacity(0.1) : Color.textPrimary.opacity(isHovered ? 0.06 : 0)))
-            .overlay(Capsule().strokeBorder(matching != nil ? Color.tungsten.opacity(0.4) : Color.hairline, lineWidth: 1))
+            .background(Capsule().fill(Color.textPrimary.opacity(isHovered ? 0.06 : 0)))
+            .overlay(Capsule().strokeBorder(isHovered ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
             .contentShape(Capsule())
         }
         .menuStyle(.button)

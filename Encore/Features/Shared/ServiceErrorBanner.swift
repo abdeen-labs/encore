@@ -50,11 +50,12 @@ struct ErrorPresentation: Equatable {
             tone = .danger; title = "Unknown model"; message = e.errorDescription
         case .wrongTask:
             tone = .warning; title = "Wrong kind of model"; message = e.errorDescription
-        case .modelNotDownloaded(_, _, let name, let variant, let partial):
+        case .modelNotDownloaded(_, _, let name, _, let partial):
+            // The variant's label (bf16, 4-bit…) is engineering detail; the Models screen shows which one.
             tone = .warning
             title = partial ? "\(name) is only partly downloaded" : "\(name) isn't downloaded yet"
-            message = partial ? "Finish downloading the \(variant) variant in Models, then perform again."
-                : "Download the \(variant) variant in Models, then perform again."
+            message = partial ? "Finish the download in Models, then try again."
+                : "Download it in Models, then try again."
             action = .openModels
         case .backendNeedsSetup(let runtime, let m):
             tone = .warning

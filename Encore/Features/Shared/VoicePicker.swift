@@ -15,10 +15,19 @@ struct VoicePicker: View {
     /// Presets in this language are listed first.
     var language: String?
     var panelWidth: CGFloat = 380
+    /// One line, just the voice's name: for a row that already says whose voice it is (a speaker in a cast).
+    var isCompact = false
 
     @Environment(AppDependencies.self) private var deps
     @Environment(\.snapshotOpenPicker) private var snapshotOpen
     @State private var isOpen = false
+
+    /// The one-line form (see `isCompact`).
+    func compact(_ on: Bool = true) -> VoicePicker {
+        var copy = self
+        copy.isCompact = on
+        return copy
+    }
 
     init(manifest: ModelManifest, selection: Binding<VoiceSelection>, language: String? = nil, panelWidth: CGFloat = 380) {
         self.manifest = manifest
@@ -33,6 +42,7 @@ struct VoicePicker: View {
             if d.isMissing { StatusBadge("Missing", tone: .danger) }
             else if d.isUnusable { StatusBadge("Can't clone", tone: .warning) }
         }
+        .compact(isCompact)
         .pickerPanel(isPresented: $isOpen, width: panelWidth) {
             VoicePickerPanel(manifest: manifest, selection: selection, language: language) { picked in
                 selection = picked
@@ -132,7 +142,7 @@ struct VoicePickerPanel: View {
                 VStack(alignment: .leading, spacing: 2) {
                     if query.isEmpty {
                         PickerRow(isSelected: selection == .automatic, action: { onSelect(.automatic) }) {
-                            Image(systemName: "sparkles").foregroundStyle(Color.tungsten).frame(width: 18)
+                            Image(systemName: "sparkles").foregroundStyle(Color.textSecondary).frame(width: 18)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text("Automatic").textRole(.headline)
                                 Text(manifest.presetVoices.isEmpty ? "Whatever voice \(manifest.name) speaks in by default"
@@ -159,20 +169,17 @@ struct VoicePickerPanel: View {
                     }
                     ForEach(library) { v in
                         PickerRow(isSelected: selection == .library(v.id), isEnabled: canClone, action: { onSelect(.library(v.id)) }) {
-                            Image(systemName: v.origin.symbol).foregroundStyle(canClone ? Color.tungsten : Color.textTertiary).frame(width: 18)
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack(spacing: 6) {
-                                    Text(v.name).textRole(.body)
-                                    Text(v.origin.label).textRole(.caption, color: .textTertiary)
+                            Image(systemName: v.origin.symbol).foregroundStyle(Color.textTertiary).frame(width: 18)
+                            VStack(alignment: .leading, spacing: 1) {
+                                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                    Text(v.name).textRole(.body).lineLimit(1)
+                                    Text(v.origin.label).textRole(.caption).lineLimit(1)
                                 }
                                 if !v.tags.isEmpty {
-                                    HStack(spacing: 4) {
-                                        ForEach(v.tags.prefix(4), id: \.self) { Chip($0) }
-                                    }
+                                    Text(v.tags.joined(separator: " · ")).textRole(.caption, color: .textTertiary).lineLimit(1)
                                 }
                             }
                             Spacer(minLength: 4)
-                            Text(Timecode.seconds(v.duration)).textRole(.monoSmall, color: .textTertiary)
                         }
                     }
                     if deps.voices.voices.isEmpty {

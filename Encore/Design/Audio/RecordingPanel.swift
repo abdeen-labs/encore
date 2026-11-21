@@ -60,8 +60,7 @@ struct RecordingPanel: View {
                 Spacer()
                 if state.isRecording { StatusBadge("Rec", tone: .danger, pulsing: true) }
                 Text(Timecode.string(state.elapsed))
-                    .font(.mono(22, weight: .medium))
-                    .foregroundStyle(state.isRecording ? Color.textPrimary : .textTertiary)
+                    .textRole(.readout, color: state.isRecording ? .textPrimary : .textTertiary)
                     .contentTransition(.numericText())
             }
             LevelHistory(levels: state.levels, live: state.isRecording)
@@ -93,21 +92,21 @@ struct RecordingPanel: View {
 
     private var caption: String {
         if state.permission == .undetermined && !state.isRecording {
-            return "macOS will ask for microphone access the first time. Longer takes are fine — you'll trim afterwards."
+            return "macOS will ask for microphone access the first time."
         }
-        return "A quiet room and a steady distance from the mic work best. Longer takes are fine — you'll trim afterwards."
+        return "A quiet room and a steady distance from the mic work best."
     }
 
     private var denied: some View {
         HStack(alignment: .top, spacing: Theme.Space.l) {
             Image(systemName: "mic.slash")
                 .font(.system(size: 22, weight: .light))
-                .foregroundStyle(.velvet)
+                .foregroundStyle(.velvetText)
                 .frame(width: 44, height: 44)
                 .background(Circle().fill(Color.velvet.opacity(0.1)))
                 .overlay(Circle().strokeBorder(Color.velvet.opacity(0.3), lineWidth: 1))
             VStack(alignment: .leading, spacing: Theme.Space.s) {
-                Text("Microphone access is off").textRole(.heading)
+                Text("Microphone access is off").textRole(.section)
                 Text("Encore needs the microphone to record a reference clip. Turn on Encore under Privacy & Security › Microphone, then come back. You can also drop in any audio file instead.")
                     .textRole(.caption)
                     .fixedSize(horizontal: false, vertical: true)
@@ -198,9 +197,8 @@ private struct TargetTimeline: View {
                 Capsule().fill(isRecording ? (inTarget ? Color.mint : .velvet) : .textTertiary)
                     .frame(width: max(4, x(min(elapsed, maxT))), height: 4)
                     .offset(y: 3)
-                    .glow(isRecording ? (inTarget ? .mint : .velvet) : .clear, radius: 5, intensity: 0.4)
                 ForEach([target.lowerBound, target.upperBound], id: \.self) { t in
-                    Text("\(Int(t)) s").font(.mono(9)).foregroundStyle(Color.textTertiary)
+                    Text("\(Int(t)) s").textRole(.monoSmall, color: .textTertiary)
                         .offset(x: x(t) - 8, y: 10)
                 }
             }
@@ -236,7 +234,7 @@ private struct RecordButton: View {
                 }
             }
             .frame(width: 46, height: 46)
-            .glow(.velvet, radius: 12, intensity: isRecording ? 0.6 : (isHovered ? 0.35 : 0.15))
+            .glow(.velvet, radius: 12, intensity: isRecording ? 0.6 : 0)
             .contentShape(Circle())
         }
         .buttonStyle(.plain)

@@ -181,7 +181,7 @@ struct TrackWaveform: View {
     }
 }
 
-/// Thin bars under a waveform marking cues; the active one glows. Clicking a bar seeks to it.
+/// Thin bars under a waveform marking cues; the active one is full strength and taller. Clicking a bar seeks to it.
 struct CueLane: View {
     let cues: [TrackCue]
     let duration: TimeInterval
@@ -199,7 +199,6 @@ struct CueLane: View {
                     Capsule()
                         .fill(cue.tint.opacity(on ? 1 : 0.38))
                         .frame(width: w, height: on ? 4 : 3)
-                        .glow(cue.tint, radius: on ? 5 : 0, intensity: on ? 0.6 : 0)
                         .offset(x: x)
                         .onTapGesture { onTap?(cue) }
                 }

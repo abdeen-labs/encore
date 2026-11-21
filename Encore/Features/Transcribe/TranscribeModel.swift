@@ -114,7 +114,7 @@ final class TranscribeModel {
 
     var blockedReason: String? {
         guard let m = manifest else { return "Choose a transcription model." }
-        if shelf.hasScanned, !isDownloaded { return "\(m.name) isn't downloaded yet." }
+        if shelf.hasScanned, !isDownloaded { return "Download the model first." }
         guard let source else { return "Add audio or video to transcribe." }
         if let p = source.problem { return p }
         if timestamps == .word, !m.capabilities.wordTimestamps { return "\(m.name) can't time each word. Choose segments, or another model." }

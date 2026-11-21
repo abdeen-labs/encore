@@ -2,8 +2,8 @@ import AppKit
 import EncoreCore
 import SwiftUI
 
-/// Everything Encore has made, newest first: search as you type, a few quiet filters, a waveform player on every
-/// take, and a detail panel with the full script or transcript and every setting it was made with.
+/// Everything Encore has made, newest first: search as you type, kind tabs and one filter menu, a dense list with a
+/// play button on every take, and a detail panel with the full script or transcript and what it was made with.
 ///
 /// Wide windows show the list and the detail side by side; narrower ones slide the detail in over the list.
 struct HistoryScreen: View {
@@ -65,7 +65,7 @@ struct HistoryStage: View {
                 // Narrow windows: the detail slides in over the list (and the filters), like a drawer.
                 .overlay(alignment: .topTrailing) {
                     if !wide, let item = model.focused {
-                        HistoryDetail(model: model, item: item, compactPlayer: true)
+                        HistoryDetail(model: model, item: item, floating: true)
                             .frame(width: min(370, outer.size.width - 40))
                             .padding(.vertical, Theme.Space.m)
                             .padding(.trailing, Theme.Space.s)
@@ -87,160 +87,100 @@ struct HistoryStage: View {
 
 // MARK: - Filters
 
-/// Kind tabs (only the kinds the history has), then favorites, model, voice and date as quiet chips.
+/// One row: the kind tabs (only the kinds the history has), one "Filter" menu for favorites, model, voice and date,
+/// and, while anything narrows the list, what does and how many match.
 private struct HistoryFilterBar: View {
     @Bindable var model: HistoryModel
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: Theme.Space.m) {
-                kinds
-                chips
-                Spacer(minLength: 0)
-                summary
+        HStack(spacing: Theme.Space.m) {
+            ViewThatFits(in: .horizontal) {
+                SegmentedControl(selection: $model.kind, options: model.kindTabs) { $0.title }
+                    .controlSize(.small)
+                    .fixedSize()
+                // Too narrow for every tab: the same choice as a menu.
+                MenuPicker(selection: $model.kind, options: model.kindTabs) { $0.title }
+                    .fixedSize()
             }
-            VStack(alignment: .leading, spacing: Theme.Space.s) {
-                kinds
-                HStack(spacing: Theme.Space.m) { chips; Spacer(minLength: 0); summary }
-            }
+            .layoutPriority(1)
+            HistoryFilterMenu(model: model)
+            Spacer(minLength: Theme.Space.s)
+            summary
         }
     }
 
-    private var kinds: some View {
-        SegmentedControl(selection: $model.kind, options: model.kindTabs, count: { k in
-            // Counts are of the whole history, so they'd mislead while searching or filtering.
-            let n = model.isFiltered ? 0 : model.count(k)
-            return k != .all && n > 0 ? n : nil
-        }) { k in k == .all ? "All" : k.title }
-        .controlSize(.small)
+    @ViewBuilder private var summary: some View {
+        if model.isFiltered {
+            let matches = model.totalCount == 1 ? "1 match" : "\(model.totalCount) matches"
+            // Whole, or just the count, or nothing: never cut to a few letters.
+            ViewThatFits(in: .horizontal) {
+                Text((model.menuFilterNames + [matches]).joined(separator: " · "))
+                    .textRole(.caption).lineLimit(1).fixedSize()
+                Text(matches).textRole(.caption).lineLimit(1).fixedSize()
+                Color.clear.frame(width: 0, height: 0)
+            }
+        }
     }
+}
 
-    private var chips: some View {
-        HStack(spacing: 6) {
-            FilterChip(title: "Favorites", symbol: model.favoritesOnly ? "star.fill" : "star", isActive: model.favoritesOnly) {
-                model.favoritesOnly.toggle()
-            }
-            FilterMenu(title: model.modelName ?? "Model", symbol: "cpu", isActive: model.modelID != nil,
-                       onClear: { model.modelID = nil }) {
+/// The one filter button: favorites only, model, voice and date in a native menu, with a clear item. The button
+/// shows how many are on.
+private struct HistoryFilterMenu: View {
+    @Bindable var model: HistoryModel
+    @State private var isHovered = false
+
+    var body: some View {
+        let count = model.menuFilterCount
+        Menu {
+            Toggle("Favorites only", isOn: $model.favoritesOnly)
+            Menu(model.modelName.map { "Model: \($0)" } ?? "Model") {
+                Button { model.modelID = nil } label: { menuLabel("Any model", on: model.modelID == nil) }
+                if !model.facets.models.isEmpty { Divider() }
                 ForEach(model.facets.models) { m in
-                    Button { model.modelID = m.id } label: { menuLabel("\(m.name)  ·  \(m.count)", on: model.modelID == m.id) }
+                    Button { model.modelID = m.id } label: { menuLabel(m.name, on: model.modelID == m.id) }
                 }
             }
-            FilterMenu(title: model.voice?.name ?? "Voice", symbol: "person.wave.2", isActive: model.voice != nil,
-                       onClear: { model.voice = nil }) {
-                if model.facets.voices.isEmpty { Text("No voices yet") }
+            Menu(model.voice.map { "Voice: \($0.name)" } ?? "Voice") {
+                Button { model.voice = nil } label: { menuLabel("Any voice", on: model.voice == nil) }
+                if !model.facets.voices.isEmpty { Divider() }
                 ForEach(model.facets.voices) { v in
-                    Button { model.voice = v } label: { menuLabel("\(v.name)  ·  \(v.count)", on: model.voice == v) }
+                    Button { model.voice = v } label: { menuLabel(v.name, on: model.voice == v) }
                 }
             }
-            FilterMenu(title: model.date == .any ? "Date" : model.date.title, symbol: "calendar", isActive: model.date != .any,
-                       onClear: { model.date = .any }) {
-                ForEach(HistoryModel.DateFilter.allCases.filter { $0 != .any }, id: \.self) { d in
+            Menu(model.date == .any ? "Date" : "Date: \(model.date.title)") {
+                ForEach(HistoryModel.DateFilter.allCases, id: \.self) { d in
                     Button { model.date = d } label: { menuLabel(d.title, on: model.date == d) }
                 }
             }
+            Divider()
+            Button("Clear filters") { withStageAnimation(Theme.Motion.quick) { model.clearMenuFilters() } }
+                .disabled(count == 0)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(isHovered ? Color.textPrimary : .textSecondary)
+                Text("Filter").textRole(.label, color: count > 0 ? .textPrimary : .textSecondary)
+                if count > 0 { CountBadge(count).controlSize(.small) }
+            }
+            .padding(.horizontal, 10)
+            .frame(height: Theme.ControlHeight.small)
+            .background {
+                RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
+                    .fill(Color.surfaceRaised.opacity(isHovered ? 1 : 0.6))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
+                        .strokeBorder(isHovered ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
+            }
+            .contentShape(Rectangle())
         }
-        .fixedSize()
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+        .onHover { isHovered = $0 }
+        .help(count == 0 ? "Favorites, model, voice and date" : model.menuFilterNames.joined(separator: ", "))
+        .accessibilityLabel(count == 0 ? "Filter" : "Filter, \(count) on")
     }
 
     @ViewBuilder private func menuLabel(_ text: String, on: Bool) -> some View {
         if on { Label(text, systemImage: "checkmark") } else { Text(text) }
-    }
-
-    @ViewBuilder private var summary: some View {
-        HStack(spacing: Theme.Space.s) {
-            if model.isFiltered {
-                Text(model.totalCount == 1 ? "1 match" : "\(model.totalCount) matches")
-                    .textRole(.monoSmall, color: model.totalCount == 0 ? .footlight : .textSecondary)
-                if model.store.query.hasFilters {
-                    Button("Clear") { withStageAnimation { model.clearFilters() } }
-                        .buttonStyle(.ghost).controlSize(.small)
-                }
-            } else {
-                Text(model.totalCount == 1 ? "1 item" : "\(model.totalCount) items").textRole(.monoSmall, color: .textTertiary)
-            }
-        }
-        .fixedSize()
-    }
-}
-
-/// A toggle in the filter row: a capsule that lights tungsten when on.
-private struct FilterChip: View {
-    let title: String
-    let symbol: String
-    let isActive: Bool
-    let action: () -> Void
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: { withStageAnimation(Theme.Motion.quick, action) }) {
-            FilterCapsule(title: title, symbol: symbol, isActive: isActive, isHovered: isHovered, trailing: nil)
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .accessibilityAddTraits(isActive ? .isSelected : [])
-    }
-}
-
-/// A filter with choices: a native menu behind a capsule; when set, the capsule shows the choice and a clear button.
-private struct FilterMenu<Items: View>: View {
-    let title: String
-    let symbol: String
-    let isActive: Bool
-    let onClear: () -> Void
-    @ViewBuilder var items: Items
-    @State private var isHovered = false
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Menu {
-                items
-            } label: {
-                FilterCapsule(title: title, symbol: symbol, isActive: isActive, isHovered: isHovered,
-                              trailing: isActive ? nil : "chevron.down")
-            }
-            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
-            if isActive {
-                Button("Clear \(title)", systemImage: "xmark") { withStageAnimation(Theme.Motion.quick, onClear) }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.plain)
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(Color.tungsten)
-                    .frame(width: 20, height: 24)
-                    .contentShape(Rectangle())
-                    .padding(.leading, -24)
-                    .help("Clear")
-            }
-        }
-        .onHover { isHovered = $0 }
-    }
-}
-
-private struct FilterCapsule: View {
-    let title: String
-    let symbol: String
-    let isActive: Bool
-    let isHovered: Bool
-    let trailing: String?
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: symbol).font(.system(size: 9.5, weight: .semibold))
-            Text(title).font(.ui(11.5, weight: isActive ? .semibold : .medium)).lineLimit(1)
-            if let trailing {
-                Image(systemName: trailing).font(.system(size: 7.5, weight: .bold)).foregroundStyle(Color.textTertiary)
-            } else if isActive, symbol != "star.fill" {
-                Color.clear.frame(width: 12, height: 1)  // room for the clear button
-            }
-        }
-        .foregroundStyle(isActive ? Color.tungsten : (isHovered ? Color.textPrimary : Color.textSecondary))
-        .padding(.horizontal, 10)
-        .frame(height: 24)
-        .background {
-            Capsule().fill(isActive ? Color.tungsten.opacity(0.12) : Color.surfaceRaised.opacity(isHovered ? 1 : 0.6))
-                .overlay(Capsule().strokeBorder(isActive ? Color.tungsten.opacity(0.45) : (isHovered ? Color.hairlineStrong : Color.hairline), lineWidth: 1))
-        }
-        .contentShape(Capsule())
     }
 }
 
@@ -258,22 +198,22 @@ private struct HistoryList: View {
                 noMatches
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Self.days(items), id: \.title) { day in
                             Section {
                                 ForEach(day.items) { item in
-                                    HistoryRow(model: model, item: item, inlinePlayer: width >= 520, playerWidth: min(320, max(220, width * 0.44)))
+                                    HistoryRow(model: model, item: item)
                                         .onAppear { if item.id == items.last?.id { model.loadMore() } }
                                 }
                             } header: {
-                                DayHeader(title: day.title, count: day.items.count)
+                                DayHeader(title: day.title)
                             }
                         }
                         if model.hasMore {
                             HStack { Spacer(); ActivityIndicator(size: 12); Spacer() }.padding(.vertical, Theme.Space.m)
                         }
                     }
-                    .padding(.bottom, model.selection.isEmpty ? Theme.Space.l : 72)
+                    .padding(.bottom, model.isSelecting ? 72 : Theme.Space.l)
                 }
                 .scrollIndicators(.automatic)
             }
@@ -293,16 +233,20 @@ private struct HistoryList: View {
     }
 
     private var noMatches: some View {
-        VStack {
+        let search = model.search.trimmingCharacters(in: .whitespaces)
+        return VStack {
             EmptyState(symbol: "magnifyingglass", title: "Nothing matches",
-                       message: model.search.trimmingCharacters(in: .whitespaces).isEmpty
+                       message: search.isEmpty
                            ? "No item fits these filters."
-                           : "No title, script, transcript, voice or model has “\(model.search.trimmingCharacters(in: .whitespaces))”\(model.store.query.hasFilters ? " with these filters" : "").") {
+                           : "No title, script, transcript, voice or model has “\(search)”\(model.store.query.hasFilters ? " with these filters" : "").",
+                       style: .plain) {
                 if !model.search.isEmpty { Button("Clear search") { model.search = "" }.buttonStyle(.secondary) }
                 if model.store.query.hasFilters { Button("Clear filters") { withStageAnimation { model.clearFilters() } }.buttonStyle(.ghost) }
             }
+            .padding(.top, Theme.Space.xxl)
             Spacer()
         }
+        .frame(maxWidth: .infinity)
     }
 
     struct Day { var title: String; var items: [HistoryItem] }
@@ -326,69 +270,79 @@ private struct HistoryList: View {
     }
 }
 
+/// "Today", "Yesterday", a weekday or a date, on a hairline.
 private struct DayHeader: View {
     let title: String
-    let count: Int
 
     var body: some View {
-        HStack(spacing: 6) {
-            Text(title).textRole(.eyebrow, color: .textSecondary)
-            Text("\(count)").textRole(.monoSmall, color: .textTertiary)
-            Rectangle().fill(Color.hairline).frame(height: 1)
+        HStack(spacing: Theme.Space.s) {
+            Text(title).textRole(.eyebrow)
+                .fixedSize()
+            Hairline()
         }
-        .padding(.top, Theme.Space.m)
+        .padding(.top, Theme.Space.l)
         .padding(.bottom, Theme.Space.xs)
-        .padding(.horizontal, Theme.Space.xs)
+        .padding(.horizontal, Theme.Space.s)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
-/// One item: kind mark, title and details (search matches lit), and for audio a compact waveform player.
+/// One item on one line's worth of height: a neutral kind icon, the title and a caption (search matches lit),
+/// then for audio a play button with the duration, and the item's menu.
 private struct HistoryRow: View {
     @Bindable var model: HistoryModel
     let item: HistoryItem
-    let inlinePlayer: Bool
-    let playerWidth: CGFloat
     @State private var isHovered = false
-    @Environment(ToastCenter.self) private var toasts
+
+    /// Fits a play button and "12:34 / 31:14", so the menus line up down the list.
+    private static let playerWidth: CGFloat = 118
 
     private var isFocused: Bool { model.focusedID == item.id }
     private var isSelected: Bool { model.selection.contains(item.id) }
 
     var body: some View {
         let terms = model.searchTerms
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: Theme.Space.m) {
-                if model.isSelecting { checkmark }
-                KindMark(kind: item.kind)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 5) {
-                        Text(HistoryHighlight.attributed(item.title, terms: terms))
-                            .font(.ui(13, weight: .semibold)).lineLimit(1)
-                        if item.favorite {
-                            Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(Color.tungsten)
-                                .accessibilityLabel("Favorite")
-                        }
+        let style = HistoryKindStyle(item.kind)
+        HStack(alignment: .center, spacing: Theme.Space.m) {
+            if model.isSelecting { checkmark }
+            KindMark(kind: item.kind)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 5) {
+                    Text(HistoryHighlight.attributed(item.title, terms: terms))
+                        .textRole(.headline)
+                        .lineLimit(1)
+                    if item.favorite {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(Color.textSecondary)
+                            .accessibilityLabel("Favorite")
                     }
-                    Text(HistoryHighlight.attributed(meta, terms: terms, base: .textTertiary))
-                        .font(.ui(11)).lineLimit(1)
-                    snippet(terms)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                if inlinePlayer, let g = item.generation { player(g).frame(width: playerWidth) }
+                Text(HistoryHighlight.attributed(meta, terms: terms, base: .textTertiary))
+                    .textRole(.caption)
+                    .lineLimit(1)
+                excerpt(terms)
             }
-            if !inlinePlayer, let g = item.generation {
-                player(g).padding(.leading, (model.isSelecting ? 26 : 0) + 30 + Theme.Space.m)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Group {
+                if let g = item.generation {
+                    WaveformPlayer(url: g.audioURL, title: item.title, style: .minimal)
+                } else {
+                    Color.clear.frame(height: 1)
+                }
             }
+            .frame(width: Self.playerWidth, alignment: .leading)
+            HistoryRowMenu(model: model, item: item)
         }
         .padding(.horizontal, Theme.Space.s)
-        .padding(.vertical, 8)
+        .padding(.vertical, 7)
+        .frame(minHeight: 48)
         .background {
             let shape = RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
             shape.fill(isFocused || isSelected ? Color.tungsten.opacity(0.07) : Color.textPrimary.opacity(isHovered ? 0.03 : 0))
                 .overlay(alignment: .leading) {
                     if isFocused {
                         Capsule().fill(Color.tungsten).frame(width: 2.5).padding(.vertical, 8)
-                            .glow(.tungsten, radius: 4, intensity: 0.5)
                     }
                 }
                 .overlay(shape.strokeBorder(isSelected ? Color.tungsten.opacity(0.35) : .clear, lineWidth: 1))
@@ -403,7 +357,7 @@ private struct HistoryRow: View {
         .onHover { isHovered = $0 }
         .contextMenu { HistoryItemMenu(model: model, item: item) }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(item.title), \(meta)")
+        .accessibilityLabel("\(style.name): \(item.title), \(meta)")
         .accessibilityAddTraits(isFocused || isSelected ? .isSelected : [])
     }
 
@@ -414,82 +368,101 @@ private struct HistoryRow: View {
             .frame(width: 14)
     }
 
+    /// Voice · model · time for audio; model · length · time for transcripts.
     private var meta: String {
         var parts: [String] = []
         switch item.record {
         case .generation(let g):
             if let v = g.voiceName, !v.isEmpty { parts.append(v) }
             parts.append(g.modelName)
-            if g.kind == .voiceChange { parts.append("from \(g.text)") }
         case .transcription(let t):
             parts.append(t.modelName)
-            if let d = t.transcript.duration { parts.append("\(Timecode.string(d, tenths: false)) of audio") }
-            if let l = t.transcript.language { parts.append(Locale.current.localizedString(forLanguageCode: l) ?? l) }
+            if let d = t.transcript.duration { parts.append(Timecode.string(d, tenths: false)) }
         }
         parts.append(item.createdAt.formatted(date: .omitted, time: .shortened))
         return parts.joined(separator: " · ")
     }
 
-    /// Transcripts always show their opening; scripts show the part that matched the search.
-    @ViewBuilder private func snippet(_ terms: [String]) -> some View {
+    /// One line: a transcript's opening (or the part that matched), or the part of a script that matched the search.
+    @ViewBuilder private func excerpt(_ terms: [String]) -> some View {
         switch item.record {
         case .transcription(let t):
             let s = HistoryHighlight.snippet(t.transcript.text.isEmpty ? t.transcript.segments.map(\.text).joined(separator: " ") : t.transcript.text, terms: terms)
             Text(HistoryHighlight.attributed(s.text, terms: terms, base: .textSecondary))
-                .font(.ui(11.5)).lineLimit(2).padding(.top, 1)
+                .textRole(.caption)
+                .lineLimit(1)
         case .generation(let g):
             if !terms.isEmpty, g.kind != .voiceChange {
                 let s = HistoryHighlight.snippet(g.text, terms: terms)
                 if s.matched, s.text.trimmingCharacters(in: .whitespaces) != item.title {
                     Text(HistoryHighlight.attributed(s.text, terms: terms, base: .textSecondary))
-                        .font(.ui(11.5)).lineLimit(2).padding(.top, 1)
+                        .textRole(.caption)
+                        .lineLimit(1)
                 }
             }
         }
     }
+}
 
-    private func player(_ g: GenerationRecord) -> some View {
-        WaveformPlayer(url: g.audioURL, title: item.title, subtitle: [g.voiceName, g.modelName].compactMap { $0 }.joined(separator: " · "),
-                       style: .compact)
+/// The "…" at the end of a row: the same actions as its context menu.
+private struct HistoryRowMenu: View {
+    let model: HistoryModel
+    let item: HistoryItem
+    @State private var isHovered = false
+
+    var body: some View {
+        Menu {
+            HistoryItemMenu(model: model, item: item)
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(isHovered ? Color.textPrimary : .textSecondary)
+                .frame(width: Theme.ControlHeight.small, height: Theme.ControlHeight.small)
+                .background {
+                    RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
+                        .fill(Color.textPrimary.opacity(isHovered ? 0.06 : 0))
+                }
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+        .onHover { isHovered = $0 }
+        .help("More")
+        .accessibilityLabel("More actions")
     }
 }
 
-/// The kind of an item as a small lit tile.
+/// The kind of an item as a small neutral icon.
 struct KindMark: View {
     let kind: HistoryKind
-    var size: CGFloat = 30
+    var size: CGFloat = 18
 
     var body: some View {
         let style = HistoryKindStyle(kind)
         Image(systemName: style.symbol)
-            .font(.system(size: size * 0.4, weight: .medium))
-            .foregroundStyle(style.color)
+            .font(.system(size: size * 0.66, weight: .regular))
+            .foregroundStyle(Color.textSecondary)
             .frame(width: size, height: size)
-            .background {
-                RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous).fill(style.color.opacity(0.1))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous).strokeBorder(style.color.opacity(0.22), lineWidth: 1))
-            }
             .help(style.name)
             .accessibilityLabel(style.name)
     }
 }
 
+/// How a kind of item is named and drawn. Kinds are told apart by icon and word, never by color.
 struct HistoryKindStyle {
     var name: String
     var symbol: String
-    var color: Color
 
     init(_ kind: HistoryKind) {
         switch kind {
-        case .speech: self.init(name: "Speech", symbol: "text.bubble", color: .tungsten)
-        case .conversation: self.init(name: "Conversation", symbol: "bubble.left.and.bubble.right", color: .mint)
-        case .voiceChange: self.init(name: "Voice change", symbol: "arrow.triangle.swap", color: .gel)
-        case .voiceDesign: self.init(name: "Voice design", symbol: "wand.and.stars", color: .gel)
-        case .transcription: self.init(name: "Transcript", symbol: "captions.bubble", color: .textSecondary)
+        case .speech: self.init(name: "Speech", symbol: "text.bubble")
+        case .conversation: self.init(name: "Conversation", symbol: "bubble.left.and.bubble.right")
+        case .voiceChange: self.init(name: "Voice change", symbol: "arrow.triangle.swap")
+        case .voiceDesign: self.init(name: "Voice design", symbol: "wand.and.stars")
+        case .transcription: self.init(name: "Transcript", symbol: "captions.bubble")
         }
     }
 
-    private init(name: String, symbol: String, color: Color) { self.name = name; self.symbol = symbol; self.color = color }
+    private init(name: String, symbol: String) { self.name = name; self.symbol = symbol }
 }
 
 /// The actions on one item, shared by the row's context menu.
@@ -522,7 +495,7 @@ private struct HistoryItemMenu: View {
 
 // MARK: - Selection
 
-/// Shown while selecting: how many, select all, export and delete.
+/// Shown while selecting: how many, select all, export and delete. Leaving selection is the header's "Done".
 private struct HistorySelectionBar: View {
     @Bindable var model: HistoryModel
     @Environment(ToastCenter.self) private var toasts
@@ -531,7 +504,7 @@ private struct HistorySelectionBar: View {
         let n = model.selection.count
         HStack(spacing: Theme.Space.s) {
             Text(n == 0 ? "Click items to select them" : (n == 1 ? "1 selected" : "\(n) selected"))
-                .font(.ui(12, weight: .semibold)).foregroundStyle(n == 0 ? Color.textSecondary : .textPrimary)
+                .textRole(.headline, color: n == 0 ? .textSecondary : .textPrimary)
                 .monospacedDigit()
                 .padding(.leading, Theme.Space.xs)
             Spacer(minLength: Theme.Space.s)
@@ -543,8 +516,6 @@ private struct HistorySelectionBar: View {
             Button("Delete…", systemImage: "trash") { model.requestDelete(Array(model.selection)) }
                 .buttonStyle(.destructive).controlSize(.small)
                 .disabled(n == 0)
-            Button("Done") { withStageAnimation { model.endSelecting() } }
-                .buttonStyle(.secondary).controlSize(.small)
         }
         .padding(.horizontal, Theme.Space.s)
         .padding(.vertical, 6)
@@ -645,12 +616,12 @@ struct HistoryDeleteSheet: View {
                 VStack(alignment: .leading, spacing: 5) {
                     ForEach(items.prefix(4)) { item in
                         HStack(spacing: Theme.Space.s) {
-                            KindMark(kind: item.kind, size: 20)
+                            KindMark(kind: item.kind)
                             Text(item.title).textRole(.label).lineLimit(1)
                             Spacer(minLength: 0)
                         }
                     }
-                    if items.count > 4 { Text("and \(items.count - 4) more").textRole(.caption, color: .textTertiary).padding(.leading, 28) }
+                    if items.count > 4 { Text("and \(items.count - 4) more").textRole(.caption, color: .textTertiary).padding(.leading, 26) }
                 }
                 .padding(Theme.Space.m)
                 .surface(.sunken, radius: Theme.Radius.m)
@@ -705,7 +676,7 @@ private struct HistoryEmptyStage: View {
     var body: some View {
         VStack {
             EmptyState(symbol: "clock.arrow.circlepath", title: "Nothing in the archive yet",
-                       message: "Every take, conversation, voice change, kept voice design and transcript lands here, newest first. It stays on this Mac, searchable, with the settings each was made with.") {
+                       message: "Every take, conversation, voice change, kept design and transcript lands here, newest first, and stays on this Mac.") {
                 Button("Perform in the Studio", systemImage: "text.bubble") { router.go(.studio) }
                     .buttonStyle(.primary)
                 Button("Transcribe a file") { router.go(.transcribe) }

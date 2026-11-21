@@ -2,8 +2,8 @@ import AppKit
 import EncoreCore
 import SwiftUI
 
-/// A model's details: what it does, its variants and how they fit, its license (summary and the real
-/// text), gates, and download / delete / reveal.
+/// A model's details, and the home of its engineering detail: what it does, its variants and how they fit, its
+/// license (summary and the real text), how it runs, gates, and download / delete / reveal.
 struct ModelDetailView: View {
     let manifest: ModelManifest
     let library: ModelsLibrary
@@ -18,6 +18,7 @@ struct ModelDetailView: View {
 
     private var variant: ModelVariant { library.variant(of: manifest) }
     private var state: ModelDownloadState { downloads.state(manifest, variant) }
+    private var isGatedFailure: Bool { state.error?.gatedRepo != nil }
 
     var body: some View {
         SheetContainer(title: manifest.name, subtitle: subtitle, width: 680) {
@@ -25,9 +26,9 @@ struct ModelDetailView: View {
                 VStack(alignment: .leading, spacing: Theme.Space.xl) {
                     overview
                     notices
-                    variants
+                    if manifest.variants.count > 1 { variants }
                     license
-                    capabilities
+                    details
                 }
                 .padding(.vertical, Theme.Space.xs)
                 .padding(.trailing, Theme.Space.s)
@@ -57,10 +58,13 @@ struct ModelDetailView: View {
         }
     }
 
+    /// Banners only for what needs action: a gate, a missing helper, a tight or impossible fit, a failed download.
     @ViewBuilder private var notices: some View {
         let gated = library.gatedRepos(manifest, variant).filter { library.gates[$0] != .open }
         if let repo = gated.first {
-            GateNotice(repo: repo, state: library.gates[repo] ?? .unknown, info: library.repoInfo[repo]) { onGetAccess(repo) }
+            // When the download already stopped at the gate, "Get access" is the sheet's primary action instead.
+            GateNotice(repo: repo, state: library.gates[repo] ?? .unknown, info: library.repoInfo[repo],
+                       showsAction: !isGatedFailure) { onGetAccess(repo) }
         }
         if case .pythonUnavailable(let message)? = library.plans[manifest.id] {
             Banner(.warning, title: "Needs the Python helper", message: message)
@@ -75,15 +79,14 @@ struct ModelDetailView: View {
         }
     }
 
-    @ViewBuilder private var variants: some View {
+    private var variants: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
-            SectionHeader(manifest.variants.count > 1 ? "Variants" : "Download", subtitle: manifest.variants.count > 1
-                          ? "Smaller variants load faster and use less memory; larger ones can sound better." : nil)
+            SectionHeader("Variants", subtitle: "Smaller variants load faster and use less memory; larger ones can sound better.")
             VStack(spacing: Theme.Space.xs) {
                 ForEach(manifest.variants) { v in
                     VariantRow(manifest: manifest, variant: v, isSelected: v.id == variant.id,
                                fit: library.fits[ModelVariantKey(manifest, v)],
-                               state: downloads.state(manifest, v), selectable: manifest.variants.count > 1) {
+                               state: downloads.state(manifest, v)) {
                         library.chosenVariant[manifest.id] = v.id
                         confirmingDelete = false
                     }
@@ -92,33 +95,83 @@ struct ModelDetailView: View {
         }
     }
 
-    private var capabilities: some View {
+    private var license: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
-            SectionHeader("What it does")
-            ModelChips(manifest: manifest, plan: nil, showsLicense: false)
-            VStack(alignment: .leading, spacing: Theme.Space.s) {
-                if let plan = library.plans[manifest.id] {
-                    FactRow("Runs", runs(plan))
-                }
-                if !manifest.languages.isEmpty { FactRow("Languages", languages) }
-                if !manifest.presetVoices.isEmpty { FactRow("Preset voices", voices) }
-                if let ref = manifest.reference { FactRow("Reference clip", reference(ref)) }
-                if !manifest.expressiveTags.isEmpty {
-                    FactRow("Tags", manifest.expressiveTags.prefix(8).map(\.tag).joined(separator: " ")
-                            + (manifest.expressiveTags.count > 8 ? " …" : ""), mono: true)
-                }
-                FactRow("Sample rate", String(format: manifest.sampleRate % 1000 == 0 ? "%.0f kHz" : "%.1f kHz",
-                                              Double(manifest.sampleRate) / 1000), mono: true)
+            SectionHeader("License") {
+                if manifest.isNonCommercial { Chip("Non-commercial", tone: .warning) }
             }
-            .padding(.top, Theme.Space.xs)
+            if let summary = manifest.license.summary {
+                Text(summary).textRole(.body).fixedSize(horizontal: false, vertical: true)
+            }
+            VStack(spacing: 0) {
+                fact("License", manifest.license.name)
+                fact("Commercial use", commercialUse)
+            }
+            LicenseTextBox(state: library.licenses[manifest.id], repo: ModelsLibrary.licenseRepo(manifest, variant),
+                           licenseName: manifest.license.name, fallbackURL: manifest.license.url.flatMap(URL.init(string:))) {
+                library.licenses[manifest.id] = nil
+                Task { await library.loadDetails(manifest, variant, hub: downloads.service) }
+            }
         }
+    }
+
+    private var commercialUse: String {
+        switch manifest.license.commercialUse {
+        case true?: "Allowed"
+        case false?: "Not allowed"
+        case nil: "Check the license"
+        }
+    }
+
+    /// What the list leaves out: capabilities in full, reach, how it runs and what it costs.
+    private var details: some View {
+        let capabilities = ModelFacts.capabilities(manifest)
+        return VStack(alignment: .leading, spacing: Theme.Space.s) {
+            SectionHeader("Details")
+            VStack(spacing: 0) {
+                if !capabilities.isEmpty { fact("Capabilities", capabilities.joined(separator: ", ")) }
+                if !manifest.languages.isEmpty { fact("Languages", languages) }
+                if !manifest.presetVoices.isEmpty { fact("Built-in voices", voices) }
+                if let ref = manifest.reference { fact("Reference clip", reference(ref)) }
+                if !manifest.expressiveTags.isEmpty {
+                    fact("Expressive tags", manifest.expressiveTags.prefix(8).map(\.tag).joined(separator: " ")
+                         + (manifest.expressiveTags.count > 8 ? " …" : ""))
+                }
+                if let plan = library.plans[manifest.id] { fact("Runs", runs(plan)) }
+                if manifest.variants.count == 1 {
+                    KeyValueRow("Variant") {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(variant.friendlyName(in: manifest)).textRole(.body)
+                            if variant.friendlyName(in: manifest) != variant.label {
+                                Text(variant.label).textRole(.monoSmall, color: .textTertiary)
+                            }
+                        }
+                    }
+                    figure("Download size", Bytes.file(variant.downloadBytes))
+                }
+                figure("Memory while generating", Bytes.memory(variant.memoryBytes))
+                figure("Sample rate", String(format: manifest.sampleRate % 1000 == 0 ? "%.0f kHz" : "%.1f kHz",
+                                             Double(manifest.sampleRate) / 1000))
+                figure("Repository", variant.allRepos.joined(separator: "\n"))
+            }
+        }
+    }
+
+    /// A fact in words.
+    private func fact(_ key: String, _ value: String) -> some View {
+        KeyValueRow(key) { Text(value).textRole(.body).textSelection(.enabled) }
+    }
+
+    /// A figure or an identifier.
+    private func figure(_ key: String, _ value: String) -> some View {
+        KeyValueRow(key) { Text(value).textRole(.mono).textSelection(.enabled) }
     }
 
     private func runs(_ plan: ModelsLibrary.RuntimePlan) -> String {
         switch plan {
-        case .native: "Natively on Apple silicon (MLX Swift)"
-        case .python: "In Encore's Python helper (mlx-audio)"
-        case .pythonUnavailable: "In Encore's Python helper, which isn't set up yet"
+        case .native: "On this Mac's GPU"
+        case .python: "In the bundled Python helper"
+        case .pythonUnavailable: "In the Python helper, which isn't set up yet"
         }
     }
 
@@ -145,31 +198,9 @@ struct ModelDetailView: View {
 
     static func seconds(_ s: Double) -> String { s == s.rounded() ? String(Int(s)) : String(format: "%.1f", s) }
 
-    private var license: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s) {
-            SectionHeader("License") {
-                LicenseChip(license: manifest.license)
-            }
-            if let summary = manifest.license.summary {
-                Text(summary).textRole(.body).fixedSize(horizontal: false, vertical: true)
-            }
-            KeyValueRow("Commercial use") {
-                switch manifest.license.commercialUse {
-                case true?: Text("Allowed").textRole(.label, color: .mint)
-                case false?: Text("Not allowed").textRole(.label, color: .velvet)
-                case nil: Text("Check the license").textRole(.label, color: .textSecondary)
-                }
-            }
-            LicenseTextBox(state: library.licenses[manifest.id], repo: ModelsLibrary.licenseRepo(manifest, variant),
-                           licenseName: manifest.license.name, fallbackURL: manifest.license.url.flatMap(URL.init(string:))) {
-                library.licenses[manifest.id] = nil
-                Task { await library.loadDetails(manifest, variant, hub: downloads.service) }
-            }
-        }
-    }
-
     // MARK: Actions
 
+    /// The sheet's one primary action is the next download step: download, resume, retry or get access.
     @ViewBuilder private var actions: some View {
         if confirmingDelete {
             Text(deleteQuestion).textRole(.label, color: .textSecondary)
@@ -188,12 +219,26 @@ struct ModelDetailView: View {
                 Button("Delete…", systemImage: "trash") { confirmingDelete = true }
                     .buttonStyle(.ghost)
             }
-            if case .notDownloaded = state {
-                Button("Download \(Bytes.file(variant.downloadBytes))", systemImage: "arrow.down") {
-                    downloads.download(manifest, variant)
+            switch state {
+            case .notDownloaded:
+                Button("Download", systemImage: "arrow.down") { downloads.download(manifest, variant) }
+                    .buttonStyle(.primary)
+            case .partial(let bytes):
+                Text("\(Bytes.file(bytes)) of \(Bytes.file(variant.downloadBytes))").textRole(.monoSmall, color: .textTertiary)
+                Button("Resume", systemImage: "arrow.clockwise") { downloads.download(manifest, variant) }
+                    .buttonStyle(.primary)
+            case .failed(let error, _):
+                if let repo = error.gatedRepo {
+                    Button("Get access", systemImage: "lock.open") { onGetAccess(repo) }
+                        .buttonStyle(.primary)
+                } else {
+                    Button("Retry", systemImage: "arrow.clockwise") { downloads.retry(manifest, variant) }
+                        .buttonStyle(.primary)
                 }
-                .buttonStyle(.primary)
-            } else {
+            case .downloaded:
+                // With several variants, each variant row already says which ones are on this Mac.
+                if manifest.variants.count == 1 { StatusBadge("On this Mac", tone: .success) }
+            case .unknown, .downloading:
                 DownloadControl(manifest: manifest, variant: variant, onGetAccess: onGetAccess)
             }
         }
@@ -236,76 +281,65 @@ struct ModelDetailView: View {
     }
 }
 
-/// A fact about the model: key on the left, prose on the right.
-private struct FactRow: View {
-    let key: String
-    let value: String
-    var mono = false
-    init(_ key: String, _ value: String, mono: Bool = false) { self.key = key; self.value = value; self.mono = mono }
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Theme.Space.m) {
-            Text(key).textRole(.label, color: .textTertiary)
-                .frame(width: 112, alignment: .leading)
-            Text(value).textRole(mono ? .mono : .body, color: .textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-}
-
-/// One selectable variant: label, sizes, fit and whether it's on this Mac.
+/// One selectable variant: its friendly name and raw label, whether it's the one for this Mac, its size, its fit
+/// (only when tight or won't fit), and whether it's on this Mac.
 private struct VariantRow: View {
     let manifest: ModelManifest
     let variant: ModelVariant
     let isSelected: Bool
     let fit: ModelsLibrary.Fit?
     let state: ModelDownloadState
-    let selectable: Bool
     let select: () -> Void
     @State private var isHovered = false
 
     var body: some View {
+        let friendly = variant.friendlyName(in: manifest)
         HStack(spacing: Theme.Space.m) {
-            if selectable {
-                Circle()
-                    .strokeBorder(isSelected ? Color.tungsten : Color.hairlineStrong, lineWidth: 1.5)
-                    .background(Circle().fill(isSelected ? Color.tungsten : .clear).padding(4))
-                    .frame(width: 14, height: 14)
-            }
-            HStack(spacing: 6) {
-                Text(variant.label).font(.ui(13, weight: .semibold)).foregroundStyle(.textPrimary)
-                if manifest.isRecommended(variant) { Chip("Recommended", tone: .accent).fixedSize().help(ModelManifest.recommendationHelp) }
+            Circle()
+                .strokeBorder(isSelected ? Color.tungsten : Color.hairlineStrong, lineWidth: 1.5)
+                .background(Circle().fill(isSelected ? Color.tungsten : .clear).padding(4))
+                .frame(width: 14, height: 14)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(friendly).textRole(.headline).lineLimit(1)
+                    if friendly != variant.label {
+                        Text(variant.label).textRole(.monoSmall, color: .textTertiary).lineLimit(1)
+                    }
+                }
+                if manifest.isRecommended(variant) {
+                    Text("Recommended for this Mac").textRole(.caption)
+                        .help(ModelManifest.recommendationHelp)
+                }
             }
             Spacer(minLength: Theme.Space.s)
+            FitNote(fit: fit)
             Text(Bytes.file(variant.downloadBytes)).textRole(.mono, color: .textSecondary)
                 .frame(width: 74, alignment: .trailing)
-            FitLabel(fit: fit, memoryBytes: variant.memoryBytes)
-                .frame(width: 170, alignment: .trailing)
+                .help("Download size")
             Group {
                 switch state {
-                case .downloaded: StatusBadge("On Mac", tone: .success)
-                case .downloading(let p): Text("\(Int(p.fractionCompleted * 100))%").textRole(.monoSmall, color: .tungsten)
-                case .partial: StatusBadge("Partial", tone: .warning)
+                case .downloaded: StatusBadge("On this Mac", tone: .success)
+                case .downloading(let p): Text("\(Int(p.fractionCompleted * 100))%").textRole(.monoSmall, color: .textSecondary)
+                case .partial: Text("Partly downloaded").textRole(.caption, color: .textTertiary).lineLimit(1)
                 default: Color.clear.frame(height: 1) // keeps the column, so sizes line up across rows
                 }
             }
-            .frame(width: 70, alignment: .trailing)
+            .frame(width: 110, alignment: .trailing)
         }
         .padding(.horizontal, Theme.Space.m)
-        .frame(height: 40)
+        .padding(.vertical, 6)
+        .frame(minHeight: 40)
         .background {
-            RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
-                .fill(isSelected && selectable ? Color.tungsten.opacity(0.07) : (isHovered && selectable ? Color.textPrimary.opacity(0.03) : Color.surfaceSunken.opacity(0.6)))
-                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
-                    .strokeBorder(isSelected && selectable ? Color.tungsten.opacity(0.35) : Color.hairline))
+            let shape = RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
+            shape.fill(isSelected ? Color.textPrimary.opacity(0.05) : (isHovered ? Color.textPrimary.opacity(0.03) : Color.surfaceSunken.opacity(0.6)))
+                .overlay(shape.strokeBorder(isSelected ? Color.hairlineStrong : Color.hairline))
         }
         .contentShape(Rectangle())
-        .onTapGesture { if selectable { select() } }
+        .onTapGesture(perform: select)
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
+        .accessibilityAction(named: "Choose", select)
     }
 }
 
@@ -338,10 +372,7 @@ struct LicenseTextBox: View {
                 case .loaded(let license)?:
                     if let text = license.text {
                         ScrollView {
-                            Text(text)
-                                .font(.mono(11))
-                                .foregroundStyle(.textSecondary)
-                                .lineSpacing(2)
+                            Text(text).textRole(.caption)
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(Theme.Space.m)
@@ -389,12 +420,14 @@ struct GateNotice: View {
     let repo: String
     let state: ModelsLibrary.GateState
     let info: HubRepoInfo?
+    /// False when the sheet's action row already offers "Get access".
+    var showsAction = true
     var getAccess: () -> Void
 
     var body: some View {
         switch state {
         case .pending(let message):
-            Banner(.neutral, title: "Access requested — waiting for approval",
+            Banner(.neutral, title: "Access requested, waiting for approval",
                    message: "The authors of \(repo) review each request themselves. \(message)") {
                 Button("Check again", action: getAccess).buttonStyle(.secondary).controlSize(.small)
             }
@@ -402,26 +435,29 @@ struct GateNotice: View {
             Banner(.warning, title: "Accept the terms on Hugging Face first",
                    message: "\(repo) is gated: its authors ask you to accept their conditions"
                        + ((info?.gate ?? .auto) == .manual ? " and approve each request." : " before downloading. Access is granted as soon as you accept.")) {
-                Button("Get access", systemImage: "lock.open", action: getAccess).buttonStyle(.secondary).controlSize(.small)
+                if showsAction {
+                    Button("Get access", systemImage: "lock.open", action: getAccess).buttonStyle(.secondary).controlSize(.small)
+                }
             }
         }
     }
 }
 
-/// An underlined-on-hover text link with an outward arrow.
+/// A text link with an outward arrow, underlined on hover.
 struct LinkButton: View {
     let title: String
     let url: URL
     @State private var isHovered = false
 
     var body: some View {
+        let color: Color = isHovered ? .textPrimary : .textSecondary
         Button { NSWorkspace.shared.open(url) } label: {
             HStack(spacing: 3) {
-                Text(title).underline(isHovered)
-                Image(systemName: "arrow.up.right").font(.system(size: 8.5, weight: .bold))
+                Text(title).underline(isHovered).textRole(.label, color: color)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 8.5, weight: .bold))
+                    .foregroundStyle(color)
             }
-            .font(.ui(12, weight: .medium))
-            .foregroundStyle(isHovered ? Color.tungsten : Color.tungsten.opacity(0.85))
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }

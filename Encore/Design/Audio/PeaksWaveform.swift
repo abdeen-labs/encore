@@ -63,12 +63,11 @@ struct PeaksWaveform: View {
     }
 }
 
-/// A glowing vertical playhead line.
+/// A thin vertical playhead line.
 struct Playhead: View {
     var color: Color = .textPrimary
     var body: some View {
         Rectangle().fill(color).frame(width: 1.5)
-            .glow(.tungsten, radius: 4, intensity: 0.6)
             .allowsHitTesting(false)
     }
 }

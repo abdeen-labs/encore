@@ -137,12 +137,12 @@ final class ChangerModel {
 
     var blockedReason: String? {
         guard let m = manifest else { return "Choose a voice-changer model." }
-        if shelf.hasScanned, !isDownloaded { return "\(m.name) isn't downloaded yet." }
+        if shelf.hasScanned, !isDownloaded { return "Download the model first." }
         guard let source else { return "Add the recording to re-voice." }
         if let p = source.problem { return p }
         guard voiceID != nil else { return hasVoices ? "Choose the voice it should be in." : "Make a voice first: clone or design one." }
         if voice == nil { return "That voice was deleted. Choose another." }
-        if helperProblem != nil { return "\(m.name) needs the Python helper set up." }
+        if helperProblem != nil { return "\(m.name) needs setting up first." }
         return nil
     }
 

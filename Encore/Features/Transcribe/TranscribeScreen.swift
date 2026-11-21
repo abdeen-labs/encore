@@ -44,12 +44,17 @@ struct TranscribeStage: View {
     private var runtimeKey: String { "\(model.choice?.modelID ?? "-")|\(model.timestamps.rawValue)|\(model.isDownloaded)" }
 
     @ViewBuilder private var headerActions: some View {
-        if model.record != nil {
+        if model.needsFirstModel {
+            if model.recentTotal > 0 {
+                Button("Earlier in History", systemImage: "clock.arrow.circlepath") { router.go(.history) }
+                    .buttonStyle(.ghost)
+            }
+        } else if model.record != nil {
             Button("New transcription", systemImage: "plus") { withStageAnimation { model.closeTranscript() } }
                 .buttonStyle(.secondary).controlSize(.small)
                 .disabled(model.runner.isBusy)
         }
-        if !wide, model.recentTotal > 0 {
+        if !wide, !model.needsFirstModel, model.recentTotal > 0 {
             Button { showEarlier.toggle() } label: {
                 Label("Earlier · \(model.recentTotal)", systemImage: "clock.arrow.circlepath")
             }
@@ -64,7 +69,9 @@ struct TranscribeStage: View {
         if !model.shelf.hasScanned {
             Color.clear
         } else if model.needsFirstModel {
-            TranscribeFirstRun(model: model)
+            FirstModelStage(symbol: "captions.bubble", title: "Nothing to listen with yet",
+                            message: "Transcription runs on this Mac. Download a model to start: Whisper knows about a hundred languages, Parakeet is fast for European ones.",
+                            starterIDs: ["whisper-large-v3-turbo", "parakeet-tdt-v3", "whisper-tiny"])
         } else {
             HStack(alignment: .top, spacing: Theme.Space.xl) {
                 Group {
@@ -79,9 +86,7 @@ struct TranscribeStage: View {
                     EarlierList(model: model, compact: false)
                         .frame(width: 252)
                         .padding(.leading, Theme.Space.l)
-                        .overlay(alignment: .leading) {
-                            Rectangle().fill(LinearGradient(colors: [.clear, Color.hairlineStrong, .clear], startPoint: .top, endPoint: .bottom)).frame(width: 1)
-                        }
+                        .overlay(alignment: .leading) { Hairline(.vertical) }
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
@@ -102,8 +107,8 @@ private struct SetupView: View {
                     WaveformPlayer(track: source.track)
                         .accessory {
                             if let info = source.info {
-                                Text(source.url.pathExtension.uppercased() + (info.hasVideo ? " · VIDEO" : ""))
-                                    .font(.mono(9.5, weight: .semibold)).foregroundStyle(.textTertiary)
+                                Text(source.url.pathExtension.uppercased() + (info.hasVideo ? " video" : ""))
+                                    .textRole(.caption, color: .textTertiary)
                             }
                             Button("Remove", systemImage: "xmark") { withStageAnimation { model.clearSource() } }
                                 .buttonStyle(.icon).controlSize(.small).help("Remove")
@@ -116,7 +121,7 @@ private struct SetupView: View {
                     if let p = source.problem { Banner(.warning, title: "Can't use this file", message: p) }
                 } else {
                     DropZone(symbol: "captions.bubble", title: "Drop audio or video to transcribe",
-                             message: "Any length · WAV, MP3, M4A, MP4, MOV, MKV, WebM… (ffmpeg covers the unusual ones)",
+                             message: "Any length · WAV, MP3, M4A, MP4, MOV, MKV, WebM…",
                              allowedTypes: TranscribeModel.mediaTypes, minHeight: 168) { urls in
                         if let u = urls.first { withStageAnimation { model.setSource(u) } }
                     }
@@ -126,7 +131,7 @@ private struct SetupView: View {
                 notices
                 RunSurface(runner: model.runner, title: "Transcribe", systemImage: "text.quote",
                            blockedReason: model.runner.error == nil ? model.blockedReason : nil,
-                           idleNote: model.idleNote, action: model.transcribe)
+                           action: model.transcribe)
                 if model.runner.isRunning { ListeningPlaceholder() }
             }
             .padding(.bottom, Theme.Space.l)
@@ -180,37 +185,39 @@ private struct SetupView: View {
         }
     }
 
-    /// Timings may route to the Python helper; say so before the run, not after.
+    /// Timings may route to the Python helper, which is slower to start; say so before the run, in one line, with
+    /// the where and why in the tooltip. A blocked runtime is the banner's to say.
     @ViewBuilder private var runtimeNote: some View {
-        if let text = runtimeNoteText {
-            HStack(alignment: .top, spacing: 6) {
-                Image(systemName: "clock.badge.checkmark").font(.system(size: 11)).foregroundStyle(Color.tungsten.opacity(0.8))
-                Text(text)
+        if let note = runtimeNoteText {
+            HStack(spacing: 6) {
+                Image(systemName: "clock").font(.system(size: 11)).foregroundStyle(Color.textTertiary)
+                Text(note.text)
                     .textRole(.caption, color: .textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
             }
             .padding(.horizontal, Theme.Space.xs)
+            .help(note.detail)
         }
     }
 
-    private var runtimeNoteText: String? {
+    private var runtimeNoteText: (text: String, detail: String)? {
         guard let m = model.manifest else { return nil }
         switch model.timestamps {
         case .word:
             switch model.plannedRuntime {
             case .runs(.python)?:
-                return "Word timings come from \(m.name) in Encore's Python helper. The first run starts the helper, which takes a few seconds."
-            case .runs?:
-                return "\(m.name) times each word natively."
-            case .blocked(let e)?:
-                return "Word timings need \(m.name) in the Python helper: \(ErrorPresentation(e)?.message ?? e.localizedDescription)"
+                return ("The first run with word timings takes a few seconds to start.",
+                        "Word timings come from \(m.name) in Encore's Python helper, which starts on the first run.")
             case nil:
-                return "Checking where \(m.name) can time each word…"
+                return ("Checking how to time each word…", "Checking where \(m.name) can time each word.")
+            case .runs?, .blocked?:
+                return nil
             }
         case .segment:
             // Only worth a line when the job leaves the app's own process.
             guard case .runs(.python)? = model.segmentRuntime else { return nil }
-            return "Sentence-length segments come from \(m.name) in Encore's Python helper. The first run starts the helper, which takes a few seconds."
+            return ("The first run takes a few seconds to start.",
+                    "Sentence-length segments come from \(m.name) in Encore's Python helper, which starts on the first run.")
         case .none:
             return nil
         }
@@ -221,7 +228,7 @@ private struct SetupView: View {
             ServiceErrorBanner(error: error, onDismiss: { withStageAnimation { model.runner.error = nil } }, onRetry: model.transcribe)
         } else if let m = model.manifest, model.shelf.hasScanned, !model.isDownloaded {
             Banner(.warning, title: "\(m.name) isn't downloaded yet",
-                   message: "Get it in Models (\(MemoryGauge.bytes(m.variant(model.choice?.variantID).downloadBytes))), or pick a model that's on this Mac.") {
+                   message: "Get it in Models (\(Bytes.file(m.variant(model.choice?.variantID).downloadBytes))), or pick a model that's on this Mac.") {
                 Button("Get it in Models") { router.go(.models) }.buttonStyle(.secondary).controlSize(.small)
             }
         } else if case .blocked(let e)? = model.plannedRuntime, let p = ErrorPresentation(e) {
@@ -276,18 +283,25 @@ private struct TranscriptView: View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
             if let track = model.recordTrack {
                 PlayheadReader(track: track, segments: t.segments) { active in
-                    WaveformPlayer(track: track, cues: cues(t), activeCue: active, onCueTap: { track.play(from: $0.start) })
+                    WaveformPlayer(track: track, cues: cues(t, active: active), activeCue: active, onCueTap: { track.play(from: $0.start) })
                 }
             } else {
-                Banner(.neutral, title: "“\(record.sourceName)” isn't where it was",
-                       message: "The transcript is all here; playback needs the original file at \(record.sourcePath).")
+                // Information, not a problem to act on: a caption, with the old path in the tooltip.
+                HStack(spacing: Theme.Space.s) {
+                    Image(systemName: "info.circle").font(.system(size: 11)).foregroundStyle(Color.textTertiary)
+                    Text("“\(record.sourceName)” isn't where it was, so it can't play. The transcript is all here.")
+                        .textRole(.caption, color: .textSecondary).lineLimit(1)
+                }
+                .padding(.horizontal, Theme.Space.xs)
+                .help(record.sourcePath)
             }
             toolbar(t)
             if model.hasCoarseSegments {
                 HStack(spacing: Theme.Space.s) {
                     Image(systemName: "info.circle").font(.system(size: 11)).foregroundStyle(Color.textTertiary)
-                    Text("\(record.modelName) timed this in long blocks. Word timings also give sentence-length segments.")
-                        .textRole(.caption, color: .textSecondary).lineLimit(2)
+                    Text("\(record.modelName) timed this in long blocks.")
+                        .textRole(.caption, color: .textSecondary).lineLimit(1)
+                        .help("Word timings also give sentence-length segments.")
                     Spacer(minLength: Theme.Space.s)
                     if model.recordTrack != nil, model.manifest?.capabilities.wordTimestamps == true {
                         Button("Run again with words") { withStageAnimation { model.rerunWithWords() } }
@@ -310,8 +324,9 @@ private struct TranscriptView: View {
         .stageAnimation(Theme.Motion.standard, value: model.showTimings)
     }
 
-    private func cues(_ t: Transcript) -> [TrackCue] {
-        t.segments.enumerated().map { i, s in TrackCue(id: i, start: s.start, end: s.end, tint: i % 2 == 0 ? .tungsten : .mint) }
+    /// Segment marks under the waveform: neutral, with only the playing one lit.
+    private func cues(_ t: Transcript, active: Int?) -> [TrackCue] {
+        t.segments.enumerated().map { i, s in TrackCue(id: i, start: s.start, end: s.end, tint: i == active ? .tungsten : .textSecondary) }
     }
 
     private func toolbar(_ t: Transcript) -> some View {
@@ -353,14 +368,15 @@ private struct TranscriptView: View {
         .zIndex(5)
     }
 
+    /// "139 words · English". The rest (segments, word timings, model) is in the tooltip.
     private func facts(_ t: Transcript) -> some View {
-        var parts: [String] = []
-        parts.append("\(model.wordCount) words")
+        var parts: [String] = ["\(model.wordCount) words"]
         if let l = t.language { parts.append(model.languageName(l)) }
-        if !t.segments.isEmpty { parts.append("\(t.segments.count) segments") }
-        if model.hasWordTimings { parts.append("word-timed") }
-        parts.append(record.modelName)
-        return Text(parts.joined(separator: " · ")).textRole(.monoSmall, color: .textTertiary).lineLimit(1)
+        var detail: [String] = []
+        if !t.segments.isEmpty { detail.append("\(t.segments.count) segments" + (model.hasWordTimings ? ", timed to the word" : "")) }
+        detail.append(record.modelName)
+        return Text(parts.joined(separator: " · ")).textRole(.caption, color: .textTertiary).lineLimit(1)
+            .help(detail.joined(separator: " · "))
     }
 }
 
@@ -427,16 +443,15 @@ private struct SegmentRow: View {
         Button(action: onTap) {
             HStack(alignment: .firstTextBaseline, spacing: Theme.Space.m) {
                 Text(TranscriptFormatterClock.string(segment.start, hours: hours))
-                    .font(.mono(11, weight: isActive ? .semibold : .regular))
-                    .foregroundStyle(isActive ? Color.tungsten : (hovered ? .textSecondary : .textTertiary))
+                    .textRole(.monoSmall, color: isActive ? .tungsten : (hovered ? .textSecondary : .textTertiary))
                     .frame(width: hours ? 62 : 44, alignment: .leading)
+                // The words carry their own colors (AttributedString runs win over the role's color).
                 Text(attributed)
-                    .font(.ui(14.5))
-                    .lineSpacing(4)
+                    .textRole(.script)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
                 if hovered, canPlay {
-                    Image(systemName: "play.fill").font(.system(size: 8.5)).foregroundStyle(Color.tungsten)
+                    Image(systemName: "play.fill").font(.system(size: 8.5)).foregroundStyle(Color.textSecondary)
                 }
             }
             .padding(.horizontal, Theme.Space.l)
@@ -445,7 +460,7 @@ private struct SegmentRow: View {
                 if isActive {
                     Rectangle().fill(Color.tungsten.opacity(0.07))
                         .overlay(alignment: .leading) {
-                            Capsule().fill(Color.tungsten).frame(width: 2.5).padding(.vertical, 5).glow(.tungsten, radius: 4, intensity: 0.5)
+                            Capsule().fill(Color.tungsten).frame(width: 2.5).padding(.vertical, 5)
                         }
                 } else if hovered {
                     Rectangle().fill(Color.textPrimary.opacity(0.03))
@@ -490,7 +505,7 @@ private struct ProseTranscript: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Space.l) {
                 ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, p in
-                    Text(p).font(.ui(15)).foregroundStyle(.textPrimary).lineSpacing(6)
+                    Text(p).textRole(.script)
                         .frame(maxWidth: 680, alignment: .leading)
                 }
             }
@@ -546,7 +561,7 @@ private struct ExportPanel: View {
                             Spacer()
                             Text(".\(f.fileExtension)").textRole(.monoSmall, color: .textTertiary)
                         }
-                        Text(preview(f)).font(.mono(10)).foregroundStyle(.textTertiary).lineLimit(1)
+                        Text(preview(f)).textRole(.monoSmall, color: .textTertiary).lineLimit(1)
                     }
                 }
             }
@@ -583,8 +598,8 @@ private struct EarlierList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Earlier").textRole(compact ? .eyebrow : .heading)
-                Text("\(model.recentTotal)").textRole(.mono, color: .textTertiary)
+                Text("Earlier").textRole(compact ? .eyebrow : .section)
+                Text("\(model.recentTotal)").textRole(.monoSmall, color: .textTertiary)
                 Spacer()
             }
             .padding(.horizontal, compact ? Theme.Space.s : 0)
@@ -622,62 +637,13 @@ private struct EarlierList: View {
                 HStack(spacing: 6) {
                     Text(r.createdAt, format: .relative(presentation: .named)).textRole(.caption, color: .textTertiary)
                     if r.transcript.segments.contains(where: { !($0.words ?? []).isEmpty }) {
-                        Text("WORDS").font(.mono(8.5, weight: .semibold)).foregroundStyle(Color.tungsten.opacity(0.7))
+                        Text("· word timings").textRole(.caption, color: .textTertiary)
                     }
                 }
             }
         }
         .contextMenu {
             Button("Delete from History", role: .destructive) { model.delete(r.id) }
-        }
-    }
-}
-
-// MARK: - First run
-
-private struct TranscribeFirstRun: View {
-    let model: TranscribeModel
-    @Environment(Router.self) private var router
-
-    private var starters: [ModelManifest] {
-        ["whisper-large-v3-turbo", "parakeet-tdt-v3", "whisper-tiny"].compactMap { model.service.catalog.model($0) }
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: Theme.Space.xl) {
-                EmptyState(symbol: "captions.bubble", title: "Nothing to listen with yet",
-                           message: "Transcription runs on this Mac. Download a model to start: Whisper knows about a hundred languages, Parakeet is fast for European ones.") {
-                    Button("Open Models", systemImage: "arrow.down.circle") { router.go(.models) }
-                        .buttonStyle(.primary).controlSize(.large)
-                    if model.recentTotal > 0 {
-                        Button("Earlier transcriptions in History") { router.go(.history) }.buttonStyle(.ghost)
-                    }
-                }
-                HStack(alignment: .top, spacing: Theme.Space.m) {
-                    ForEach(starters) { m in
-                        Button { router.go(.models) } label: {
-                            VStack(alignment: .leading, spacing: Theme.Space.s) {
-                                Text(m.name).textRole(.heading)
-                                Text(m.summary).textRole(.caption).lineLimit(3).fixedSize(horizontal: false, vertical: true)
-                                Spacer(minLength: 0)
-                                HStack {
-                                    Text(MemoryGauge.bytes(m.defaultVariant.downloadBytes)).textRole(.mono, color: .textSecondary)
-                                    Spacer()
-                                    Text("\(m.languages.count) languages").textRole(.monoSmall, color: .textTertiary)
-                                }
-                            }
-                            .padding(Theme.Space.l)
-                            .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
-                            .surface(.card)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .frame(maxWidth: 820)
-            }
-            .frame(maxWidth: .infinity)
         }
     }
 }

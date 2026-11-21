@@ -3,7 +3,7 @@
   "name": "Chatterbox Voice Changer",
   "family": "Chatterbox",
   "author": "Resemble AI",
-  "summary": "Speech-to-speech: re-voices a recording in a chosen voice while keeping the words and timing. Uses Chatterbox's S3 speech tokens and S3Gen decoder; runs in the Python helper.",
+  "summary": "Speech to speech: re-voices a recording in a voice you choose, keeping the words, timing and delivery.",
   "tasks": [
     "voiceConversion"
   ],

@@ -1,29 +1,27 @@
 import EncoreCore
 import SwiftUI
 
-/// The global mini-player, pinned under the stage on every screen. It follows `NowPlaying.shared`: whatever
-/// any waveform card (or feature) last played shows here with its waveform, transport and time.
+/// The global mini-player under the stage. It follows `NowPlaying.shared`: whatever any waveform card (or
+/// feature) last played shows here with its waveform, transport and time. Until something plays it isn't
+/// there at all (the stage takes the space); it slides in when something plays and leaves when dismissed.
+/// `RootView` animates the change, honoring Reduce Motion.
 struct PlayerDock: View {
     @State private var loader = WaveformLoader()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let nowPlaying = NowPlaying.shared
-        Group {
-            if let player = nowPlaying.player {
-                PlayerDockBar(title: player.title ?? "Untitled", subtitle: player.subtitle,
-                              peaks: player.waveform ?? loader.peaks, gain: player.waveform.map(WaveformLoader.gain) ?? loader.displayGain,
-                              currentTime: player.currentTime, duration: player.duration, isPlaying: player.isPlaying,
-                              onToggle: { player.toggle() }, onSeek: { player.seek(to: $0) },
-                              onDismiss: { withStageAnimation { nowPlaying.dismiss() } })
-                    .task(id: player.id) {
-                        if player.waveform == nil, let url = player.url { await loader.load(url: url) }
-                    }
-                    .transition(.opacity)
-            } else {
-                PlayerDockBar.idle
-            }
+        if let player = nowPlaying.player {
+            PlayerDockBar(title: player.title ?? "Untitled", subtitle: player.subtitle,
+                          peaks: player.waveform ?? loader.peaks, gain: player.waveform.map(WaveformLoader.gain) ?? loader.displayGain,
+                          currentTime: player.currentTime, duration: player.duration, isPlaying: player.isPlaying,
+                          onToggle: { player.toggle() }, onSeek: { player.seek(to: $0) },
+                          onDismiss: { withStageAnimation { nowPlaying.dismiss() } })
+                .task(id: player.id) {
+                    if player.waveform == nil, let url = player.url { await loader.load(url: url) }
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
         }
-        .stageAnimation(Theme.Motion.standard, value: nowPlaying.player?.id)
     }
 }
 
@@ -42,6 +40,8 @@ struct PlayerDockBar: View {
 
     @State private var scrubTime: TimeInterval?
 
+    /// A bar with nothing loaded. The app no longer shows one (the dock is absent until something plays); kept
+    /// for previews.
     static var idle: PlayerDockBar { PlayerDockBar() }
     private var isIdle: Bool { title == nil }
     private var shownTime: TimeInterval { scrubTime ?? currentTime }
@@ -49,26 +49,22 @@ struct PlayerDockBar: View {
     var body: some View {
         HStack(spacing: Theme.Space.m) {
             Button(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill", action: onToggle)
-                .buttonStyle(.icon(tone: isIdle ? .neutral : .accent, filled: !isIdle))
+                .buttonStyle(.play(isPlaying: isPlaying))
                 .controlSize(.small)
                 .disabled(isIdle)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title ?? "Nothing on stage")
-                    .font(.ui(12, weight: isIdle ? .medium : .semibold))
-                    .foregroundStyle(isIdle ? Color.textTertiary : .textPrimary)
+                Text(title ?? "Nothing playing")
+                    .textRole(.label, color: isIdle ? .textTertiary : .textPrimary)
                     .lineLimit(1)
                 if let subtitle, !isIdle {
-                    Text(subtitle).font(.ui(10.5)).foregroundStyle(.textSecondary).lineLimit(1)
-                } else if isIdle {
-                    Text("Play any take and it stays here").font(.ui(10.5)).foregroundStyle(Color.textTertiary.opacity(0.7))
-                        .lineLimit(1)
+                    Text(subtitle).textRole(.caption).lineLimit(1)
                 }
             }
             .frame(width: 190, alignment: .leading)
             waveform
             Text(isIdle ? "0:00" : "\(Timecode.string(shownTime, tenths: false)) / \(Timecode.string(duration, tenths: false))")
-                .font(.mono(10.5))
-                .foregroundStyle(isIdle ? Color.textTertiary : .textSecondary)
+                .textRole(.monoSmall, color: isIdle ? .textTertiary : .textSecondary)
+                .monospacedDigit()
                 .fixedSize()
             Button("Close player", systemImage: "xmark", action: onDismiss)
                 .buttonStyle(.icon)
@@ -77,7 +73,7 @@ struct PlayerDockBar: View {
                 .disabled(isIdle)
         }
         .padding(.horizontal, Theme.Space.l)
-        .frame(height: 52)
+        .frame(height: 46)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Player")
     }
@@ -87,7 +83,7 @@ struct PlayerDockBar: View {
             let d = max(duration, 0.001)
             ZStack(alignment: .leading) {
                 if isIdle {
-                    Capsule().fill(Color.textTertiary.opacity(0.18)).frame(height: 1).frame(maxHeight: .infinity)
+                    Hairline().frame(maxHeight: .infinity)
                 } else {
                     PeaksWaveform(peaks: peaks, played: shownTime, tint: .tungsten, gain: gain,
                                   barWidth: 1.5, gap: 1.5, duration: duration > 0 ? duration : nil)

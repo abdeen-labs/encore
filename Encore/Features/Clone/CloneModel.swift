@@ -158,18 +158,14 @@ final class CloneModel {
         }
     }
 
-    /// Which step of the flow is current, for the cue sheet: 0 source, 1 trim, 2 words, 3 details, 4 consent, 5 saved.
-    var currentStep: Int {
-        if saved != nil { return 5 }
-        guard source != nil else { return 0 }
-        if lengthVerdict == .tooLong || lengthVerdict == .tooShort { return 1 }
-        if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return 2 }
-        if !consent { return 4 }
-        return 4
-    }
-
     /// Why Save can't run, or nil.
-    var blockedReason: String? {
+    var blockedReason: String? { blocker(ignoringConsent: false) }
+
+    /// Why Save can't run apart from the consent tick, or nil. The save bar shows this beside the consent
+    /// check, which already asks for the tick itself.
+    var blockedReasonBesidesConsent: String? { blocker(ignoringConsent: true) }
+
+    private func blocker(ignoringConsent: Bool) -> String? {
         guard source != nil else { return "Choose a recording first." }
         switch lengthVerdict {
         case .tooLong: return "Trim the clip to \(Int(target.upperBound)) seconds or less (it's \(Self.seconds(length)) now)."
@@ -178,10 +174,12 @@ final class CloneModel {
         }
         if case .transcribing = transcriptState { return "Transcribing the clip…" }
         if case .pending = transcriptState { return "Transcribing the clip…" }
-        if !consent { return "Confirm you have the speaker's permission." }
+        if !ignoringConsent, !consent { return "Confirm you have the speaker's permission." }
         if isSaving { return "Saving…" }
         return nil
     }
+
+    var hasTranscript: Bool { !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var effectiveName: String {
         let n = name.trimmingCharacters(in: .whitespacesAndNewlines)

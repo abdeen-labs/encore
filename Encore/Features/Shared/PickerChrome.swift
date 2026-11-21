@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The trigger every shared picker uses: an eyebrow label over a value line, on a raised plate that lights
-/// tungsten while its panel is open.
+/// The trigger every shared picker uses: an eyebrow label over a value line, on a raised plate. It stays unlit
+/// while its panel is open (a stronger edge says so); the light belongs to the selected row inside.
 ///
 ///     PickerPlate(label: "Voice", symbol: "person.wave.2", value: "Heart", detail: "Model voice", isOpen: open) { open.toggle() }
 struct PickerPlate<Badge: View>: View {
@@ -12,9 +12,18 @@ struct PickerPlate<Badge: View>: View {
     var isOpen: Bool
     var action: () -> Void
     @ViewBuilder var badge: Badge
+    /// One line, no label or glyph, 30 pt tall: for a picker that sits inside a row which already says what it is.
+    var isCompact = false
 
     @State private var isHovered = false
     @Environment(\.isEnabled) private var isEnabled
+
+    /// The one-line form (see `isCompact`).
+    func compact(_ on: Bool = true) -> PickerPlate {
+        var copy = self
+        copy.isCompact = on
+        return copy
+    }
 
     init(label: String, symbol: String, value: String, detail: String? = nil, isOpen: Bool,
          action: @escaping () -> Void, @ViewBuilder badge: () -> Badge) {
@@ -25,17 +34,19 @@ struct PickerPlate<Badge: View>: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Theme.Space.s) {
-                Image(systemName: symbol)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(isOpen ? Color.tungsten : (isHovered ? .textSecondary : .textTertiary))
-                    .frame(width: 16)
+                if !isCompact {
+                    Image(systemName: symbol)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(isOpen || isHovered ? Color.textSecondary : .textTertiary)
+                        .frame(width: 16)
+                }
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(label).textRole(.eyebrow)
+                    if !isCompact { Text(label).textRole(.eyebrow) }
                     HStack(spacing: 5) {
-                        Text(value).font(.ui(13, weight: .semibold)).foregroundStyle(.textPrimary).lineLimit(1)
+                        Text(value).textRole(isCompact ? .label : .headline, color: .textPrimary).lineLimit(1)
                             .layoutPriority(1)
                         if let detail {
-                            Text(detail).font(.ui(11.5)).foregroundStyle(.textTertiary).lineLimit(1)
+                            Text(detail).textRole(.caption, color: .textTertiary).lineLimit(1)
                         }
                     }
                 }
@@ -44,18 +55,16 @@ struct PickerPlate<Badge: View>: View {
                 badge
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8.5, weight: .bold))
-                    .foregroundStyle(isOpen ? Color.tungsten : .textTertiary)
+                    .foregroundStyle(isOpen ? Color.textSecondary : .textTertiary)
                     .rotationEffect(.degrees(isOpen ? 180 : 0))
             }
             .padding(.horizontal, 10)
-            .frame(height: 42)
+            .frame(height: isCompact ? Theme.ControlHeight.regular : 42)
             .background {
                 let shape = RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
                 shape.fill(Color.surfaceRaised)
                     .brightness(isHovered ? 0.02 : 0)
-                    .overlay(shape.strokeBorder(isOpen ? Color.tungsten.opacity(0.6) : (isHovered ? Color.hairlineStrong : .hairline),
-                                                lineWidth: 1))
-                    .shadow(color: .tungsten.opacity(isOpen ? 0.18 : 0), radius: 8)
+                    .overlay(shape.strokeBorder(isOpen || isHovered ? Color.hairlineStrong : .hairline, lineWidth: 1))
             }
             .contentShape(Rectangle())
         }
@@ -123,7 +132,7 @@ private struct PickerPanelModifier<Panel: View>: ViewModifier {
     }
 }
 
-/// A row in a picker panel: selectable, with a lit edge when selected.
+/// A row in a picker panel: selectable, with a lit edge when selected (the one lit thing in the list).
 struct PickerRow<Content: View>: View {
     var isSelected: Bool
     var isEnabled: Bool = true
@@ -141,11 +150,10 @@ struct PickerRow<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 let shape = RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
-                shape.fill(isSelected ? Color.tungsten.opacity(0.1) : Color.textPrimary.opacity(isHovered && isEnabled ? 0.05 : 0))
+                shape.fill(Color.textPrimary.opacity(isSelected ? 0.06 : (isHovered && isEnabled ? 0.04 : 0)))
                     .overlay(alignment: .leading) {
                         if isSelected {
                             Capsule().fill(Color.tungsten).frame(width: 2.5).padding(.vertical, 6)
-                                .glow(.tungsten, radius: 4, intensity: 0.5)
                         }
                     }
             }
@@ -167,7 +175,7 @@ struct PanelHeading: View {
         HStack(spacing: 6) {
             Text(title).textRole(.eyebrow)
             if let count { Text("\(count)").textRole(.monoSmall, color: .textTertiary) }
-            Rectangle().fill(Color.hairline).frame(height: 1)
+            Hairline()
         }
         .padding(.horizontal, 10)
         .padding(.top, Theme.Space.s)

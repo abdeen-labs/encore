@@ -13,9 +13,20 @@ import SwiftUI
 ///     WaveformPlayer(url: take.url, title: "Take 3", subtitle: "Captain · Qwen3-TTS")
 ///     WaveformPlayer(buffer: result, title: "Preview")
 ///     WaveformPlayer(url: line.url, title: line.speaker, style: .compact)
+///     WaveformPlayer(url: row.url, title: row.title, style: .minimal)     // dense list rows: play + duration
 ///     WaveformPlayer(track: model.track, cues: cues, activeCue: active, onCueTap: { model.track.play(from: $0.start) })
+///
+/// The play button is unlit at rest and lit only while this audio plays (`.play(isPlaying:)`).
 struct WaveformPlayer: View {
-    enum Style: Sendable { case regular, compact }
+    enum Style: Sendable {
+        /// A card: one header row (play, title, subtitle, accessory, export), the waveform, timecodes.
+        case regular
+        /// A slim sunken strip: play, waveform, time, accessory, export menu.
+        case compact
+        /// Just the play button and the duration (elapsed / total while playing). No waveform, no card, no
+        /// accessory or export menu. For dense list rows.
+        case minimal
+    }
 
     /// A track the caller owns; when nil the card uses its own.
     private let external: PlaybackTrack?
@@ -74,6 +85,7 @@ struct WaveformPlayer: View {
             switch style {
             case .regular: regular(track)
             case .compact: compact(track)
+            case .minimal: minimal(track)
             }
         }
         .task(id: PlaybackTrack.key(for: source)) {
@@ -112,10 +124,10 @@ struct WaveformPlayer: View {
             }
             HStack {
                 Text(Timecode.string(scrubTime ?? track.currentTime))
-                    .textRole(.monoSmall, color: track.hasPosition ? .tungsten : .textTertiary)
+                    .textRole(.monoSmall, color: track.isPlaying ? .tungsten : (track.hasPosition ? .textSecondary : .textTertiary))
                 Spacer()
                 if let message = track.loadError ?? track.loader.errorMessage {
-                    Text(message).textRole(.caption, color: .velvet).lineLimit(1)
+                    Text(message).textRole(.caption, color: .velvetText).lineLimit(1)
                     Spacer()
                 }
                 Text(track.duration > 0 ? Timecode.string(track.duration) : "–:––").textRole(.monoSmall, color: .textTertiary)
@@ -133,7 +145,7 @@ struct WaveformPlayer: View {
                 .onDrag { AudioExportActions.dragProvider(for: track.source, suggestedName: track.title) }
             let shown = track.hasPosition || scrubTime != nil
             Text(Timecode.string(shown ? (scrubTime ?? track.currentTime) : track.duration, tenths: false))
-                .textRole(.monoSmall, color: shown ? .tungsten : .textSecondary)
+                .textRole(.monoSmall, color: track.isPlaying ? .tungsten : (shown ? .textPrimary : .textSecondary))
                 .frame(minWidth: 38, alignment: .trailing)
             if let accessory { accessory }
             AudioExportMenu(source: track.source, suggestedName: track.title, symbol: "ellipsis")
@@ -145,9 +157,24 @@ struct WaveformPlayer: View {
         .surface(.sunken, radius: Theme.Radius.m)
     }
 
+    private func minimal(_ track: PlaybackTrack) -> some View {
+        HStack(spacing: Theme.Space.s) {
+            playButton(track).controlSize(.small)
+            let shown = track.hasPosition || track.isPlaying
+            let total = track.duration > 0 ? Timecode.string(track.duration, tenths: false) : "–:––"
+            Text(verbatim: shown ? "\(Timecode.string(track.currentTime, tenths: false)) / \(total)" : total)
+                .textRole(.monoSmall, color: track.isPlaying ? .tungsten : (shown ? .textPrimary : .textSecondary))
+                .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize()
+                .onDrag { AudioExportActions.dragProvider(for: track.source, suggestedName: track.title) }
+        }
+        .fixedSize()
+    }
+
     private func playButton(_ track: PlaybackTrack) -> some View {
         Button(track.isPlaying ? "Pause" : "Play", systemImage: track.isPlaying ? "pause.fill" : "play.fill") { track.toggle() }
-            .buttonStyle(.icon(tone: .accent, filled: true))
+            .buttonStyle(.play(isPlaying: track.isPlaying))
             .disabled(!track.source.canPlay && !(isPreview && track.hasPosition))
             .help(track.isPlaying ? "Pause" : "Play")
     }

@@ -93,14 +93,14 @@ private struct RailItem: View {
                     .frame(width: 18)
                     .foregroundStyle(isSelected ? Color.tungsten : (isHovered ? .textPrimary : .textTertiary))
                 Text(title)
-                    .font(.ui(13, weight: isSelected ? .semibold : .medium))
-                    .foregroundStyle(isSelected ? Color(hex: 0xFFE3B8) : (isHovered ? .textPrimary : .textSecondary))
+                    .textRole(isSelected ? .headline : .body,
+                              color: isSelected ? Color(hex: 0xFFE3B8) : (isHovered ? .textPrimary : .textSecondary))
                 Spacer(minLength: 0)
                 // Both live in the row's fixed height, so neither shifts the rail.
                 if showsKey {
                     KeycapBadge(key).transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.85)))
                 } else if isHovered && !isSelected {
-                    Text(shortcut).font(.mono(10)).foregroundStyle(.textTertiary)
+                    Text(shortcut).textRole(.monoSmall, color: .textTertiary)
                         .transition(.opacity)
                 }
             }

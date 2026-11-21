@@ -144,7 +144,8 @@ final class StudioModel {
     /// Why Perform can't run right now, or nil.
     var blockedReason: String? {
         guard let m = manifest else { return "Choose a model to perform with." }
-        if shelf.hasScanned, !isDownloaded { return "\(m.name) isn't downloaded yet." }
+        // The banner above names the model; this only says what stands in the way.
+        if shelf.hasScanned, !isDownloaded { return "Download the model first." }
         if script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Write something to perform." }
         if let plan {
             if let name = plan.parsed.unknownVoiceNames.first { return "No voice called “\(name)”: fix the [voice:] tag." }
@@ -153,13 +154,6 @@ final class StudioModel {
         }
         if case .library = voice, !m.capabilities.cloning { return "\(m.name) can't speak in library voices. Pick one of its own." }
         return nil
-    }
-
-    var idleNote: String? {
-        guard let m = manifest, let plan, !plan.chunks.isEmpty else { return nil }
-        let v = VoiceDescription(voice, manifest: m, library: voices).name
-        let chunks = plan.chunks.count == 1 ? "1 chunk" : "\(plan.chunks.count) chunks"
-        return "\(chunks) · \(v) · \(m.name)"
     }
 
     // MARK: Actions

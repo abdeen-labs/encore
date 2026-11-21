@@ -3,7 +3,7 @@ import EncoreCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The voice library: a playbill of voice cards (search, filter by origin and tag, sort), an inspector to edit one,
+/// The voice library: a grid of voice cards (search, one Filter menu for origin, tags and sort), an inspector to edit one,
 /// multi-select for export and delete, and `.encorevoice` import by button or by dropping files on the screen.
 struct VoicesScreen: View {
     @Environment(AppDependencies.self) private var deps
@@ -74,6 +74,14 @@ struct VoicesStage: View {
             Text("The voice files go to the Trash, so you can still get them back from there.")
         }
         .onChange(of: library.voices) { _, _ in model.prune() }
+        .onChange(of: model.importReport) { _, report in
+            // A clean import is news, not a problem: it goes in a toast. Refusals stay as a banner until dismissed.
+            guard let report, report.refused.isEmpty, !report.imported.isEmpty else { return }
+            let n = report.imported.count
+            toasts.show(n == 1 ? "“\(report.imported[0].name)” joined your company" : "\(n) voices joined your company",
+                        tone: .success, symbol: "person.wave.2")
+            model.importReport = nil
+        }
         .onChange(of: model.exportNote) { _, note in
             if let note { toasts.show(note, tone: note.hasPrefix("Export failed") ? .danger : .success); model.exportNote = nil }
         }
@@ -99,13 +107,7 @@ struct VoicesStage: View {
                 Button("Clone a voice", systemImage: "mic") { deps.router.go(.clone) }
                 Button("Design a voice", systemImage: "wand.and.stars") { deps.router.go(.design) }
             } label: {
-                Label("New voice", systemImage: "plus")
-                    .font(.ui(12, weight: .semibold))
-                    .foregroundStyle(Color.onTungsten)
-                    .padding(.horizontal, 12)
-                    .frame(height: Theme.ControlHeight.small)
-                    .background(Capsule().fill(Color.tungsten))
-                    .contentShape(Capsule())
+                SecondaryMenuLabel(title: "New voice", systemImage: "plus")
             }
             .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
         }
@@ -117,7 +119,7 @@ struct VoicesStage: View {
         let list = model.visible
         return VStack(alignment: .leading, spacing: Theme.Space.m) {
             toolbar
-            if !library.allTags.isEmpty { tagRow }
+            if model.activeFilterCount > 0 { activeFilters }
             if let report = model.importReport { ImportReportBanner(report: report) { withStageAnimation { model.importReport = nil } } }
             if !library.problems.isEmpty {
                 Banner(.warning, title: "Some voice folders couldn't be read",
@@ -125,16 +127,15 @@ struct VoicesStage: View {
             }
             if model.showsChecks { bulkBar }
             if list.isEmpty {
-                VStack(spacing: Theme.Space.s) {
-                    Text("No voices match").textRole(.headline, color: .textSecondary)
+                EmptyState(symbol: "magnifyingglass", title: "No voices match", style: .plain) {
                     Button("Clear filters", action: model.clearFilters).buttonStyle(.ghost).controlSize(.small)
                 }
                 .frame(maxWidth: .infinity).padding(.top, Theme.Space.xxl)
                 Spacer(minLength: 0)
             } else {
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 236, maximum: 380), spacing: Theme.Space.l)],
-                              alignment: .leading, spacing: Theme.Space.l) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 236, maximum: 380), spacing: Theme.Space.m)],
+                              alignment: .leading, spacing: Theme.Space.m) {
                         ForEach(list) { voice in
                             VoiceCard(voice: voice, reference: library.referenceAudioURL(for: voice.id),
                                       isFocused: model.focused == voice.id,
@@ -152,55 +153,67 @@ struct VoicesStage: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .stageAnimation(Theme.Motion.quick, value: model.activeFilterCount)
     }
 
+    /// The search field and one Filter menu (origin, tags, sort).
     private var toolbar: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: Theme.Space.m) {
-                SearchField(text: $model.query, prompt: "Search names, tags, words").frame(minWidth: 180, maxWidth: 300)
-                originControl
-                Spacer(minLength: 0)
-                sortMenu
-            }
-            VStack(alignment: .leading, spacing: Theme.Space.s) {
-                HStack(spacing: Theme.Space.m) {
-                    SearchField(text: $model.query, prompt: "Search names, tags, words")
-                    sortMenu
-                }
-                originControl
-            }
+        HStack(spacing: Theme.Space.s) {
+            SearchField(text: $model.query, prompt: "Search names, tags, words")
+                .frame(minWidth: 160, maxWidth: 300)
+            filterMenu
+            Spacer(minLength: 0)
         }
     }
 
-    private var originControl: some View {
-        SegmentedControl(selection: $model.origin, options: VoicesModel.OriginFilter.allCases,
-                         count: { o in let n = model.count(o); return o == .all || n > 0 ? n : nil }) { $0.rawValue }
-        .controlSize(.small)
-    }
-
-    private var sortMenu: some View {
-        MenuPicker(selection: $model.sort, options: VoicesModel.Sort.allCases) { $0.rawValue }
-            .frame(width: 150)
-    }
-
-    private var tagRow: some View {
-        HStack(alignment: .center, spacing: Theme.Space.s) {
-            Text("Tags").textRole(.eyebrow)
-            ScrollView(.horizontal) {
-                HStack(spacing: 6) {
-                    ForEach(library.allTags, id: \.self) { tag in
-                        Chip(tag, isSelected: Binding(get: { model.tags.contains(tag) },
-                                                      set: { on in if on { model.tags.insert(tag) } else { model.tags.remove(tag) } }))
+    private var filterMenu: some View {
+        Menu {
+            Section("Show") {
+                ForEach(VoicesModel.OriginFilter.allCases, id: \.self) { o in
+                    if o == .all || o == model.origin || model.count(o) > 0 {
+                        Button { model.origin = o } label: { checkLabel(o == .all ? "All voices" : o.rawValue, on: model.origin == o) }
                     }
                 }
-                .padding(.vertical, 2)
             }
-            .scrollIndicators(.never)
-            .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.92),
-                                         .init(color: .black.opacity(0), location: 1)], startPoint: .leading, endPoint: .trailing))
-            if !model.tags.isEmpty {
-                Button("Clear") { model.tags = [] }.buttonStyle(.ghost).controlSize(.small)
+            if !library.allTags.isEmpty {
+                Section("Tags") {
+                    ForEach(library.allTags, id: \.self) { tag in
+                        Button {
+                            if model.tags.contains(tag) { model.tags.remove(tag) } else { model.tags.insert(tag) }
+                        } label: { checkLabel(tag, on: model.tags.contains(tag)) }
+                    }
+                }
             }
+            Section("Sort") {
+                ForEach(VoicesModel.Sort.allCases, id: \.self) { s in
+                    Button { model.sort = s } label: { checkLabel(s.rawValue, on: model.sort == s) }
+                }
+            }
+            Divider()
+            Button("Clear filters", action: model.clearMenuFilters)
+                .disabled(model.activeFilterCount == 0)
+        } label: {
+            SecondaryMenuLabel(title: "Filter", systemImage: "line.3.horizontal.decrease", count: model.activeFilterCount,
+                               size: .regular)
+        }
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+        .help("Filter by origin and tags, and change the order")
+    }
+
+    @ViewBuilder private func checkLabel(_ title: String, on: Bool) -> some View {
+        if on { Label(title, systemImage: "checkmark") } else { Text(title) }
+    }
+
+    /// The filters that are on, as removable chips, so the state is visible without opening the menu.
+    private var activeFilters: some View {
+        FlowRow(spacing: 6, lineSpacing: 6) {
+            if model.origin != .all {
+                Chip(model.origin.rawValue, symbol: model.origin.symbol, onRemove: { model.origin = .all })
+            }
+            ForEach(model.tags.sorted(), id: \.self) { tag in
+                Chip(tag, symbol: "tag", onRemove: { model.tags.remove(tag) })
+            }
+            Button("Clear", action: model.clearMenuFilters).buttonStyle(.ghost).controlSize(.mini)
         }
     }
 
@@ -217,12 +230,9 @@ struct VoicesStage: View {
             Button("Done") { model.endPicking() }
                 .buttonStyle(.ghost).controlSize(.small)
         }
-        .padding(.horizontal, Theme.Space.l)
+        .padding(.horizontal, Theme.Space.m)
         .padding(.vertical, Theme.Space.s)
-        .background {
-            RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous).fill(Color.tungsten.opacity(0.07))
-                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous).strokeBorder(Color.tungsten.opacity(0.3)))
-        }
+        .surface(.sunken, radius: Theme.Radius.m)
     }
 
     @ViewBuilder private func contextMenu(_ voice: Voice) -> some View {
@@ -264,11 +274,7 @@ struct VoicesStage: View {
             if let report = model.importReport {
                 ImportReportBanner(report: report) { withStageAnimation { model.importReport = nil } }.frame(maxWidth: 560)
             }
-            HStack(spacing: Theme.Space.s) {
-                Image(systemName: "square.and.arrow.down").foregroundStyle(.textTertiary)
-                Text("Have an .encorevoice file? Drop it here or").textRole(.caption, color: .textTertiary)
-                Button("import it") { model.showImporter = true }.buttonStyle(.ghost).controlSize(.small)
-            }
+            Text("You can also drop an .encorevoice file here.").textRole(.caption, color: .textTertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -277,12 +283,11 @@ struct VoicesStage: View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
         return ZStack {
             shape.fill(Color.backdrop.opacity(0.78))
-            shape.strokeBorder(Color.tungsten, style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [0.1, 8]))
+            shape.strokeBorder(Color.tungsten.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, dash: [6, 6]))
             VStack(spacing: Theme.Space.s) {
-                Image(systemName: "person.wave.2").font(.system(size: 30, weight: .light)).foregroundStyle(Color.tungsten)
-                    .glow(.tungsten, radius: 12, intensity: 0.5)
+                Image(systemName: "person.wave.2").font(.system(size: 28, weight: .light)).foregroundStyle(Color.textSecondary)
                 Text("Drop to add to the company").textRole(.title)
-                Text(".encorevoice files are imported · audio goes to Clone").textRole(.caption)
+                Text("Voice files are imported. Audio opens in Clone.").textRole(.caption)
             }
         }
         .padding(Theme.Space.l)
@@ -364,15 +369,15 @@ struct ImportConsentSheet: View {
                 .padding(Theme.Space.m)
                 .background {
                     let shape = RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
-                    shape.fill((pending.consent ? Color.mint : .velvet).opacity(0.06))
-                        .overlay(shape.strokeBorder((pending.consent ? Color.mint : Color.velvet).opacity(0.25), lineWidth: 1))
+                    shape.fill(pending.consent ? Color.mint.opacity(0.06) : Color.surfaceSunken)
+                        .overlay(shape.strokeBorder(pending.consent ? Color.mint.opacity(0.25) : Color.hairline, lineWidth: 1))
                 }
                 .stageAnimation(Theme.Motion.standard, value: pending.consent)
             if !pending.refused.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
                     ForEach(pending.refused, id: \.self) { r in
                         Label(r.reason.contains(r.file) ? r.reason : "\(r.file): \(r.reason)", systemImage: "exclamationmark.triangle.fill")
-                            .textRole(.caption, color: .footlight)
+                            .textRole(.caption, color: Tone.warning.textColor)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -408,13 +413,13 @@ struct ImportConsentSheet: View {
         return VStack(alignment: .leading, spacing: 7) {
             ForEach(shown, id: \.id) { v in
                 HStack(spacing: Theme.Space.s) {
-                    Image(systemName: v.needsSpeakerConsent ? "person.wave.2" : "wand.and.stars")
+                    Image(systemName: v.needsSpeakerConsent ? Voice.Origin.cloned.symbol : Voice.Origin.designed.symbol)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(v.needsSpeakerConsent ? Color.tungsten : Color.mint)
+                        .foregroundStyle(Color.textTertiary)
                         .frame(width: 18)
                     Text(v.name).textRole(.label).lineLimit(1)
                     Spacer(minLength: Theme.Space.s)
-                    Text((v.needsSpeakerConsent ? "Cloned" : "Designed") + String(format: " · %.1f s", v.duration))
+                    Text((v.needsSpeakerConsent ? "Cloned" : "Designed") + " · \(max(1, Int(v.duration.rounded()))) s")
                         .textRole(.caption, color: .textTertiary)
                         .fixedSize()
                 }
@@ -426,5 +431,40 @@ struct ImportConsentSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.Space.m)
         .surface(.sunken, radius: Theme.Radius.m)
+    }
+}
+
+// MARK: - Menu label
+
+/// The label of a header or toolbar menu, drawn like a `.secondary` button (a `Menu` doesn't take Encore's button
+/// styles). An optional count shows how many of the menu's options are on.
+private struct SecondaryMenuLabel: View {
+    let title: String
+    let systemImage: String
+    var count = 0
+    var size: ControlSize = .small
+    @State private var isHovered = false
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
+        let small = size == .small || size == .mini
+        HStack(spacing: 6) {
+            Image(systemName: systemImage).imageScale(.small)
+            Text(title).textRole(small ? .label : .headline)
+            if count > 0 { CountBadge(count).controlSize(.small) }
+        }
+        .foregroundStyle(Color.textPrimary)
+        .lineLimit(1)
+        .padding(.horizontal, small ? 10 : 12)
+        .frame(height: Theme.ControlHeight.of(size))
+        .background {
+            shape.fill(Color.surfaceRaised)
+                .brightness(isHovered ? 0.03 : 0)
+                .overlay(shape.strokeBorder(isHovered ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
+        }
+        .contentShape(shape)
+        .onHover { isHovered = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(count > 0 ? "\(count) on" : "")
     }
 }

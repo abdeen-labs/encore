@@ -1,12 +1,14 @@
+import EncoreCore
 import SwiftUI
 
-/// The window layout: the rail on the ink, the current screen on a lit "stage" panel, and the
-/// player dock in the pit underneath it.
+/// The window layout: the rail on the ink, the current screen on a lit "stage" panel, and, once something has
+/// played, the player dock in the pit underneath it. With nothing played the stage runs down to an 8pt margin.
 struct RootView: View {
     @Environment(Router.self) private var router
     @Environment(ToastCenter.self) private var toasts
 
     var body: some View {
+        let hasDock = NowPlaying.shared.player != nil
         HStack(spacing: 0) {
             SidebarRail()
             VStack(spacing: 0) {
@@ -21,6 +23,8 @@ struct RootView: View {
             }
             .padding(.top, Theme.Space.s)
             .padding(.trailing, Theme.Space.s)
+            .padding(.bottom, hasDock ? 0 : Theme.Space.s)
+            .stageAnimation(Theme.Motion.standard, value: NowPlaying.shared.player?.id)
         }
         .background(StageBackdrop())
         .preferredColorScheme(.dark)

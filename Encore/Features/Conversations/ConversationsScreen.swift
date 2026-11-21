@@ -2,12 +2,13 @@ import EncoreCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Multi-speaker scripts, cast and staged.
+/// Multi-speaker scripts, cast and performed.
 ///
-/// The script is a running order of lines, each in its speaker's color, with the pause after it shown (and
-/// adjustable) between lines. The cast and the staging (model, language, pauses, tuning) sit in the wings beside
-/// it, or in a drawer when the window is narrow. Lines already rendered are marked and reused, so after an edit
-/// only the changed lines are generated again; any line can be auditioned on its own.
+/// The script is a running order of lines, each speaker's name in their color. A pause marker shows between two
+/// lines only where that pause differs from the default (hover the gap, or use the line's menu, to set one). The
+/// cast and the staging (model, language, pauses, tuning) sit in a column beside the script, or in a drawer when
+/// the window is narrow. Lines already generated are reused, so after an edit only the changed lines are
+/// generated again; those still to generate are marked. Any line can be auditioned on its own.
 struct ConversationsScreen: View {
     @Environment(AppDependencies.self) private var deps
 
@@ -66,8 +67,9 @@ struct ConversationsStage: View {
             if !wide {
                 Button {
                     withStageAnimation { drawerOpen.toggle() }
-                } label: { Label("Cast & staging", systemImage: "person.2.badge.gearshape") }
+                } label: { Label("Cast", systemImage: "person.2") }
                     .buttonStyle(.ghost)
+                    .help("Cast and staging: model, voices, pauses, tuning")
             }
             Button("Pronunciations", systemImage: "character.book.closed") { showPronunciations = true }
                 .labelStyle(.iconOnly)
@@ -105,24 +107,25 @@ struct ConversationsStage: View {
         if !model.shelf.hasScanned {
             Color.clear
         } else if model.needsFirstModel {
-            ConversationsFirstRun()
+            FirstModelStage(symbol: "bubble.left.and.bubble.right", title: "No one to cast yet",
+                            message: "Conversations are performed by the same models as the Studio. Zonos3 Mini has dozens of voices to cast from; Qwen3-TTS and Chatterbox can speak in your own.",
+                            starterIDs: ["zonos3-mini", "qwen3-tts-base", "chatterbox-turbo"])
         } else {
             HStack(alignment: .top, spacing: Theme.Space.xl) {
                 if wide {
                     StagingColumn(model: model)
                         .frame(width: 286)
                         .padding(.trailing, Theme.Space.l)
-                        .overlay(alignment: .trailing) { wingEdge }
+                        .overlay(alignment: .trailing) { Hairline(.vertical) }
                 }
-                ScriptColumn(model: model, compact: !wide, shortWindow: height < 520,
-                             openCast: { withStageAnimation { drawerOpen = true } }, importScript: importScript, chooseFile: { importing = true })
+                ScriptColumn(model: model, shortWindow: height < 520, importScript: importScript, chooseFile: { importing = true })
                     .zIndex(1)
             }
             .overlay(alignment: .trailing) {
                 if drawerOpen && !wide {
                     VStack(alignment: .leading, spacing: Theme.Space.s) {
                         HStack {
-                            Text("Cast & staging").textRole(.heading)
+                            Text("Cast & staging").textRole(.section)
                             Spacer()
                             Button("Close", systemImage: "xmark") { withStageAnimation { drawerOpen = false } }
                                 .buttonStyle(.icon).controlSize(.small)
@@ -144,22 +147,13 @@ struct ConversationsStage: View {
             .onGeometryChange(for: CGSize.self) { $0.size } action: { width = $0.width; height = $0.height }
         }
     }
-
-    private var wingEdge: some View {
-        Rectangle()
-            .fill(LinearGradient(colors: [.clear, Color.hairlineStrong, Color.tungsten.opacity(0.18), Color.hairlineStrong, .clear],
-                                 startPoint: .top, endPoint: .bottom))
-            .frame(width: 1)
-    }
 }
 
 // MARK: - Script column
 
 private struct ScriptColumn: View {
     @Bindable var model: ConversationsModel
-    let compact: Bool
     let shortWindow: Bool
-    let openCast: () -> Void
     let importScript: (URL) -> Void
     let chooseFile: () -> Void
     @Environment(Router.self) private var router
@@ -173,7 +167,6 @@ private struct ScriptColumn: View {
             } else if let report = model.importReport {
                 ScriptImportBanner(model: model, report: report)
             }
-            if compact, !model.speakers.isEmpty { CastStrip(model: model, open: openCast) }
             if model.lines.isEmpty {
                 EmptyScript(model: model, chooseFile: chooseFile)
                     .frame(maxHeight: .infinity)
@@ -186,7 +179,7 @@ private struct ScriptColumn: View {
                 ResultCard(model: model, result: result, compact: shortWindow)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            RunSurface(runner: model.runner, title: model.result == nil ? "Stage it" : "Render again", systemImage: "play.fill",
+            RunSurface(runner: model.runner, title: model.result == nil ? "Perform" : "Perform again", systemImage: "play.fill",
                        blockedReason: model.runner.error == nil ? model.blockedReason : nil,
                        idleNote: model.idleNote, action: model.render)
         }
@@ -194,9 +187,9 @@ private struct ScriptColumn: View {
         .overlay {
             if dropTargeted {
                 RoundedRectangle(cornerRadius: Theme.Radius.l, style: .continuous)
-                    .strokeBorder(Color.tungsten, style: StrokeStyle(lineWidth: 1.5, dash: [0.1, 7]))
-                    .background(Color.tungsten.opacity(0.05))
-                    .overlay(Text("Drop to import the script").textRole(.headline, color: .tungsten))
+                    .strokeBorder(Color.textSecondary, style: StrokeStyle(lineWidth: 1.5, dash: [0.1, 7]))
+                    .background(Color.textPrimary.opacity(0.04))
+                    .overlay(Text("Drop to import the script").textRole(.headline))
                     .allowsHitTesting(false)
             }
         }
@@ -214,18 +207,17 @@ private struct ScriptColumn: View {
         HStack(alignment: .firstTextBaseline, spacing: Theme.Space.m) {
             TextField("Untitled conversation", text: $model.script.title)
                 .textFieldStyle(.plain)
-                .font(.display(22))
-                .foregroundStyle(.textPrimary)
+                .textRole(.heading)
                 .frame(minWidth: 120)
             if !model.lines.isEmpty {
-                Text(stats).textRole(.monoSmall, color: .textTertiary).lineLimit(1).fixedSize()
+                Text(stats).textRole(.caption, color: .textTertiary).lineLimit(1).fixedSize()
             }
         }
     }
 
     private var stats: String {
         let n = model.lines.count
-        return "\(n) line\(n == 1 ? "" : "s") · \(model.speakingCount) speaking · ≈ \(Timecode.string(model.estimatedSeconds, tenths: false))"
+        return "\(n) line\(n == 1 ? "" : "s") · about \(Timecode.string(model.estimatedSeconds, tenths: false))"
     }
 
     @ViewBuilder private var notices: some View {
@@ -264,34 +256,35 @@ private struct UnnamedSpeakersQuestion: View {
     let pending: ConversationsModel.PendingUnnamedImport
 
     var body: some View {
-        Banner(.accent, title: "Who reads “\(pending.fileName)”?",
+        Banner(.neutral, title: "Who reads “\(pending.fileName)”?",
                message: "It has no speaker names. Read all \(pending.paragraphs) paragraphs in one voice, or alternate them between two speakers?",
                onDismiss: { withStageAnimation { model.cancelUnnamedImport() } }) {
             Button("Alternate", systemImage: "person.2") { withStageAnimation { model.finishUnnamedImport(.alternating) } }
                 .buttonStyle(.secondary).controlSize(.small)
                 .help("Paragraphs alternate between Speaker 1 and Speaker 2")
             Button("One voice", systemImage: "person") { withStageAnimation { model.finishUnnamedImport(.oneVoice) } }
-                .buttonStyle(.primary).controlSize(.small)
+                .buttonStyle(.secondary).controlSize(.small)
                 .help("One speaker reads every paragraph")
         }
     }
 }
 
-/// What an import found: the layout it recognized, the cast, and anything worth checking.
+/// What an import found, in one line: the layout it recognized. Skipped lines and voices cast from the library
+/// follow only when there are any; the cast and line count are already on screen.
 private struct ScriptImportBanner: View {
     let model: ConversationsModel
     let report: ConversationsModel.ImportReport
 
     var body: some View {
         let layout: String = switch report.layout {
-        case .labeled: "labeled lines (Name: text)"
+        case .labeled: "labeled lines"
         case .screenplay: "a screenplay"
-        case .paragraphs: "paragraphs without names"
+        case .paragraphs: "paragraphs"
         }
-        var message = "Read as \(layout): \(report.speakers) speaker\(report.speakers == 1 ? "" : "s"), \(report.lines) lines."
-        if !report.castFromLibrary.isEmpty { message += " Cast from your library: \(report.castFromLibrary.joined(separator: ", "))." }
-        if !report.notes.isEmpty { message += " " + report.notes.joined(separator: " ") }
-        return Banner(.neutral, title: "Imported “\(report.fileName)”", message: message,
+        var details: [String] = report.notes
+        if !report.castFromLibrary.isEmpty { details.append("Cast from your library: \(report.castFromLibrary.joined(separator: ", ")).") }
+        return Banner(.neutral, title: "Imported “\(report.fileName)” as \(layout)",
+                      message: details.isEmpty ? nil : details.joined(separator: " "),
                       onDismiss: { withStageAnimation { model.dismissImportReport() } }) {
             if model.canUndoImport {
                 Button("Undo import") { withStageAnimation { model.undoImport() } }.buttonStyle(.ghost).controlSize(.small)
@@ -307,24 +300,18 @@ private struct EmptyScript: View {
     var body: some View {
         // Scrolls rather than pushing the page taller than a small window.
         ScrollView {
-            VStack(spacing: Theme.Space.m) {
-                Image(systemName: "bubble.left.and.bubble.right")
-                    .font(.system(size: 30, weight: .light))
-                    .foregroundStyle(Color.tungsten)
-                    .glow(.tungsten, radius: 14, intensity: 0.45)
-                Text("Write a scene").font(.display(26)).foregroundStyle(.textPrimary)
-                Text("Import a .txt or .pdf script (labeled lines or a screenplay), drop one here, or start writing.")
-                    .textRole(.body, color: .textSecondary).multilineTextAlignment(.center).frame(maxWidth: 440)
+            EmptyState(symbol: "bubble.left.and.bubble.right", title: "Write a scene",
+                       message: "Import a .txt or .pdf script (labeled lines or a screenplay), drop one here, or start writing.",
+                       style: .plain) {
                 HStack(spacing: Theme.Space.s) {
                     Button("Import a script…", systemImage: "square.and.arrow.down", action: chooseFile)
                         .buttonStyle(.primary)
                     Button("Start writing", systemImage: "pencil") { withStageAnimation { model.startWriting() } }
                         .buttonStyle(.secondary)
                 }
-                .padding(.top, Theme.Space.xs)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Space.xxl)
+            .padding(.vertical, Theme.Space.xl)
         }
         .scrollBounceBehavior(.basedOnSize)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -338,11 +325,13 @@ private struct LinesList: View {
     @Bindable var model: ConversationsModel
 
     var body: some View {
+        // Marks for lines still to generate mean something only once some lines are generated already.
+        let marksPending = model.hasReusableLines
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(model.lines.enumerated()), id: \.element.id) { i, line in
-                        LineRow(model: model, line: line, number: i + 1)
+                        LineRow(model: model, line: line, number: i + 1, marksPending: marksPending)
                             .id(line.id)
                         if i + 1 < model.lines.count {
                             PauseGap(model: model, line: line)
@@ -352,8 +341,7 @@ private struct LinesList: View {
                         withStageAnimation { model.editingLineID = model.addLine(after: model.lines.last?.id) }
                     } label: {
                         Label("Add a line", systemImage: "plus")
-                            .font(.ui(12.5, weight: .medium))
-                            .foregroundStyle(.textTertiary)
+                            .textRole(.label, color: .textTertiary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, Theme.Space.l)
                             .frame(height: 34)
@@ -378,11 +366,13 @@ private struct LinesList: View {
     }
 }
 
-/// One line of the script: number, speaker (in their color), the text with its tags lit, and its state.
+/// One line of the script: number, speaker (in their color), the text with its tags marked, and a mark while it
+/// still needs generating.
 private struct LineRow: View {
     @Bindable var model: ConversationsModel
     let line: ConversationScript.Line
     let number: Int
+    let marksPending: Bool
     @State private var hovered = false
     @State private var dropTarget = false
 
@@ -394,30 +384,27 @@ private struct LineRow: View {
         let state = model.state(of: line)
         HStack(alignment: .top, spacing: Theme.Space.m) {
             Text("\(number)")
-                .font(.mono(10.5, weight: .medium))
-                .foregroundStyle(state == .rendering ? Color.tungsten : .textTertiary)
+                .textRole(.monoSmall, color: .textTertiary)
                 .frame(width: 22, alignment: .trailing)
-                .padding(.top, 3)
+                .padding(.top, 2)
                 .draggable(line.id.uuidString) {
                     Text(speaker?.name ?? "Line").textRole(.headline, color: tint)
                         .padding(8).background(Color.surfaceRaised, in: RoundedRectangle(cornerRadius: 6))
                 }
                 .help("Drag to reorder")
             Capsule().fill(tint.opacity(state == .empty ? 0.3 : 0.9)).frame(width: 2.5)
-                .glow(tint, radius: 4, intensity: state == .rendering ? 0.7 : 0)
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: Theme.Space.s) {
                     speakerMenu(speaker, tint: tint)
                     Spacer(minLength: Theme.Space.s)
                     if hovered || isEditing || state == .rendering { actions(state) }
-                    StateMark(state: state, reuse: model.reuseLines)
+                    StateMark(state: state, marksPending: marksPending, reuse: model.reuseLines)
                 }
                 if isEditing {
                     LineEditor(model: model, line: line, speakerName: speaker?.name ?? "this speaker")
                 } else {
                     Text(attributedText)
-                        .font(.ui(14.5))
-                        .lineSpacing(4)
+                        .textRole(.script)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .contentShape(Rectangle())
@@ -428,7 +415,7 @@ private struct LineRow: View {
         }
         .padding(.leading, Theme.Space.s)
         .padding(.trailing, Theme.Space.m)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
         .background {
             let shape = RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
             if isEditing {
@@ -440,7 +427,7 @@ private struct LineRow: View {
             }
         }
         .overlay(alignment: .top) {
-            if dropTarget { Capsule().fill(Color.tungsten).frame(height: 2).glow(.tungsten, radius: 4, intensity: 0.6).offset(y: -1) }
+            if dropTarget { Capsule().fill(Color.textSecondary).frame(height: 2).offset(y: -1) }
         }
         .padding(.horizontal, Theme.Space.s)
         .onHover { hovered = $0 }
@@ -468,9 +455,7 @@ private struct LineRow: View {
             }
         } label: {
             HStack(spacing: 4) {
-                Text((speaker?.name ?? "Nobody").uppercased())
-                    .font(.ui(10.5, weight: .bold)).tracking(1.1)
-                    .foregroundStyle(tint)
+                Text(speaker?.name ?? "Nobody").textRole(.eyebrow, color: tint)
                 Image(systemName: "chevron.down").font(.system(size: 6.5, weight: .bold)).foregroundStyle(tint.opacity(hovered ? 0.8 : 0))
             }
             .contentShape(Rectangle())
@@ -485,16 +470,17 @@ private struct LineRow: View {
                 Button("Stop", systemImage: "stop.fill") { model.auditionRunner.cancel() }
                     .buttonStyle(.icon).controlSize(.small).help("Stop the audition")
             } else if model.auditionedLineID == line.id, model.auditionPlayer.isLoaded {
-                Button(model.auditionPlayer.isPlaying ? "Pause" : "Play again", systemImage: model.auditionPlayer.isPlaying ? "pause.fill" : "play.fill") {
+                let playing = model.auditionPlayer.isPlaying
+                Button(playing ? "Pause" : "Play again", systemImage: playing ? "pause.fill" : "play.fill") {
                     model.auditionPlayer.toggle()
                 }
-                .buttonStyle(.icon(tone: .accent)).controlSize(.small).help("Play the audition again")
+                .buttonStyle(.play(isPlaying: playing)).controlSize(.small).help("Play the audition again")
                 Button("Audition again", systemImage: "arrow.clockwise") { model.audition(line.id) }
                     .buttonStyle(.icon).controlSize(.small).help("Audition this line again")
                     .disabled(model.auditionRunner.isBusy || state == .empty)
             } else {
                 Button("Audition", systemImage: "play.circle") { model.audition(line.id) }
-                    .buttonStyle(.icon(tone: .accent)).controlSize(.small)
+                    .buttonStyle(.icon).controlSize(.small)
                     .help("Hear this line on its own (not saved to History)")
                     .disabled(model.auditionRunner.isBusy || state == .empty || model.manifest == nil)
             }
@@ -511,6 +497,7 @@ private struct LineRow: View {
             if isEditing { model.endEditing() } else { model.endEditing(); model.editingLineID = line.id }
         }
         Button("Audition") { model.audition(line.id) }.disabled(model.auditionRunner.isBusy)
+        Button("Pause after this line…") { model.pauseEditingLineID = line.id }.disabled(number == model.lines.count)
         Divider()
         Button("Insert a line after") { withStageAnimation { model.editingLineID = model.addLine(after: line.id) } }
         Button(line.text.contains(where: \.isNewline) ? "Split at the line breaks" : "Split into sentences") {
@@ -525,13 +512,13 @@ private struct LineRow: View {
         Button("Delete line", role: .destructive) { withStageAnimation { model.deleteLine(line.id) } }
     }
 
-    /// The text with its tags colored as in the editor.
+    /// The text with its tags marked as in the editor: voice cues in gel, other tags as quiet markup, and a tag the
+    /// model won't understand underlined.
     private var attributedText: AttributedString {
         let text = line.text
         guard !text.isEmpty else {
             var a = AttributedString("Empty line: click to write it")
             a.foregroundColor = .textTertiary
-            a.font = .display(15, italic: true)
             return a
         }
         var a = AttributedString(text)
@@ -539,40 +526,41 @@ private struct LineRow: View {
         for tag in model.parser.parse(text).tags {
             guard let r = Range<AttributedString.Index>(tag.range, in: a) else { continue }
             a[r].foregroundColor = ScriptTagStyle.color(tag.kind)
-            a[r].font = .mono(12.5, weight: .medium)
-            a[r].backgroundColor = ScriptTagStyle.color(tag.kind).opacity(0.11)
+            a[r].backgroundColor = ScriptTagStyle.background(tag.kind)
+            a[r].font = TextRole.mono.font
+            if tag.kind == .unrecognized {
+                a[r].underlineStyle = Text.LineStyle(pattern: .dot, color: ScriptTagStyle.problemColor)
+            }
         }
         return a
     }
 }
 
-/// Ready / to generate / generating / done, as a small mark at the end of a line's header.
+/// A small mark at the end of a line's header, only while the line still needs work: to generate, or generating.
+/// A line that is ready shows nothing.
 private struct StateMark: View {
     let state: ConversationsModel.LineState
+    /// Whether "to generate" is worth marking (some other lines are already generated).
+    let marksPending: Bool
     let reuse: Bool
 
     var body: some View {
-        Group {
-            switch state {
-            case .empty: EmptyView()
-            case .pending:
-                Circle().strokeBorder(Color.tungsten.opacity(0.75), style: StrokeStyle(lineWidth: 1.3, dash: [2, 2]))
-                    .frame(width: 11, height: 11)
-                    .help(reuse ? "New or changed: will be generated" : "Will be generated (reuse is off)")
-            case .ready:
-                Image(systemName: "checkmark.circle.fill").font(.system(size: 11.5)).foregroundStyle(Color.mint.opacity(0.85))
-                    .help("Rendered already: reused as is, so it costs nothing to render again")
-            case .rendering:
-                ActivityIndicator(tone: .accent, size: 11)
-            case .done:
-                Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.mint)
-            }
+        switch state {
+        case .pending where marksPending:
+            Circle().strokeBorder(Color.textSecondary, style: StrokeStyle(lineWidth: 1.3, dash: [2, 2]))
+                .frame(width: 11, height: 11)
+                .frame(width: 14, height: 14)
+                .help(reuse ? "New or changed: will be generated" : "Will be generated (reuse is off)")
+        case .rendering:
+            ActivityIndicator(tone: .accent, size: 11)
+                .frame(width: 14, height: 14)
+        default:
+            EmptyView()
         }
-        .frame(width: 14, height: 14)
     }
 }
 
-/// The editor for the line being edited: tags lit as you type, chips to insert tags, Return to split.
+/// The editor for the line being edited: tags marked as you type, menus to insert tags, Return to split.
 private struct LineEditor: View {
     @Bindable var model: ConversationsModel
     let line: ConversationScript.Line
@@ -583,23 +571,21 @@ private struct LineEditor: View {
                            set: { model.setText($0, for: line.id) })
         VStack(alignment: .leading, spacing: 0) {
             TaggedScriptEditor(text: text, parsed: model.parser.parse(text.wrappedValue), controller: model.editor,
-                               placeholder: "What does \(speakerName) say?", fontSize: 14.5,
+                               placeholder: "What does \(speakerName) say?", fontSize: 15,
                                onCommandReturn: { withStageAnimation(Theme.Motion.quick) { model.endEditing() } })
                 .frame(height: height(for: text.wrappedValue))
+            Hairline()
             HStack(spacing: Theme.Space.s) {
                 if let m = model.manifest {
                     TagInserter(manifest: m, includesVoiceSwitch: false) { model.editor.insert($0) }
-                        .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.88),
-                                                     .init(color: .black.opacity(0), location: 1)], startPoint: .leading, endPoint: .trailing))
                 }
                 Spacer(minLength: Theme.Space.s)
-                Text("↩ splits · ⌘↩ done").textRole(.monoSmall, color: .textTertiary).fixedSize()
+                Text("↩ splits · ⌘↩ done").textRole(.caption, color: .textTertiary).fixedSize()
                 Button("Done") { withStageAnimation(Theme.Motion.quick) { model.endEditing() } }
                     .buttonStyle(.secondary).controlSize(.small)
             }
             .padding(.horizontal, Theme.Space.s)
             .padding(.vertical, 6)
-            .overlay(alignment: .top) { Rectangle().fill(Color.hairline).frame(height: 1) }
         }
         .surface(.sunken, radius: Theme.Radius.m)
         .onAppear { DispatchQueue.main.async { model.editor.focus() } }
@@ -612,59 +598,72 @@ private struct LineEditor: View {
     }
 }
 
-/// The pause after a line, drawn between it and the next. Dim at the default; lit when this line has its own.
+/// The pause after a line, between it and the next. Shown only where it differs from the default (set once by the
+/// slider); hovering the gap shows it so a pause can be set, as does "Pause after this line…" in the line's menu.
 private struct PauseGap: View {
     @Bindable var model: ConversationsModel
     let line: ConversationScript.Line
-    @State private var open = false
     @State private var hovered = false
 
     var body: some View {
         let own = line.pauseAfter
         let seconds = own ?? model.pauseSeconds
-        HStack(spacing: Theme.Space.s) {
-            Rectangle().fill(Color.hairline).frame(width: 40, height: 1)
-            Button { open.toggle() } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "pause").font(.system(size: 7, weight: .bold))
-                    Text(String(format: "%.2g s", seconds)).font(.mono(10, weight: own == nil ? .regular : .semibold))
-                }
-                .foregroundStyle(own == nil ? (hovered ? Color.textSecondary : Color.textTertiary) : Color.mint)
-                .padding(.horizontal, 7)
-                .frame(height: 17)
-                .background(Capsule().fill(own == nil ? Color.clear : Color.mint.opacity(0.1)))
-                .overlay(Capsule().strokeBorder(own == nil ? Color.hairline.opacity(hovered ? 1 : 0) : Color.mint.opacity(0.4), lineWidth: 1))
-                .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .onHover { hovered = $0 }
-            .help(own == nil ? "Pause after this line: the default. Click to set this one." : "This line's own pause. Click to change.")
-            .pickerPanel(isPresented: $open, width: 260) {
-                VStack(alignment: .leading, spacing: Theme.Space.m) {
-                    Text("Pause after line").textRole(.eyebrow)
-                    StageSlider(value: Binding(get: { line.pauseAfter ?? model.pauseSeconds },
-                                               set: { model.setPause($0, after: line.id) }),
-                                in: 0...4, step: 0.05, defaultValue: model.pauseSeconds) { String(format: "%.2f s", $0) }
-                    HStack {
-                        Text(own == nil ? "Using the default" : "Default is \(String(format: "%.2g", model.pauseSeconds)) s")
-                            .textRole(.caption, color: .textTertiary)
-                        Spacer()
-                        if own != nil {
-                            Button("Use default") { model.setPause(nil, after: line.id); open = false }
-                                .buttonStyle(.ghost).controlSize(.small)
-                        }
+        let differs = own.map { abs($0 - model.pauseSeconds) > 0.001 } ?? false
+        let open = Binding(get: { model.pauseEditingLineID == line.id },
+                           set: { show in
+                               if show { model.pauseEditingLineID = line.id }
+                               else if model.pauseEditingLineID == line.id { model.pauseEditingLineID = nil }
+                           })
+        let shown = differs || hovered || open.wrappedValue
+        ZStack(alignment: .leading) {
+            Color.clear.contentShape(Rectangle())
+            HStack(spacing: Theme.Space.s) {
+                Button { open.wrappedValue.toggle() } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "pause").font(.system(size: 7, weight: .bold))
+                        Text(String(format: "%.2g s", seconds)).textRole(.monoSmall, color: differs ? .textSecondary : .textTertiary)
                     }
-                    Text("Pauses never need a re-render: lines are reused, only the gaps change.")
-                        .textRole(.caption, color: .textTertiary).fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(differs ? Color.textSecondary : .textTertiary)
+                    .padding(.horizontal, 7)
+                    .frame(height: 17)
+                    .background(Capsule().fill(Color.surfaceRaised.opacity(differs ? 1 : 0)))
+                    .overlay(Capsule().strokeBorder(Color.hairline, lineWidth: 1))
+                    .contentShape(Capsule())
                 }
-                .padding(Theme.Space.m)
+                .buttonStyle(.plain)
+                .help(differs ? "This line's own pause. Click to change." : "Pause after this line: the default. Click to set this one.")
+                .pickerPanel(isPresented: open, width: 260) {
+                    VStack(alignment: .leading, spacing: Theme.Space.m) {
+                        Text("Pause after line \(lineNumber)").textRole(.headline)
+                        StageSlider(value: Binding(get: { line.pauseAfter ?? model.pauseSeconds },
+                                                   set: { model.setPause($0, after: line.id) }),
+                                    in: 0...4, step: 0.05, defaultValue: model.pauseSeconds) { String(format: "%.2f s", $0) }
+                        HStack {
+                            Text(own == nil ? "Using the default" : "Default is \(String(format: "%.2g", model.pauseSeconds)) s")
+                                .textRole(.caption, color: .textTertiary)
+                            Spacer()
+                            if own != nil {
+                                Button("Use default") { model.setPause(nil, after: line.id); open.wrappedValue = false }
+                                    .buttonStyle(.ghost).controlSize(.small)
+                            }
+                        }
+                        Text("Changing a pause doesn't generate any line again.")
+                            .textRole(.caption, color: .textTertiary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(Theme.Space.m)
+                }
+                Hairline()
             }
-            Rectangle().fill(Color.hairline).frame(height: 1)
+            .opacity(shown ? 1 : 0)
         }
         .padding(.leading, 30 + Theme.Space.s)
         .padding(.trailing, Theme.Space.l)
-        .frame(height: 20)
+        .frame(height: 12)
+        .onHover { hovered = $0 }
+        .stageAnimation(Theme.Motion.quick, value: shown)
     }
+
+    private var lineNumber: Int { (model.lines.firstIndex { $0.id == line.id } ?? 0) + 1 }
 }
 
 // MARK: - Cast and staging
@@ -682,20 +681,22 @@ private struct StagingColumn: View {
                     LanguagePicker(manifest: m, selection: $model.language)
                 }
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Cast").textRole(.heading)
-                    if !model.speakers.isEmpty { Text("\(model.speakers.count)").textRole(.mono, color: .textTertiary) }
+                    Text("Cast").textRole(.section)
                     Spacer()
                     Button("Add speaker", systemImage: "plus") { withStageAnimation { model.addSpeaker() } }
                         .buttonStyle(.ghost).controlSize(.small)
                 }
                 .padding(.top, Theme.Space.xs)
-                if model.speakers.isEmpty {
-                    Text("Speakers appear here when you import a script or start writing.")
-                        .textRole(.caption, color: .textTertiary)
+                VStack(alignment: .leading, spacing: 0) {
+                    if model.speakers.isEmpty {
+                        Text("Speakers appear here when you import a script or start writing.")
+                            .textRole(.caption, color: .textTertiary)
+                    }
+                    ForEach(model.speakers) { s in
+                        SpeakerRow(model: model, speaker: s, onRemove: { removing = s })
+                    }
                 }
-                ForEach(model.speakers) { s in
-                    SpeakerCard(model: model, speaker: s, onRemove: { removing = s })
-                }
+                .padding(.top, -Theme.Space.xs)
                 if !model.sharedVoices.isEmpty {
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "info.circle").font(.system(size: 10.5)).foregroundStyle(Color.footlight)
@@ -703,27 +704,26 @@ private struct StagingColumn: View {
                             .textRole(.caption).fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                PerforatedDivider(notchFill: .stage).padding(.vertical, Theme.Space.xxs)
+                Hairline().padding(.vertical, Theme.Space.xxs)
                 StageSlider("Pause between lines", value: $model.pauseSeconds, in: 0...3, step: 0.05, defaultValue: 0.4) {
                     String(format: "%.2f s", $0)
                 }
-                .help("Silence after each line, unless a line has its own (click the pause under it).")
+                .help("Silence after each line, unless a line has its own (hover the gap under a line to set one).")
                 if let m = model.manifest {
                     AdvancedDisclosure("Tuning", isExpanded: $model.showTuning) {
                         VStack(alignment: .leading, spacing: Theme.Space.m) {
                             HStack {
-                                Text(m.name).textRole(.headline)
                                 Spacer()
                                 PresetsMenu(manifest: m, parameters: $model.parameters, post: $model.post)
                             }
                             ParameterPanel(manifest: m, values: $model.parameters)
-                            PerforatedDivider(notchFill: .stage).padding(.vertical, Theme.Space.xxs)
+                            Hairline().padding(.vertical, Theme.Space.xxs)
                             Text("Finishing").textRole(.eyebrow)
                             PostProcessingControls(options: $model.post)
                             Toggle(isOn: $model.reuseLines) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Reuse unchanged lines").textRole(.body)
-                                    Text("Off: a fresh take of every line on each render").textRole(.caption, color: .textTertiary)
+                                    Text("Off: a fresh take of every line each time").textRole(.caption, color: .textTertiary)
                                 }
                             }
                             .toggleStyle(.stage)
@@ -750,101 +750,45 @@ private struct StagingColumn: View {
     }
 }
 
-/// A speaker: their mark, name (editable) and voice.
-private struct SpeakerCard: View {
+/// A speaker on one row: a dot in their color, their name (editable), their voice, and a quiet remove control.
+private struct SpeakerRow: View {
     @Bindable var model: ConversationsModel
     let speaker: ConversationScript.Speaker
     let onRemove: () -> Void
     @State private var name = ""
+    @State private var hovered = false
     @FocusState private var editingName: Bool
 
     var body: some View {
-        let tint = model.tint(speaker.id)
         let count = model.lineCount(for: speaker.id)
-        VStack(alignment: .leading, spacing: Theme.Space.s) {
-            HStack(spacing: Theme.Space.s) {
-                Monogram(name: speaker.name, tint: tint)
-                TextField("Name", text: $name)
-                    .textFieldStyle(.plain)
-                    .font(.ui(13.5, weight: .semibold))
-                    .foregroundStyle(.textPrimary)
-                    .focused($editingName)
-                    .onSubmit { model.rename(speaker.id, to: name) }
-                    .onChange(of: editingName) { _, f in if !f { model.rename(speaker.id, to: name) } }
-                Text(count == 0 ? "silent" : "\(count) line\(count == 1 ? "" : "s")").textRole(.monoSmall, color: .textTertiary).fixedSize()
-                Button("Remove \(speaker.name)", systemImage: "xmark") { onRemove() }
-                    .buttonStyle(.icon).controlSize(.small)
-                    .help("Remove from the cast")
-            }
+        HStack(spacing: Theme.Space.s) {
+            Circle().fill(model.tint(speaker.id)).frame(width: 8, height: 8)
+                .help(count == 0 ? "No lines yet" : "\(count) line\(count == 1 ? "" : "s")")
+                .accessibilityHidden(true)
+            TextField("Name", text: $name)
+                .textFieldStyle(.plain)
+                .textRole(.headline)
+                .focused($editingName)
+                .onSubmit { model.rename(speaker.id, to: name) }
+                .onChange(of: editingName) { _, f in if !f { model.rename(speaker.id, to: name) } }
+                .frame(width: 84, alignment: .leading)
             if let m = model.manifest {
                 VoicePicker(manifest: m, selection: Binding(get: { model.speaker(speaker.id)?.voice ?? .automatic },
                                                             set: { model.setVoice($0, for: speaker.id) }),
                             language: model.language)
+                    .compact()
+                    .frame(maxWidth: .infinity)
             }
+            Button("Remove \(speaker.name)", systemImage: "xmark") { onRemove() }
+                .buttonStyle(.icon).controlSize(.small)
+                .opacity(hovered || editingName ? 1 : 0.45)
+                .help("Remove from the cast")
         }
-        .padding(Theme.Space.s)
-        .background {
-            let shape = RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
-            shape.fill(Color.surface)
-                .overlay(alignment: .leading) { Rectangle().fill(tint).frame(width: 2.5).clipShape(shape) }
-                .overlay(shape.strokeBorder(Color.hairline, lineWidth: 1))
-        }
+        .padding(.vertical, 1)
+        .frame(minHeight: 38)
+        .onHover { hovered = $0 }
         .onAppear { name = speaker.name }
         .onChange(of: speaker.name) { _, n in if !editingName { name = n } }
-    }
-}
-
-/// A speaker's mark: their initials on their color.
-struct Monogram: View {
-    let name: String
-    let tint: Color
-    var size: CGFloat = 24
-
-    var body: some View {
-        Text(initials)
-            .font(.ui(size * 0.42, weight: .bold))
-            .foregroundStyle(Color.onTungsten)
-            .frame(width: size, height: size)
-            .background(Circle().fill(tint))
-            .accessibilityHidden(true)
-    }
-
-    private var initials: String {
-        let words = name.split(whereSeparator: { $0 == " " || $0 == "." }).filter { ($0.first?.isLetter ?? false) || ($0.first?.isNumber ?? false) }
-        let letters = words.prefix(2).compactMap(\.first).map(String.init)
-        return letters.isEmpty ? "?" : letters.joined().uppercased()
-    }
-}
-
-/// Narrow windows: the cast as a row of chips (mark, name, voice); tapping one opens the cast drawer.
-private struct CastStrip: View {
-    let model: ConversationsModel
-    let open: () -> Void
-
-    var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: Theme.Space.s) {
-                ForEach(model.speakers) { s in
-                    Button(action: open) {
-                        HStack(spacing: 6) {
-                            Monogram(name: s.name, tint: model.tint(s.id), size: 20)
-                            Text(s.name).font(.ui(12, weight: .semibold)).foregroundStyle(.textPrimary)
-                            if let m = model.manifest {
-                                Text(VoiceDescription(s.voice, manifest: m, library: model.voices).name)
-                                    .font(.ui(11.5)).foregroundStyle(.textTertiary)
-                            }
-                        }
-                        .padding(.leading, 4).padding(.trailing, 10)
-                        .frame(height: 28)
-                        .background(Capsule().fill(Color.surfaceRaised))
-                        .overlay(Capsule().strokeBorder(Color.hairline, lineWidth: 1))
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .scrollIndicators(.never)
     }
 }
 
@@ -856,11 +800,9 @@ private struct ResultCard: View {
     let compact: Bool
 
     var body: some View {
-        let generated = max(0, result.lines - result.reused)
-        let summary = result.reused > 0 ? "\(generated) generated · \(result.reused) reused" : "\(result.lines) lines"
         if compact {
             HStack(spacing: Theme.Space.s) {
-                Text(summary).textRole(.monoSmall, color: .mint).fixedSize()
+                if let summary { Text(summary).textRole(.caption).lineLimit(1).fixedSize().help(reuseHelp) }
                 WaveformPlayer(track: result.track, style: .compact)
                 Button("Close", systemImage: "xmark") { withStageAnimation { model.dismissResult() } }
                     .buttonStyle(.icon).controlSize(.small)
@@ -868,27 +810,19 @@ private struct ResultCard: View {
         } else {
             WaveformPlayer(track: result.track)
                 .accessory {
-                    StatusBadge(summary, tone: result.reused > 0 ? .success : .neutral)
-                        .help("Lines rendered before with the same text, voice and settings were reused as they were.")
+                    if let summary { Text(summary).textRole(.caption).lineLimit(1).help(reuseHelp) }
                     Button("Close", systemImage: "xmark") { withStageAnimation { model.dismissResult() } }
                         .buttonStyle(.icon).controlSize(.small)
                 }
         }
     }
-}
 
-// MARK: - First run
-
-private struct ConversationsFirstRun: View {
-    @Environment(Router.self) private var router
-
-    var body: some View {
-        EmptyState(symbol: "bubble.left.and.bubble.right", title: "No one to cast yet",
-                   message: "Conversations are performed by the same models as the Studio. Download one first: Zonos3 Mini has dozens of voices to cast from; Qwen3-TTS and Chatterbox can speak in your own.") {
-            Button("Open Models", systemImage: "arrow.down.circle") { router.go(.models) }
-                .buttonStyle(.primary).controlSize(.large)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, Theme.Space.xl)
+    /// "1 line generated, 9 reused", only when some lines were reused (the line count is in the script's title row).
+    private var summary: String? {
+        guard result.reused > 0 else { return nil }
+        let generated = max(0, result.lines - result.reused)
+        return "\(generated) line\(generated == 1 ? "" : "s") generated, \(result.reused) reused"
     }
+
+    private var reuseHelp: String { "Lines generated before with the same text, voice and settings were reused as they were." }
 }

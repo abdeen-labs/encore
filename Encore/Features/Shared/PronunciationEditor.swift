@@ -43,8 +43,8 @@ struct PronunciationEditor: View {
                 Button("CSV…") { exportFormat = .csv }
                 Button("JSON…") { exportFormat = .json }
             } label: {
-                Label("Export", systemImage: "square.and.arrow.up").font(.ui(12.5, weight: .medium))
-                    .foregroundStyle(.textSecondary).padding(.horizontal, 10).frame(height: Theme.ControlHeight.regular)
+                Label("Export", systemImage: "square.and.arrow.up").textRole(.label, color: .textSecondary)
+                    .padding(.horizontal, 10).frame(height: Theme.ControlHeight.regular)
             }
             .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
             .disabled(store.entries.isEmpty)
@@ -136,7 +136,7 @@ struct PronunciationEditor: View {
             Text("Try it").textRole(.eyebrow)
             StageTextField("Type a sentence to test", text: $trial, symbol: "text.cursor")
             HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
-                Image(systemName: "waveform").font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.tungsten)
+                Image(systemName: "waveform").font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.textTertiary)
                 Text(applied.isEmpty ? " " : applied)
                     .textRole(.body, color: applied == trial ? .textSecondary : .textPrimary)
                     .textSelection(.enabled)
@@ -197,11 +197,10 @@ private struct PronunciationRow: View {
                 var e = entry; e.caseSensitive.toggle(); onChange(e)
             } label: {
                 Text("Aa")
-                    .font(.ui(11, weight: .bold))
-                    .foregroundStyle(entry.caseSensitive ? Color.tungsten : .textTertiary)
+                    .textRole(.label, color: entry.caseSensitive ? .textPrimary : .textTertiary)
                     .frame(width: 28, height: 22)
-                    .background(RoundedRectangle(cornerRadius: Theme.Radius.xs).fill(entry.caseSensitive ? Color.tungsten.opacity(0.12) : .clear))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.xs).strokeBorder(entry.caseSensitive ? Color.tungsten.opacity(0.4) : Color.hairline, lineWidth: 1))
+                    .background(RoundedRectangle(cornerRadius: Theme.Radius.xs).fill(entry.caseSensitive ? Color.surfaceRaised : .clear))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.xs).strokeBorder(entry.caseSensitive ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
             }
             .buttonStyle(.plain)
             .help(entry.caseSensitive ? "Case-sensitive: only this exact capitalization" : "Any capitalization")
@@ -228,8 +227,7 @@ private struct PronunciationRow: View {
     private func field(_ text: Binding<String>, placeholder: String, which: Field) -> some View {
         TextField(placeholder, text: text, prompt: Text(placeholder).foregroundStyle(Color.textTertiary))
             .textFieldStyle(.plain)
-            .font(.ui(13))
-            .foregroundStyle(.textPrimary)
+            .textRole(.body)
             .focused($focus, equals: which)
             .onSubmit(commit)
             .padding(.horizontal, 8)

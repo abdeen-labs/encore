@@ -137,10 +137,24 @@ final class HistoryModel {
 
     var modelName: String? { modelID.map { id in facets.models.first { $0.id == id }?.name ?? service.catalog.model(id)?.name ?? id } }
 
+    /// The filters behind the "Filter" menu (favorites, model, voice, date) in words, in menu order; the kind tab
+    /// isn't one of them.
+    var menuFilterNames: [String] {
+        [favoritesOnly ? "Favorites" : nil, modelName, voice?.name, date == .any ? nil : date.title].compactMap { $0 }
+    }
+
+    /// How many of the "Filter" menu's filters are on.
+    var menuFilterCount: Int { menuFilterNames.count }
+
     // MARK: Query plumbing
 
     func clearFilters() {
         kind = .all; favoritesOnly = false; modelID = nil; voice = nil; date = .any
+    }
+
+    /// Clears what the "Filter" menu sets and keeps the kind tab.
+    func clearMenuFilters() {
+        favoritesOnly = false; modelID = nil; voice = nil; date = .any
     }
 
     func loadMore() { store.loadMore() }

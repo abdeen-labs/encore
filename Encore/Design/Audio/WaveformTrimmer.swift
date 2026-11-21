@@ -152,9 +152,7 @@ struct WaveformTrimmer: View {
             Spacer(minLength: Theme.Space.l)
             VStack(alignment: .trailing, spacing: 4) {
                 Text(Timecode.seconds(length))
-                    .font(.mono(26, weight: .medium))
-                    .foregroundStyle(tone)
-                    .glow(tone, radius: 8, intensity: 0.25)
+                    .textRole(.readout, color: tone)
                     .contentTransition(.numericText())
                 StatusBadge(badgeText, tone: verdict == .good ? .success : .warning)
             }
@@ -164,7 +162,6 @@ struct WaveformTrimmer: View {
     private var fileFacts: String {
         var parts: [String] = []
         parts.append(duration > 0 ? Timecode.string(duration, tenths: duration < 60) : "Reading…")
-        if loader.sampleRate > 0 { parts.append(String(format: "%g kHz", loader.sampleRate / 1000)) }
         if loader.isLoading, let p = loader.peaks, duration > 0 {
             parts.append("analyzing \(Int(min(1, p.coveredDuration / duration) * 100))%")
         }
@@ -183,10 +180,10 @@ struct WaveformTrimmer: View {
     private var guidance: some View {
         let lo = Int(target.lowerBound), hi = Int(target.upperBound)
         let text: String = switch verdict {
-        case .good: "Ready to use. Play it back and make sure it's one voice, clean, with no music or noise."
-        case .tooShort: "Widen the selection to at least \(lo) seconds — drag either handle outwards."
-        case .tooLong: "Cloning works best with \(lo)–\(hi) seconds. Drag the handles to keep just the best part; the rest of the recording isn't needed."
-        case .recordingTooShort: "This recording is under \(lo) seconds. It may still work, but a longer clip of \(lo)–\(hi) seconds clones better."
+        case .good: "Ready to use. Play it back to check it's one clean voice."
+        case .tooShort: "Drag a handle outward to select at least \(lo) seconds."
+        case .tooLong: "Drag the handles in to keep the best \(lo) to \(hi) seconds."
+        case .recordingTooShort: "Under \(lo) seconds. It may work, but \(lo) to \(hi) seconds clones better."
         }
         return Text(text).textRole(.caption, color: verdict == .good ? .textSecondary : .footlight.opacity(0.9))
             .fixedSize(horizontal: false, vertical: true)
@@ -289,8 +286,7 @@ struct WaveformTrimmer: View {
     private func handle(_ edge: Edge, at xPos: CGFloat, height: CGFloat) -> some View {
         let isActive = active == edge && focused
         return ZStack {
-            Rectangle().fill(tone).frame(width: 2)
-                .glow(tone, radius: 6, intensity: isActive ? 0.7 : 0.35)
+            Rectangle().fill(tone).frame(width: isActive ? 2.5 : 2)
             RoundedRectangle(cornerRadius: 3)
                 .fill(tone)
                 .frame(width: 9, height: 26)
@@ -312,9 +308,10 @@ struct WaveformTrimmer: View {
     private var footer: some View {
         HStack(spacing: Theme.Space.m) {
             Button(isPlaying ? "Stop" : "Play selection", systemImage: isPlaying ? "stop.fill" : "play.fill") { playSelection() }
-                .buttonStyle(.secondary)
+                .buttonStyle(.play(isPlaying: isPlaying))
                 .controlSize(.small)
                 .disabled(!source.canPlay)
+                .help(isPlaying ? "Stop" : "Play selection (Space)")
             HStack(spacing: 6) {
                 Text(Timecode.string(selection.lowerBound)).textRole(.monoSmall)
                 Image(systemName: "arrow.right").font(.system(size: 8, weight: .bold)).foregroundStyle(.textTertiary)
@@ -510,7 +507,7 @@ private struct Ruler: View {
                 let x = size.width * (t - range.lowerBound) / span
                 ctx.fill(Path(CGRect(x: x, y: 0, width: 1, height: 4)), with: .color(Color.textTertiary.opacity(0.7)))
                 let label = step < 1 ? Timecode.string(t) : Timecode.string(t, tenths: false)
-                let text = Text(label).font(.mono(9)).foregroundStyle(Color.textTertiary)
+                let text = Text(label).font(TextRole.monoSmall.font).foregroundStyle(Color.textTertiary)
                 ctx.draw(text, at: CGPoint(x: x + 3, y: 5), anchor: .topLeading)
                 t += step
             }

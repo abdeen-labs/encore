@@ -5,7 +5,7 @@ import SwiftUI
 ///
 /// Idle: the primary action (⌘↩), plus a note on why it can't run yet or how the last job went.
 /// Waiting: queue position and what is running ahead. Running: stage, progress, elapsed time, Cancel (⌘.).
-/// Memory warning: the numbers, what would be unloaded, and "Run anyway" / "Not now".
+/// Memory warning: a title, one sentence, the bar and its numbers, and "Run anyway" / "Not now".
 ///
 ///     RunSurface(runner: runner, title: "Perform", systemImage: "play.fill",
 ///                blockedReason: canRun ? nil : "Write something first", action: perform)
@@ -15,7 +15,7 @@ struct RunSurface: View {
     var systemImage: String = "play.fill"
     /// When non-nil the action is disabled and this says why.
     var blockedReason: String?
-    /// Idle caption shown when nothing else needs saying (e.g. "3 chunks · Soprano").
+    /// Idle note shown when nothing else needs saying: one short sentence, one line.
     var idleNote: String?
     let action: () -> Void
 
@@ -47,13 +47,13 @@ struct RunSurface: View {
                 if runner.phase == .checkingMemory {
                     Text("Checking memory…").textRole(.caption)
                 } else if let blockedReason {
-                    Text(blockedReason).textRole(.caption, color: .textSecondary).lineLimit(2)
+                    Text(blockedReason).textRole(.caption).lineLimit(2)
                 } else {
                     if let note = outcomeNote {
                         Text(note).textRole(.caption, color: .textSecondary).lineLimit(1)
                     }
                     if let idleNote {
-                        Text(idleNote).textRole(.monoSmall, color: .textTertiary).lineLimit(1)
+                        Text(idleNote).textRole(.caption, color: .textTertiary).lineLimit(1)
                     }
                 }
             }
@@ -138,8 +138,9 @@ private struct ElapsedLabel: View {
 
 // MARK: - Memory warning
 
-/// "This model won't fit comfortably": the verdict in plain words, the numbers, what Encore would unload,
-/// and the decision. Used by `RunSurface`; usable on its own (e.g. before a download).
+/// "Memory will be tight": a title, one sentence, the bar with its numbers (the one place memory figures come
+/// forward, because they need a decision), then the decision. Used by `RunSurface`; usable on its own (e.g.
+/// before a download).
 struct MemoryWarning: View {
     let assessment: MemoryAssessment
     let modelName: String
@@ -148,42 +149,45 @@ struct MemoryWarning: View {
 
     private var wontFit: Bool { assessment.verdict == .wontFit }
 
+    private var title: String {
+        wontFit ? "\(modelName) may not fit in memory" : "Memory will be tight for \(modelName)"
+    }
+
+    private var sentence: String {
+        if !assessment.wouldUnload.isEmpty {
+            return "Encore will unload \(assessment.wouldUnload.joined(separator: ", ")) first, and memory may still run short."
+        }
+        return wontFit ? "It needs more memory than is free, so the Mac may slow down or the run may fail."
+            : "It needs most of the free memory, so other apps may slow down."
+    }
+
     var body: some View {
         let tone: Tone = wontFit ? .danger : .warning
         VStack(alignment: .leading, spacing: Theme.Space.m) {
-            HStack(alignment: .top, spacing: Theme.Space.m) {
-                Image(systemName: "memorychip")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(tone.color)
-                    .glow(tone.color, radius: 6, intensity: 0.4)
-                    .frame(width: 20)
-                    .padding(.top, 1)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(wontFit ? "\(modelName) won't fit comfortably" : "Memory will be tight for \(modelName)")
-                        .textRole(.headline)
-                    Text(assessment.summary + (assessment.wouldUnload.isEmpty ? ""
-                         : " Encore will unload \(assessment.wouldUnload.joined(separator: ", ")) first."))
-                        .textRole(.caption).fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
+                    Image(systemName: "memorychip")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(tone.textColor)
+                    Text(title).textRole(.headline)
                 }
-                Spacer(minLength: Theme.Space.s)
-                HStack(spacing: Theme.Space.xs) {
-                    Button("Not now", action: onCancel)
-                        .buttonStyle(.ghost)
-                        .keyboardShortcut(".", modifiers: .command)
-                    Button(wontFit ? "Try anyway" : "Run anyway", systemImage: "play.fill", action: onRun)
-                        .buttonStyle(wontFit ? .destructive : .secondary)
-                        .keyboardShortcut(.return, modifiers: .command)
-                }
-                .fixedSize()
+                Text(sentence).textRole(.caption).fixedSize(horizontal: false, vertical: true)
             }
             MemoryGauge(assessment: assessment)
-                .padding(.leading, 20 + Theme.Space.m)
+            HStack(spacing: Theme.Space.xs) {
+                Spacer(minLength: 0)
+                Button("Not now", action: onCancel)
+                    .buttonStyle(.ghost)
+                    .keyboardShortcut(".", modifiers: .command)
+                Button(wontFit ? "Try anyway" : "Run anyway", systemImage: "play.fill", action: onRun)
+                    .buttonStyle(wontFit ? .destructive : .secondary)
+                    .keyboardShortcut(.return, modifiers: .command)
+            }
         }
         .padding(Theme.Space.l)
         .background {
             let shape = RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
             shape.fill(Color.surface)
-                .overlay(shape.fill(LinearGradient(colors: [tone.color.opacity(0.1), .clear], startPoint: .top, endPoint: .bottom)))
                 .overlay(shape.strokeBorder(tone.color.opacity(0.3), lineWidth: 1))
         }
     }
@@ -207,7 +211,6 @@ struct MemoryGauge: View {
                     Rectangle().fill(Color.textTertiary.opacity(0.55)).frame(width: max(0, w * other / total))
                     Rectangle().fill(Color.textSecondary.opacity(0.7)).frame(width: max(0, w * Double(a.loadedBytes) / total))
                     Rectangle().fill(tone.color).frame(width: max(2, w * need / total))
-                        .glow(tone.color, radius: 4, intensity: 0.4)
                     Spacer(minLength: 0)
                 }
                 .frame(width: w, alignment: .leading)
@@ -216,7 +219,7 @@ struct MemoryGauge: View {
             }
             .frame(height: 6)
             HStack(spacing: Theme.Space.m) {
-                legend("Needs", Self.bytes(a.requiredBytes), tone.color)
+                legend("Needs", Self.bytes(a.requiredBytes), tone.textColor)
                 legend("Free", Self.bytes(a.memory.availableBytes), .textPrimary)
                 if a.loadedBytes > 0 { legend("Encore models", Self.bytes(a.loadedBytes), .textSecondary) }
                 Spacer(minLength: 0)

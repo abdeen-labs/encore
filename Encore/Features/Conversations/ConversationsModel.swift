@@ -35,6 +35,8 @@ final class ConversationsModel {
     var reuseLines = true { didSet { saveDraft() } }
 
     var editingLineID: UUID?
+    /// The line whose pause-after panel is open (from the gap under it, or its menu).
+    var pauseEditingLineID: UUID?
     var showTuning = false
     var importReport: ImportReport?
 
@@ -182,8 +184,8 @@ final class ConversationsModel {
     }
 
     var blockedReason: String? {
-        guard let m = manifest else { return "Choose a model to stage it with." }
-        if shelf.hasScanned, !isDownloaded { return "\(m.name) isn't downloaded yet." }
+        guard let m = manifest else { return "Choose a model to perform with." }
+        if shelf.hasScanned, !isDownloaded { return "Download the model first." }
         if spokenLines.isEmpty { return script.lines.isEmpty ? "Write or import a script." : "Every line is empty." }
         if let c = cloningProblem { return "\(m.name) can't clone, and \(ListFormatter.localizedString(byJoining: c.names)) \(c.names.count == 1 ? "uses" : "use") a library voice." }
         if let p = lineProblem { return p.message }
@@ -193,15 +195,19 @@ final class ConversationsModel {
     /// How many spoken lines will actually be generated (the rest are reused).
     var pendingLines: Int { spokenLines.filter { !isRendered($0) }.count }
 
+    /// Only what's new: how many lines will be generated, when some are already generated and will be reused.
+    /// Nothing when every line is to be generated (the usual first time).
     var idleNote: String? {
-        guard let m = manifest, !spokenLines.isEmpty else { return nil }
+        guard manifest != nil, reuseLines, !spokenLines.isEmpty else { return nil }
         let n = spokenLines.count
-        let pending = reuseLines ? pendingLines : n
-        let what = pending == n ? "\(n) line\(n == 1 ? "" : "s")" : (pending == 0 ? "all \(n) lines ready, nothing to generate" : "\(pending) of \(n) lines to generate, the rest reused")
-        return "\(what) · \(speakingCount) speakers · \(m.name)"
+        let pending = pendingLines
+        if pending == n { return nil }
+        if pending == 0 { return "Nothing new to generate" }
+        return "\(pending) of \(n) lines to generate"
     }
 
-    var speakingCount: Int { Set(spokenLines.map(\.speakerID)).count }
+    /// Some spoken line is already generated and will be reused, so the ones still to generate are worth marking.
+    var hasReusableLines: Bool { reuseLines && spokenLines.contains { isRendered($0) } }
 
     /// Rough running time: speech at ~14 characters a second plus the pauses.
     var estimatedSeconds: TimeInterval {
@@ -348,6 +354,7 @@ final class ConversationsModel {
 
     func deleteLine(_ id: UUID) {
         if editingLineID == id { editingLineID = nil }
+        if pauseEditingLineID == id { pauseEditingLineID = nil }
         script.lines.removeAll { $0.id == id }
     }
 
@@ -422,6 +429,7 @@ final class ConversationsModel {
 
     func newScript() {
         editingLineID = nil
+        pauseEditingLineID = nil
         importReport = nil
         pendingUnnamedImport = nil
         script = ConversationScript()

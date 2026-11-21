@@ -7,7 +7,19 @@ import UniformTypeIdentifiers
 /// import/export of `.encorevoice` files, duplicate and delete. Kept for the app's lifetime (`deps.screenModel("Voices")`).
 @MainActor @Observable
 final class VoicesModel {
-    enum OriginFilter: String, CaseIterable, Hashable { case all = "All", cloned = "Cloned", designed = "Designed", imported = "Imported" }
+    enum OriginFilter: String, CaseIterable, Hashable {
+        case all = "All", cloned = "Cloned", designed = "Designed", imported = "Imported"
+
+        /// The origin's neutral icon (nil for All).
+        var symbol: String? {
+            switch self {
+            case .all: nil
+            case .cloned: Voice.Origin.cloned.symbol
+            case .designed: Voice.Origin.designed.symbol
+            case .imported: Voice.Origin.imported.symbol
+            }
+        }
+    }
     enum Sort: String, CaseIterable, Hashable { case newest = "Newest first", oldest = "Oldest first", name = "Name", length = "Length" }
 
     /// What an import brought in, and what it refused (with the importer's own words).
@@ -60,6 +72,9 @@ final class VoicesModel {
 
     var isFiltered: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty || !tags.isEmpty || origin != .all }
 
+    /// How many filters the Filter menu has on (the origin and each tag; the search field shows its own).
+    var activeFilterCount: Int { (origin == .all ? 0 : 1) + tags.count }
+
     var visible: [Voice] {
         var list = library.search(query, tags: tags)
         switch origin {
@@ -88,6 +103,12 @@ final class VoicesModel {
 
     func clearFilters() {
         query = ""
+        tags = []
+        origin = .all
+    }
+
+    /// Clears what the Filter menu holds (origin and tags), leaving the search and the sort alone.
+    func clearMenuFilters() {
         tags = []
         origin = .all
     }

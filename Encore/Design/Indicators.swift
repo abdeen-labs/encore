@@ -4,6 +4,9 @@ import SwiftUI
 
 /// A small tag. Static, selectable (bind `isSelected`) or removable (pass `onRemove`).
 ///
+/// Neutral chips are quiet. `.accent` draws exactly like neutral (amber is not a category color); warning,
+/// danger and success keep a tint. A selected chip (bound `isSelected`) is lit tungsten: it says where you are.
+///
 ///     Chip("English")
 ///     Chip("Warm", isSelected: $warm)
 ///     Chip("narration", symbol: "tag", onRemove: { tags.remove("narration") })
@@ -26,15 +29,29 @@ struct Chip: View {
 
     private var selected: Bool { isSelected?.wrappedValue ?? false }
 
-    private var tint: Color {
+    /// The tone as drawn: accent is not a category color, so it draws as neutral.
+    private var shownTone: Tone { tone == .accent ? .neutral : tone }
+
+    private var foreground: Color {
         if selected { return .tungsten }
-        return tone == .neutral ? .textSecondary : tone.color
+        return shownTone == .neutral ? .textSecondary : shownTone.textColor
+    }
+
+    private var fillColor: Color {
+        if selected { return Color.tungsten.opacity(0.14) }
+        return shownTone == .neutral ? .surfaceRaised : shownTone.color.opacity(0.1)
+    }
+
+    private var borderColor: Color {
+        if selected { return Color.tungsten.opacity(0.55) }
+        if isHovered && isSelected != nil { return .hairlineStrong }
+        return shownTone == .neutral ? .clear : shownTone.color.opacity(0.25)
     }
 
     var body: some View {
         let content = HStack(spacing: 5) {
             if let symbol { Image(systemName: symbol).font(.system(size: 9, weight: .semibold)) }
-            Text(title).font(.ui(11.5, weight: .medium)).lineLimit(1)
+            Text(title).font(TextRole.label.font).lineLimit(1)
             if let onRemove {
                 Button("Remove \(title)", systemImage: "xmark", action: onRemove)
                     .labelStyle(.iconOnly)
@@ -44,14 +61,14 @@ struct Chip: View {
                     .padding(.leading, 1)
             }
         }
-        .foregroundStyle(selected ? Color.tungsten : (tone == .neutral ? Color.textPrimary.opacity(0.85) : tone.color))
+        .foregroundStyle(foreground)
         .padding(.leading, 9)
         .padding(.trailing, onRemove == nil ? 9 : 7)
         .frame(height: 22)
         .background {
             Capsule()
-                .fill(selected ? Color.tungsten.opacity(0.14) : (tone == .neutral ? Color.surfaceRaised : tone.color.opacity(0.1)))
-                .overlay(Capsule().strokeBorder(selected ? Color.tungsten.opacity(0.55) : (isHovered && isSelected != nil ? .hairlineStrong : tint.opacity(tone == .neutral ? 0.12 : 0.3)), lineWidth: 1))
+                .fill(fillColor)
+                .overlay(Capsule().strokeBorder(borderColor, lineWidth: 1))
         }
         .onHover { isHovered = $0 }
         .stageAnimation(Theme.Motion.quick, value: selected)
@@ -68,8 +85,9 @@ struct Chip: View {
 
 // MARK: - Status badge
 
-/// A tiny status lamp with an uppercase label. `pulsing` breathes the lamp (e.g. while
-/// recording or loading); it holds still under Reduce Motion.
+/// A quiet status: a 6pt dot and the text, in sentence case exactly as written, in the tone's text color.
+/// No capsule, no glow. `pulsing` breathes the dot (e.g. while recording or loading); it holds still under
+/// Reduce Motion.
 ///
 ///     StatusBadge("Ready", tone: .success)
 ///     StatusBadge("Rec", tone: .danger, pulsing: true)
@@ -93,18 +111,11 @@ struct StatusBadge: View {
             Circle()
                 .fill(tone.color)
                 .frame(width: 6, height: 6)
-                .glow(tone.color, radius: 5, intensity: tone == .neutral ? 0 : (phase ? 0.9 : 0.5))
-                .opacity(pulsing && phase ? 0.55 : 1)
+                .opacity(pulsing && phase ? 0.35 : 1)
             Text(title)
-                .font(.ui(9.5, weight: .bold))
-                .tracking(1.3)
-                .textCase(.uppercase)
-                .foregroundStyle(tone == .neutral ? Color.textSecondary : tone.color)
+                .textRole(.label, color: tone.textColor)
+                .lineLimit(1)
         }
-        .padding(.horizontal, 8)
-        .frame(height: 20)
-        .background(Capsule().fill(tone.color.opacity(0.09)))
-        .overlay(Capsule().strokeBorder(tone.color.opacity(0.22), lineWidth: 1))
         .onAppear {
             guard pulsing, !reduceMotion, !isSnapshotting else { return }
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { phase = true }
@@ -143,7 +154,6 @@ struct ProgressBar: View {
                     Capsule()
                         .fill(LinearGradient(colors: [color.opacity(0.7), color], startPoint: .leading, endPoint: .trailing))
                         .frame(width: max(height, geo.size.width * min(max(value, 0), 1)))
-                        .glow(color, radius: 5, intensity: 0.35)
                         .stageAnimation(Theme.Motion.standard, value: value)
                 } else if reduceMotion || isSnapshotting {
                     Capsule().fill(color.opacity(0.45))
@@ -247,7 +257,6 @@ struct Waveform: View {
             GeometryReader { geo in
                 if progress > 0 && progress < 1 {
                     Rectangle().fill(Color.textPrimary).frame(width: 1.5)
-                        .glow(.tungsten, radius: 4, intensity: 0.6)
                         .offset(x: geo.size.width * progress)
                 }
             }
@@ -281,7 +290,8 @@ struct Waveform: View {
 
 // MARK: - Count badge
 
-/// A small count set apart from the label it belongs to: a dim mono numeral in a pill.
+/// A small count set apart from the label it belongs to: a dim mono numeral in a pill. Neutral unless
+/// `isEmphasized`, which lights it tungsten.
 ///
 ///     HStack { Text("Auditions").textRole(.heading); CountBadge(6) }
 ///     SegmentedControl(selection: $kind, options: kinds, count: { model.count($0) }) { $0.title }
@@ -298,7 +308,7 @@ struct CountBadge: View {
     var body: some View {
         let small = controlSize == .small || controlSize == .mini
         Text(value.formatted())
-            .font(.mono(small ? 9.5 : 10.5, weight: .medium))
+            .font(TextRole.monoSmall.font)
             .monospacedDigit()
             .foregroundStyle(isEmphasized ? Color.tungsten : .textTertiary)
             .padding(.horizontal, small ? 5 : 6)

@@ -3,8 +3,9 @@ import SwiftUI
 
 /// Every generation control a model exposes, rendered from `ModelManifest.parameters`: basic ones inline,
 /// the rest in an "Advanced" disclosure. Each type gets the right control (fader with default tick for numbers,
-/// switch, segmented/menu choice, text, seed with dice); help text sits behind a small "?" on each label; a lit
-/// dot marks values that differ from the default, and "Reset" puts them all back.
+/// switch, segmented/menu choice, text, seed with dice); help text sits behind a small "?" on each label; a quiet
+/// dot marks values that differ from the default, and "N changed from default · Reset" (shown only when N > 0)
+/// puts them all back.
 ///
 ///     ParameterPanel(manifest: manifest, values: $parameters)
 ///     ParameterPanel(manifest: manifest, values: $parameters, advancedExpanded: $showAdvanced)
@@ -54,29 +55,38 @@ struct ParameterPanel: View {
     }
 }
 
-/// "2 changed · Reset" for a parameter set. Part of `ParameterPanel`; usable in a custom header.
+/// "2 changed from default · Reset" for a parameter set; draws nothing while every value is the default.
+/// Part of `ParameterPanel`; usable in a custom header.
 struct ParameterResetRow: View {
     let manifest: ModelManifest
     @Binding var values: ParamValues
 
     var body: some View {
         let changed = ParameterValues.changedCount(manifest.parameters, values)
-        HStack(spacing: Theme.Space.s) {
-            if changed == 0 {
-                Text("All defaults").textRole(.caption, color: .textTertiary)
-            } else {
-                Circle().fill(Color.tungsten).frame(width: 5, height: 5).glow(.tungsten, radius: 3, intensity: 0.6)
-                Text("\(changed) changed from default").textRole(.caption, color: .textSecondary)
+        if changed > 0 {
+            HStack(spacing: Theme.Space.s) {
+                ChangedDot(changed: true)
+                Text("\(changed) changed from default").textRole(.caption)
+                Spacer()
+                Button("Reset", systemImage: "arrow.counterclockwise") {
+                    withStageAnimation { values = [:] }
+                }
+                .buttonStyle(.ghost)
+                .controlSize(.small)
+                .help("Put every setting back to \(manifest.name)'s default")
             }
-            Spacer()
-            Button("Reset", systemImage: "arrow.counterclockwise") {
-                withStageAnimation { values = [:] }
-            }
-            .buttonStyle(.ghost)
-            .controlSize(.small)
-            .disabled(changed == 0)
-            .help("Put every setting back to \(manifest.name)'s default")
         }
+    }
+}
+
+/// The "changed from default" marker: information, not light. A neutral dot, no glow.
+private struct ChangedDot: View {
+    var changed: Bool
+    var body: some View {
+        Circle()
+            .fill(changed ? Color.textSecondary : .clear)
+            .frame(width: 5, height: 5)
+            .accessibilityHidden(true)
     }
 }
 
@@ -215,18 +225,14 @@ struct ParameterLabel: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Circle()
-                .fill(changed ? Color.tungsten : .clear)
-                .frame(width: 5, height: 5)
-                .glow(.tungsten, radius: 3, intensity: changed ? 0.6 : 0)
-                .accessibilityHidden(true)
+            ChangedDot(changed: changed)
             Text(spec.label).textRole(.label, color: changed ? .textPrimary : .textSecondary)
             if let help = spec.help, !help.isEmpty {
                 Button("About \(spec.label)", systemImage: "questionmark.circle") { showsHelp.toggle() }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.plain)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(showsHelp ? Color.tungsten : .textTertiary)
+                    .foregroundStyle(showsHelp ? Color.textPrimary : .textTertiary)
                     .help(help)
                     .popover(isPresented: $showsHelp, arrowEdge: .top) {
                         Text(help).textRole(.caption, color: .textPrimary)
@@ -260,8 +266,7 @@ struct SeedControl<Label: View>: View {
             HStack(spacing: 0) {
                 TextField("", text: $draft, prompt: Text("Random").foregroundStyle(Color.textTertiary))
                     .textFieldStyle(.plain)
-                    .font(.mono(12))
-                    .foregroundStyle(.textPrimary)
+                    .textRole(.mono)
                     .multilineTextAlignment(.trailing)
                     .focused($editing)
                     .onSubmit(commit)

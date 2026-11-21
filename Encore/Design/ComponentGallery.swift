@@ -98,12 +98,12 @@ struct ComponentGallery: View {
                 }
                 Card {
                     SectionHeader("Status")
-                    HStack(spacing: 6) {
+                    HStack(spacing: Theme.Space.m) {
                         StatusBadge("Idle")
-                        StatusBadge("Loaded", tone: .accent)
-                        StatusBadge("Ready", tone: .success)
+                        StatusBadge("Working", tone: .accent, pulsing: true)
+                        StatusBadge("On this Mac", tone: .success)
                         StatusBadge("Low disk", tone: .warning)
-                        StatusBadge("Rec", tone: .danger, pulsing: true)
+                        StatusBadge("Recording", tone: .danger, pulsing: true)
                     }
                     HStack(spacing: Theme.Space.l) {
                         ActivityIndicator()
@@ -119,14 +119,14 @@ struct ComponentGallery: View {
                     Button("Download") {}.buttonStyle(.secondary).controlSize(.small)
                 }
                 Banner(.danger, title: "Generation failed", message: "The model ran out of memory. Try a shorter script.", onDismiss: {})
-                Banner(.success, title: "Voice cloned", message: "“Captain” has joined your company.")
+                Banner(.success, title: "Voice cloned", message: "“Captain” is in your cast.")
             }
             HStack(alignment: .top, spacing: Theme.Space.l) {
                 Card {
-                    SectionHeader("Take 03", subtitle: "Ticket stub with perforation")
+                    SectionHeader("Take 03", subtitle: "Details, separated by a hairline")
                     Waveform(samples: Waveform.placeholder(count: 110), progress: 0.38)
                         .frame(height: 44)
-                    PerforatedDivider(bleed: Theme.Space.l)
+                    Hairline()
                     KeyValueRow("Voice", value: "Captain")
                     KeyValueRow("Duration", value: "0:42.18")
                     KeyValueRow("Sample rate", value: "24 kHz")
@@ -153,10 +153,20 @@ struct ComponentGallery: View {
                 DropZone(title: "Drop a reference clip", message: "WAV, MP3 or M4A · 5–30 seconds of clean speech",
                          allowedTypes: [.audio]) { _ in }
             }
-            Card(.card, padding: 0) {
-                EmptyState(symbol: "waveform", title: "No takes yet", message: "Write a line and press Perform. Every take lands here.") {
-                    Button("Open Studio") {}.buttonStyle(.primary)
-                    Button("Import audio") {}.buttonStyle(.ghost)
+            group("Empty states") {
+                HStack(alignment: .top, spacing: Theme.Space.l) {
+                    Card(.card, padding: 0) {
+                        EmptyState(symbol: "waveform", title: "No takes yet", message: "Write a line and press Perform. Every take lands here.") {
+                            Button("Open Studio") {}.buttonStyle(.primary)
+                            Button("Import audio") {}.buttonStyle(.ghost)
+                        }
+                    }
+                    Card(.card, padding: 0) {
+                        EmptyState(symbol: "magnifyingglass", title: "Nothing matches",
+                                   message: "Try another word, or clear the filters.", style: .plain) {
+                            Button("Clear filters") {}.buttonStyle(.secondary).controlSize(.small)
+                        }
+                    }
                 }
             }
             group("Sheet") {
@@ -196,15 +206,23 @@ struct ComponentGallery: View {
         Card {
             Text("Marquee — Encore").textRole(.marquee)
             Text("Title — The stage is set").textRole(.title)
-            Text("Heading — Voice settings").textRole(.heading)
+            Text("Heading — Captain").textRole(.heading)
+            Text("Section — Variants").textRole(.section)
             Text("Headline — Captain, take three").textRole(.headline)
             Text("Body — Write the lines, cast a voice, and press Perform. Everything runs on this Mac.").textRole(.body)
             Text("Label — Speaking rate").textRole(.label)
             Text("Caption — Applies to new takes only.").textRole(.caption)
             Text("Eyebrow — Advanced").textRole(.eyebrow)
-            HStack(spacing: Theme.Space.xl) {
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Space.xl) {
+                Text("0:12.4").textRole(.readout)
                 Text("Mono 00:42.180  1.15×  24 kHz").textRole(.mono)
                 Text("monoSmall 0:42").textRole(.monoSmall)
+            }
+            Hairline()
+            HStack(spacing: Theme.Space.m) {
+                Text("Hairline").textRole(.caption)
+                Hairline(.vertical).frame(height: 14)
+                Text("and its vertical variant").textRole(.caption)
             }
         }
     }
@@ -213,7 +231,8 @@ struct ComponentGallery: View {
         let colors: [(String, Color)] = [
             ("backdrop", .backdrop), ("rail", .rail), ("surface", .surface), ("raised", .surfaceRaised),
             ("sunken", .surfaceSunken), ("text", .textPrimary), ("text 2", .textSecondary), ("text 3", .textTertiary),
-            ("tungsten", .tungsten), ("velvet", .velvet), ("mint", .mint), ("footlight", .footlight), ("gel", .gel),
+            ("tungsten", .tungsten), ("velvet", .velvet), ("velvet text", .velvetText), ("mint", .mint),
+            ("footlight", .footlight), ("gel", .gel),
         ]
         return HStack(spacing: Theme.Space.s) {
             ForEach(colors, id: \.0) { name, color in
@@ -222,7 +241,7 @@ struct ComponentGallery: View {
                         .fill(color)
                         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s).strokeBorder(Color.hairline))
                         .frame(height: 38)
-                    Text(name).font(.mono(9.5)).foregroundStyle(.textTertiary)
+                    Text(name).textRole(.monoSmall, color: .textTertiary).lineLimit(1)
                 }
             }
         }
@@ -239,8 +258,8 @@ struct ComponentGallery: View {
                     Spacer()
                     Button("Shuffle", systemImage: "shuffle") {}.buttonStyle(.icon)
                     Button("More", systemImage: "ellipsis") {}.buttonStyle(.icon)
-                    Button("Play", systemImage: "play.fill") {}.buttonStyle(.icon(tone: .accent, filled: true))
-                    Button("Record", systemImage: "record.circle") {}.buttonStyle(.icon(tone: .danger, filled: true))
+                    Button("Play", systemImage: "play.fill") {}.buttonStyle(.play(isPlaying: false))
+                    Button("Pause", systemImage: "pause.fill") {}.buttonStyle(.play(isPlaying: true))
                 }
                 .controlSize(size)
             }
@@ -248,7 +267,7 @@ struct ComponentGallery: View {
                 Button("Perform", systemImage: "play.fill") {}.buttonStyle(.primary)
                 Button("Audition") {}.buttonStyle(.secondary)
                 Button("Delete") {}.buttonStyle(.destructive)
-                Button("Play", systemImage: "play.fill") {}.buttonStyle(.icon)
+                Button("Play", systemImage: "play.fill") {}.buttonStyle(.play(isPlaying: false))
                 Text("disabled").textRole(.caption)
             }
             .disabled(true)

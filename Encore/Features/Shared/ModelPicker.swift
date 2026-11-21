@@ -1,9 +1,11 @@
 import EncoreCore
 import SwiftUI
 
-/// Chooses a model and variant for a task. The panel lists every model that can do the job — downloaded or not —
-/// with what matters at the moment of choice: on disk or not, download size, whether it fits in memory now,
-/// the license (non-commercial marked), and whether it runs natively or in the Python helper.
+/// Chooses a model and variant for a task. The plate shows the model's name, with a warning glyph only when the
+/// choice needs action (not downloaded, or can't run here). The panel lists every model that can do the job,
+/// downloaded ones first: name, a one-line summary, and on the right either "On this Mac" or the download size.
+/// A row speaks up only when something needs attention: a non-commercial license, a tight or impossible memory
+/// fit, a runtime that can't run here. Engineering detail (precision, runtime, RAM) stays in tooltips.
 ///
 ///     ModelPicker(task: .tts, selection: $choice)
 ///     ModelPicker(task: .tts, requires: .cloning, feature: .cloning, selection: $choice)
@@ -46,21 +48,17 @@ struct ModelPicker: View {
 
     var body: some View {
         let m = manifest
-        let variant = m.map { $0.variant(selection?.variantID) }
-        PickerPlate(label: "Model", symbol: "cpu",
-                    value: m?.name ?? "Choose a model",
-                    detail: m.flatMap { $0.variants.count > 1 ? variant?.label : nil },
+        PickerPlate(label: "Model", symbol: "cpu", value: m?.name ?? "Choose a model",
                     isOpen: isOpen, action: { isOpen.toggle() }) {
-            if let m, !shelf.isDownloaded(m, variantID: selection?.variantID), shelf.hasScanned {
-                Circle().fill(Color.footlight).frame(width: 7, height: 7)
-                    .glow(.footlight, radius: 4, intensity: 0.6)
+            if let m, shelf.hasScanned, !shelf.isDownloaded(m, variantID: selection?.variantID) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Tone.warning.textColor)
                     .help("Not downloaded yet")
                     .accessibilityLabel("Not downloaded")
-            } else if let m, m.license.commercialUse == false {
-                Text("NC").font(.ui(9.5, weight: .bold)).tracking(1).foregroundStyle(Color.footlight).fixedSize()
-                    .help("Non-commercial license: \(m.license.name)")
+            } else if let m {
+                RuntimeMark(verdict: shelf.runtime(for: m, requiring: requires) ?? shelf.runtime(for: m))
             }
-            if let m { RuntimeMark(verdict: shelf.runtime(for: m, requiring: requires) ?? shelf.runtime(for: m)) }
         }
         .pickerPanel(isPresented: $isOpen, width: panelWidth) {
             ModelPickerPanel(task: task, requires: requires, selection: selection) { choice in
@@ -81,27 +79,18 @@ struct ModelPicker: View {
     }
 }
 
-/// The runtime a model will use, as a small glyph for tight spots (the picker plate): a bolt for native,
-/// a box for the Python helper, a warning when it can't run here. The tooltip says which.
+/// A warning glyph for a model that can't run here (the tooltip says why); nothing when it can. Which runtime a
+/// model uses is an engineering detail and isn't shown.
 struct RuntimeMark: View {
     let verdict: RuntimeVerdict?
 
     var body: some View {
-        switch verdict {
-        case .runs(let r)?:
-            Image(systemName: r == .mlxSwift ? "bolt.fill" : "shippingbox.fill")
-                .font(.system(size: 9.5, weight: .semibold))
-                .foregroundStyle(r == .mlxSwift ? Color.mint.opacity(0.85) : Color.textSecondary)
-                .help(r == .mlxSwift ? "Runs natively in Encore" : "Runs in Encore's Python helper")
-                .accessibilityLabel(r.displayName)
-        case .blocked(let e)?:
+        if case .blocked(let e)? = verdict {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 9.5, weight: .semibold))
-                .foregroundStyle(Color.footlight)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Tone.warning.textColor)
                 .help(e.errorDescription ?? ModelPickerPanel.blockedLabel(e))
                 .accessibilityLabel(ModelPickerPanel.blockedLabel(e))
-        case nil:
-            EmptyView()
         }
     }
 }
@@ -119,20 +108,12 @@ struct ModelPickerPanel: View {
     private var shelf: ModelShelf { deps.modelShelf }
 
     var body: some View {
+        // Downloaded first, then by name (`manifests(for:)` sorts them so).
         let models = shelf.manifests(for: task, requiring: requires)
-        let ready = models.filter(shelf.isAnyVariantDownloaded)
-        let rest = models.filter { !shelf.isAnyVariantDownloaded($0) }
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    if !ready.isEmpty {
-                        PanelHeading(title: "On this Mac", count: ready.count)
-                        ForEach(ready) { row($0) }
-                    }
-                    if !rest.isEmpty {
-                        PanelHeading(title: "Not downloaded", count: rest.count)
-                        ForEach(rest) { row($0) }
-                    }
+                    ForEach(models) { row($0) }
                     if models.isEmpty {
                         Text("No model can do this yet.").textRole(.caption).padding(Theme.Space.m)
                     }
@@ -159,7 +140,7 @@ struct ModelPickerPanel: View {
         }
         .padding(.horizontal, Theme.Space.m)
         .padding(.vertical, Theme.Space.s)
-        .overlay(alignment: .top) { Rectangle().fill(Color.hairline).frame(height: 1) }
+        .overlay(alignment: .top) { Hairline() }
     }
 
     private var requirementNote: String {
@@ -175,40 +156,90 @@ struct ModelPickerPanel: View {
         let selected = selection?.modelID == m.id
         let variant = selected ? m.variant(selection?.variantID) : shelf.preferredVariant(m)
         let downloaded = shelf.isDownloaded(m, variantID: variant.id)
+        let onDisk = m.variants.filter { shelf.isDownloaded(m, variantID: $0.id) }
         return VStack(alignment: .leading, spacing: 0) {
             PickerRow(isSelected: selected, action: { onSelect(ModelChoice(modelID: m.id, variantID: variant.id)) }) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(m.name).textRole(.headline, color: downloaded ? .textPrimary : .textSecondary)
-                        if m.variants.count > 1 { Text(variant.label).textRole(.monoSmall, color: .textTertiary) }
-                        Spacer(minLength: 4)
-                        runtimeBadge(m)
-                    }
-                    Text(m.summary).textRole(.caption, color: .textTertiary).lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                    facts(m, variant: variant, downloaded: downloaded)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(m.name).textRole(.headline, color: downloaded ? .textPrimary : .textSecondary).lineLimit(1)
+                    Text(m.summary).textRole(.caption, color: .textTertiary).lineLimit(1)
+                    notes(m, variant: variant)
                 }
+                .help(details(m, variant: variant))
+                Spacer(minLength: Theme.Space.s)
+                status(variant, downloaded: downloaded)
             }
-            if selected, m.variants.count > 1 {
-                variantStrip(m)
+            if selected, onDisk.count > 1 {
+                variantStrip(m, variants: onDisk)
                     .padding(.leading, 10)
                     .padding(.bottom, 6)
             }
         }
     }
 
-    @ViewBuilder private func runtimeBadge(_ m: ModelManifest) -> some View {
-        switch shelf.runtime(for: m, requiring: requires) {
-        case .runs(let r)?:
-            Text(r.displayName)
-                .textRole(.monoSmall, color: r == .mlxSwift ? .mint : .textSecondary)
-                .help(r == .mlxSwift ? "Runs natively in Encore" : "Runs in Encore's Python helper")
-        case .blocked(let e)?:
-            Text(Self.blockedLabel(e)).textRole(.monoSmall, color: .footlight)
-                .help(e.errorDescription ?? "")
-        case nil:
-            EmptyView()
+    /// "On this Mac" with a quiet check, or the download size.
+    @ViewBuilder private func status(_ variant: ModelVariant, downloaded: Bool) -> some View {
+        if downloaded {
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .semibold))
+                Text("On this Mac").textRole(.caption, color: .textTertiary)
+            }
+            .foregroundStyle(Color.textTertiary)
+            .fixedSize()
+        } else {
+            Text(Bytes.file(variant.downloadBytes)).textRole(.monoSmall, color: .textSecondary)
+                .fixedSize()
+                .help("Download size")
         }
+    }
+
+    /// Only what needs the user's attention: a non-commercial license, memory that won't comfortably fit,
+    /// a runtime that can't run here.
+    @ViewBuilder private func notes(_ m: ModelManifest, variant: ModelVariant) -> some View {
+        let nonCommercial = m.license.commercialUse == false
+        let fit = shelf.assessment(m, variantID: variant.id)
+        let memory = Self.memoryNote(fit)
+        let blocked = blockedError(m)
+        if nonCommercial || memory != nil || blocked != nil {
+            HStack(spacing: Theme.Space.s) {
+                if nonCommercial {
+                    Text("Non-commercial").textRole(.caption, color: Tone.warning.textColor)
+                        .help(m.license.summary ?? m.license.name)
+                }
+                if let memory {
+                    Text(memory).textRole(.caption, color: (fit?.verdict == .wontFit ? Tone.danger : Tone.warning).textColor)
+                        .help(fit?.summary ?? "")
+                }
+                if let blocked {
+                    Text(Self.blockedLabel(blocked)).textRole(.caption, color: Tone.warning.textColor)
+                        .help(blocked.errorDescription ?? "")
+                }
+            }
+            .lineLimit(1)
+            .padding(.top, 1)
+        }
+    }
+
+    private static func memoryNote(_ fit: MemoryAssessment?) -> String? {
+        switch fit?.verdict {
+        case .tight?: "Tight on memory"
+        case .wontFit?: "Won't fit in memory"
+        default: nil
+        }
+    }
+
+    private func blockedError(_ m: ModelManifest) -> ServiceError? {
+        if case .blocked(let e)? = shelf.runtime(for: m, requiring: requires) { return e }
+        return nil
+    }
+
+    /// The engineering detail, for the tooltip: variant, runtime, memory, license.
+    private func details(_ m: ModelManifest, variant: ModelVariant) -> String {
+        var parts: [String] = []
+        if m.variants.count > 1 { parts.append(variant.label) }
+        if case .runs(let r)? = shelf.runtime(for: m, requiring: requires) { parts.append(r.displayName) }
+        parts.append("\(MemoryGauge.bytes(variant.memoryBytes)) memory")
+        parts.append(m.license.name)
+        return parts.joined(separator: " · ")
     }
 
     static func blockedLabel(_ e: ServiceError) -> String {
@@ -219,84 +250,27 @@ struct ModelPickerPanel: View {
         }
     }
 
-    private func facts(_ m: ModelManifest, variant: ModelVariant, downloaded: Bool) -> some View {
-        HStack(spacing: Theme.Space.s) {
-            if downloaded {
-                Label("On disk", systemImage: "checkmark.circle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .font(.ui(11, weight: .medium))
-                    .foregroundStyle(Color.mint)
-            } else {
-                Text("\(MemoryGauge.bytes(variant.downloadBytes)) download")
-                    .textRole(.monoSmall, color: .textSecondary)
-            }
-            fit(shelf.assessment(m, variantID: variant.id), variant: variant)
-            license(m.license)
-            Spacer(minLength: 0)
-            if !downloaded {
-                Button("Get", systemImage: "arrow.down.circle", action: onOpenModels)
-                    .buttonStyle(.ghost)
-                    .controlSize(.small)
-                    .help("Download it in Models")
-            }
-        }
-    }
-
-    @ViewBuilder private func fit(_ a: MemoryAssessment?, variant: ModelVariant) -> some View {
-        let size = MemoryGauge.bytes(variant.memoryBytes)
-        switch a?.verdict {
-        case .comfortable?:
-            Text("\(size) RAM").textRole(.monoSmall, color: .textTertiary)
-                .help(a?.summary ?? "")
-        case .tight?:
-            Label("\(size) RAM · tight", systemImage: "exclamationmark.triangle.fill")
-                .font(.mono(10.5)).foregroundStyle(Color.footlight)
-                .help(a?.summary ?? "")
-        case .wontFit?:
-            Label("\(size) RAM · won't fit", systemImage: "xmark.octagon.fill")
-                .font(.mono(10.5)).foregroundStyle(Color.velvet)
-                .help(a?.summary ?? "")
-        case nil:
-            Text("\(size) RAM").textRole(.monoSmall, color: .textTertiary)
-        }
-    }
-
-    private func license(_ l: ModelLicense) -> some View {
-        let nc = l.commercialUse == false
-        return Text(nc ? "\(l.name) · non-commercial" : l.name)
-            .font(.ui(10.5, weight: nc ? .semibold : .regular))
-            .foregroundStyle(nc ? Color.footlight : Color.textTertiary)
-            .lineLimit(1)
-            .help(l.summary ?? l.name)
-    }
-
-    private func variantStrip(_ m: ModelManifest) -> some View {
+    /// The downloaded variants of the selected model, by their friendly names.
+    private func variantStrip(_ m: ModelManifest, variants: [ModelVariant]) -> some View {
         HStack(spacing: 6) {
-            ForEach(m.variants) { v in
-                let on = shelf.isDownloaded(m, variantID: v.id)
+            ForEach(variants) { v in
                 let selected = m.variant(selection?.variantID).id == v.id
                 Button {
                     onSelect(ModelChoice(modelID: m.id, variantID: v.id))
                 } label: {
-                    HStack(spacing: 4) {
-                        Circle().fill(on ? Color.mint : Color.textTertiary.opacity(0.5)).frame(width: 5, height: 5)
-                        Text(v.label).font(.ui(11, weight: selected ? .semibold : .medium))
-                        if m.isRecommended(v) {
-                            Image(systemName: "star.fill").font(.system(size: 7, weight: .bold)).foregroundStyle(Color.tungsten)
-                                .accessibilityLabel("Recommended")
-                        }
-                        Text(MemoryGauge.bytes(v.downloadBytes)).font(.mono(9.5)).foregroundStyle(.textTertiary)
-                    }
-                    .foregroundStyle(selected ? Color.tungsten : .textSecondary)
-                    .padding(.horizontal, 8)
-                    .frame(height: 22)
-                    .background(Capsule().fill(selected ? Color.tungsten.opacity(0.12) : Color.surface))
-                    .overlay(Capsule().strokeBorder(selected ? Color.tungsten.opacity(0.5) : Color.hairline, lineWidth: 1))
-                    .contentShape(Capsule())
+                    Text(v.friendlyName(in: m))
+                        .textRole(.label, color: selected ? .textPrimary : .textSecondary)
+                        .lineLimit(1)
+                        .padding(.horizontal, 9)
+                        .frame(height: 22)
+                        .background(Capsule().fill(selected ? Color.surface : .clear))
+                        .overlay(Capsule().strokeBorder(selected ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .help((on ? "\(v.label): on this Mac" : "\(v.label): not downloaded")
+                .help("\(v.label) · \(MemoryGauge.bytes(v.memoryBytes)) memory"
                       + (m.isRecommended(v) ? ". " + ModelManifest.recommendationHelp : ""))
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
     }

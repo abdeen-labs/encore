@@ -59,10 +59,9 @@ struct GateFlowView: View {
 
             if let prompt = info?.gatePrompt {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("What the authors ask").textRole(.eyebrow)
+                    Text("What the authors ask").textRole(.section)
                     ScrollView {
-                        Text(prompt)
-                            .font(.ui(12)).foregroundStyle(.textSecondary).lineSpacing(2)
+                        Text(prompt).textRole(.caption)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(Theme.Space.m)
@@ -74,8 +73,9 @@ struct GateFlowView: View {
             }
 
             KeyValueRow("License") {
-                HStack(spacing: Theme.Space.s) {
-                    LicenseChip(license: manifest.license)
+                HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
+                    Text(manifest.license.name).textRole(.body)
+                    if manifest.isNonCommercial { Chip("Non-commercial", tone: .warning) }
                     if let link = info?.licenseLink ?? manifest.license.url.flatMap(URL.init(string:)) {
                         LinkButton(title: "Read", url: link)
                     }
@@ -141,7 +141,7 @@ struct GateFlowView: View {
                 HStack(spacing: 6) {
                     Image(systemName: page.isSecure ? "lock.fill" : "lock.open")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(page.isSecure ? Color.textTertiary : .velvet)
+                        .foregroundStyle(page.isSecure ? Color.textTertiary : .velvetText)
                     Text(page.host).textRole(.mono, color: .textSecondary).lineLimit(1)
                     if page.isLoading { ActivityIndicator(size: 11) }
                 }
@@ -160,7 +160,7 @@ struct GateFlowView: View {
             .padding(.horizontal, Theme.Space.l)
             .padding(.vertical, Theme.Space.s + 2)
             .background(Color.surface)
-            HLine().stroke(Color.hairline).frame(height: 1)
+            Hairline()
             ZStack {
                 HubWebView(page: page)
                 if let popup = page.popup {
@@ -192,7 +192,7 @@ struct GateFlowView: View {
     @ViewBuilder private var accessPill: some View {
         switch gate {
         case .open: StatusBadge(granted ? "Access granted" : "Access open", tone: .success)
-        case .pending: StatusBadge("Waiting for approval", tone: .accent, pulsing: true)
+        case .pending: StatusBadge("Waiting for approval", pulsing: true)
         case .invalidToken: StatusBadge("Token rejected", tone: .danger)
         default: StatusBadge("Waiting for you to accept", tone: .warning, pulsing: true)
         }

@@ -70,7 +70,7 @@ struct Card<Content: View>: View {
 
 // MARK: - Section header
 
-/// A heading for a group of content: display-serif title, optional caption, trailing slot.
+/// A heading for a group of content: a sans `section` title, optional caption, trailing slot.
 ///
 ///     SectionHeader("Voice", subtitle: "Who performs the line")
 ///     SectionHeader("Takes") { Button("Clear", action: clear).buttonStyle(.ghost) }
@@ -88,7 +88,7 @@ struct SectionHeader<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .lastTextBaseline, spacing: Theme.Space.m) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).textRole(.heading)
+                Text(title).textRole(.section)
                 if let subtitle { Text(subtitle).textRole(.caption) }
             }
             Spacer(minLength: 0)
@@ -103,13 +103,36 @@ extension SectionHeader where Trailing == EmptyView {
     }
 }
 
+// MARK: - Hairline
+
+/// A 1pt rule in `Color.hairline`: the plain way to separate things. Horizontal by default.
+///
+///     Hairline()
+///     Hairline(.vertical).frame(height: 18)
+struct Hairline: View {
+    var axis: Axis = .horizontal
+
+    init(_ axis: Axis = .horizontal) {
+        self.axis = axis
+    }
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.hairline)
+            .frame(width: axis == .vertical ? 1 : nil, height: axis == .horizontal ? 1 : nil)
+            .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Perforated divider
 
 /// A ticket-stub tear line: a dotted rule with half-moon notches cut into both ends.
-/// Inside a `Card`, pass the card's horizontal padding as `bleed` so the notches bite the edges.
+///
+/// Only for the line above the action row of a sheet (`SheetContainer` draws it there). Everywhere else,
+/// separate things with `Hairline()` or space.
 ///
 ///     PerforatedDivider()
-///     PerforatedDivider(bleed: 16)
+///     PerforatedDivider(bleed: 16)   // notches bite the edges of a container with 16pt padding
 struct PerforatedDivider: View {
     var bleed: CGFloat = 0
     /// Color that fills the notches; match the ground the card sits on.
@@ -168,8 +191,8 @@ struct HLine: Shape {
 
 // MARK: - Key-value row
 
-/// A label on the left, a monospaced value on the right, joined by a dotted leader.
-/// When space runs short the leader shrinks first, then the value wraps (right-aligned); neither side truncates.
+/// A key on the left in secondary text, its value right-aligned on the right.
+/// When space runs short the value wraps (right-aligned); neither side truncates.
 ///
 ///     KeyValueRow("Sample rate", value: "24 kHz")
 ///     KeyValueRow("Model") { StatusBadge("Loaded", tone: .success) }
@@ -188,10 +211,7 @@ struct KeyValueRow<Value: View>: View {
                 .lineLimit(1)
                 .fixedSize()
                 .layoutPriority(2)
-            HLine()
-                .stroke(Color.hairlineStrong, style: StrokeStyle(lineWidth: 1.2, lineCap: .round, dash: [0.1, 4]))
-                .frame(minWidth: 4, maxWidth: .infinity)
-                .frame(height: 1.2)
+            Spacer(minLength: Theme.Space.m)
             value
                 .multilineTextAlignment(.trailing)
                 .fixedSize(horizontal: false, vertical: true)
@@ -248,9 +268,9 @@ struct AdvancedDisclosure<Content: View>: View {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 8, weight: .bold))
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        .foregroundStyle(isExpanded ? Color.tungsten : .textTertiary)
+                        .foregroundStyle(isExpanded ? Color.textSecondary : .textTertiary)
                     Text(title).textRole(.eyebrow, color: isHovered || isExpanded ? .textSecondary : .textTertiary)
-                    Rectangle().fill(Color.hairline).frame(height: 1)
+                    Hairline()
                 }
                 .contentShape(Rectangle())
                 .padding(.vertical, Theme.Space.s)
@@ -271,16 +291,12 @@ struct AdvancedDisclosure<Content: View>: View {
 
 // MARK: - Stage backdrop
 
-/// The window ground: warm ink, a soft overhead wash of light and a vignette, with a faint
-/// film grain. Cheap: two gradients and one tiled 128px noise image.
+/// The window ground: warm ink with a faint film grain, nothing else (the stage panel's warm wash is the one
+/// ambient light). Cheap: one tiled 128px noise image.
 struct StageBackdrop: View {
     var body: some View {
         ZStack {
             Color.backdrop
-            RadialGradient(colors: [Color(hex: 0x2A2017, opacity: 0.55), .clear],
-                           center: .init(x: 0.55, y: -0.15), startRadius: 0, endRadius: 900)
-            RadialGradient(colors: [.clear, .black.opacity(0.45)],
-                           center: .center, startRadius: 380, endRadius: 1200)
             Image(nsImage: Grain.image)
                 .resizable(resizingMode: .tile)
                 .opacity(0.035)

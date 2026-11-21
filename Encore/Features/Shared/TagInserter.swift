@@ -1,9 +1,10 @@
 import EncoreCore
 import SwiftUI
 
-/// A strip of chips that insert tags at the editor's cursor: Encore's pause tag (with lengths), the voice-switch
-/// tag (with the voices this model can speak in), then the model's own expressive tags. Each chip is colored
-/// like the tag it inserts in `TaggedScriptEditor`.
+/// Three quiet menus that insert tags at the editor's cursor: "Pause" (Encore's pause tag, with lengths),
+/// "Voice" (the voice-switch tag, with the voices this model can speak in) and "Sounds" (the model's own expressive
+/// tags such as Laugh or Sigh; hidden when it has none). They always fit: no scrolling, no fade, so a caller
+/// needs no mask. The row is leading-aligned and takes the width it is given.
 ///
 ///     TagInserter(manifest: manifest) { editor.insert($0) }
 ///     TagInserter(manifest: manifest, includesVoiceSwitch: false) { editor.insert($0) }
@@ -23,46 +24,43 @@ struct TagInserter: View {
     }
 
     var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 6) {
-                if includesPause {
-                    Menu {
-                        ForEach([0.25, 0.5, 1, 2, 3], id: \.self) { s in
-                            Button(Self.pauseLabel(s)) { insert(Self.pauseTag(s)) }
-                        }
-                    } label: { TagChip(title: "Pause", symbol: "pause", kind: .pause, hasMenu: true) }
-                        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
-                        .help("Insert real silence: [pause 1s]")
-                }
-                if includesVoiceSwitch {
-                    Menu {
-                        let cast = castable
-                        if cast.isEmpty {
-                            Text("No other voices for \(manifest.name)")
-                        }
-                        ForEach(cast, id: \.self) { name in
-                            Button(name) { insert("[voice: \(name)]") }
-                        }
-                        Divider()
-                        Button("Back to the main voice") { insert("[voice: default]") }
-                    } label: { TagChip(title: "Voice", symbol: "person.2", kind: .voice, hasMenu: true) }
-                        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
-                        .help("Switch voice from here on: [voice: Name]")
-                }
-                if !manifest.expressiveTags.isEmpty {
-                    Rectangle().fill(Color.hairline).frame(width: 1, height: 16).padding(.horizontal, 2)
-                    ForEach(manifest.expressiveTags) { tag in
-                        Button { insert(Self.insertable(tag.tag)) } label: {
-                            TagChip(title: tag.label, symbol: nil, kind: .expressive, hasMenu: false)
-                        }
-                        .buttonStyle(.plain)
-                        .help("Insert \(tag.tag)")
+        HStack(spacing: 6) {
+            if includesPause {
+                Menu {
+                    ForEach([0.25, 0.5, 1, 2, 3], id: \.self) { s in
+                        Button(Self.pauseLabel(s)) { insert(Self.pauseTag(s)) }
                     }
-                }
+                } label: { InserterLabel(title: "Pause", symbol: "pause") }
+                    .inserterMenu()
+                    .help("Insert real silence: [pause 1s]")
             }
-            .padding(.vertical, 2)
+            if includesVoiceSwitch {
+                Menu {
+                    let cast = castable
+                    if cast.isEmpty {
+                        Text("No other voices for \(manifest.name)")
+                    }
+                    ForEach(cast, id: \.self) { name in
+                        Button(name) { insert("[voice: \(name)]") }
+                    }
+                    Divider()
+                    Button("Back to the main voice") { insert("[voice: default]") }
+                } label: { InserterLabel(title: "Voice", symbol: "person.2", symbolColor: .gel) }
+                    .inserterMenu()
+                    .help("Switch voice from here on: [voice: Name]")
+            }
+            if !manifest.expressiveTags.isEmpty {
+                Menu {
+                    ForEach(manifest.expressiveTags) { tag in
+                        Button(tag.label) { insert(Self.insertable(tag.tag)) }
+                    }
+                } label: { InserterLabel(title: "Sounds", symbol: "face.smiling") }
+                    .inserterMenu()
+                    .help("Insert a sound \(manifest.name) can make, like \(manifest.expressiveTags[0].tag)")
+            }
         }
-        .scrollIndicators(.never)
+        .padding(.vertical, 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Names a `[voice:]` tag can use with this model: library voices when it clones, plus its presets.
@@ -85,25 +83,33 @@ struct TagInserter: View {
     static func insertable(_ tag: String) -> String { tag.replacingOccurrences(of: "*", with: "1") }
 }
 
-private struct TagChip: View {
+private extension View {
+    func inserterMenu() -> some View {
+        menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+    }
+}
+
+/// A neutral pill: glyph, title, chevron.
+private struct InserterLabel: View {
     let title: String
-    let symbol: String?
-    let kind: ScriptTagKind
-    let hasMenu: Bool
+    let symbol: String
+    var symbolColor: Color = .textTertiary
     @State private var isHovered = false
 
     var body: some View {
-        let color = ScriptTagStyle.color(kind)
-        HStack(spacing: 4) {
-            if let symbol { Image(systemName: symbol).font(.system(size: 8.5, weight: .bold)) }
-            Text(title).font(.ui(11.5, weight: .medium)).lineLimit(1)
-            if hasMenu { Image(systemName: "chevron.down").font(.system(size: 7, weight: .bold)).opacity(0.7) }
+        HStack(spacing: 5) {
+            Image(systemName: symbol)
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(symbolColor)
+            Text(title).textRole(.label, color: isHovered ? .textPrimary : .textSecondary).lineLimit(1)
+            Image(systemName: "chevron.down")
+                .font(.system(size: 7, weight: .bold))
+                .foregroundStyle(Color.textTertiary)
         }
-        .foregroundStyle(color.opacity(isHovered ? 1 : 0.88))
         .padding(.horizontal, 9)
-        .frame(height: 22)
-        .background(Capsule().fill(color.opacity(isHovered ? 0.16 : 0.08)))
-        .overlay(Capsule().strokeBorder(color.opacity(isHovered ? 0.5 : 0.24), lineWidth: 1))
+        .frame(height: 24)
+        .background(Capsule().fill(Color.textPrimary.opacity(isHovered ? 0.06 : 0)))
+        .overlay(Capsule().strokeBorder(isHovered ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
         .contentShape(Capsule())
         .onHover { isHovered = $0 }
         .stageAnimation(Theme.Motion.quick, value: isHovered)

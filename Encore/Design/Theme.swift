@@ -1,6 +1,45 @@
 import AppKit
 import SwiftUI
 
+// MARK: - Design rules
+//
+// Encore is a dark stage with one light. The personality stays; each effect has one place to live.
+//
+// THE LIGHT (tungsten fill, tungsten glow)
+//   Only three things are lit at a time:
+//   1. where you are: the rail's selection lamp, a selected row's edge;
+//   2. the next step: one primary button per screen (`.buttonStyle(.primary)`);
+//   3. what is live: the thing playing (`.buttonStyle(.play(isPlaying:))`), recording or running.
+//   Everything else is unlit: play buttons at rest, icons, category labels, secondary actions.
+//   A list never has one lit thing per row.
+//
+// COLOR
+//   Mint, footlight and velvet are states (done, needs attention, failed / destructive / recording), never
+//   categories. Kinds of things (cloned / designed / imported, speech / transcript …) are told apart by icon
+//   and word, in neutral text. Gel marks voice cues in scripts. Speaker colors exist only in Conversations.
+//   Red text on the dark grounds uses `velvetText` (or `Tone.textColor`), which is readable; `velvet` is for fills.
+//
+// TYPE
+//   Text uses a `TextRole`. Serif (`marquee`, `title`, `heading`) is for names on the bill: the screen title,
+//   sheet and empty-state titles, voices, scripts. Section headings are `section` (sans). Mono is for numbers
+//   and timecodes, not sentences. No font sizes outside the roles, except SF Symbol sizing.
+//
+// DECORATION
+//   Grain: the window ground only. Warm wash: the stage panel only. Spotlight cone: full-screen empty states
+//   only. Perforated tear line: only above the action row of a sheet. Elsewhere use `Hairline()` or space.
+//   No dotted leaders, no glow on dots, icons or badges.
+//
+// WORDS
+//   Theater words stay where there is room and nothing to operate: the rail groups, screen taglines,
+//   empty-state titles, toasts. The working vocabulary is small: Perform (make speech), Audition (try designed
+//   voices), Cast, Takes. Steps, field labels, status and errors are plain. No cue numbers ("Q1"), no
+//   "company" in counts or labels.
+//
+// DENSITY
+//   Say each fact once per screen. Engineering detail (precision names like bf16, runtimes, memory figures,
+//   seeds, chunk counts, file paths) lives in a details view or a tooltip, and comes forward only when it
+//   needs action. The primary action is always visible without scrolling.
+
 // MARK: - Palette
 
 /// The semantic color slots of an Encore theme.
@@ -28,8 +67,9 @@ struct Palette: Sendable {
     var tungsten: UInt32          // primary accent: warm amber stage light
     var tungstenDeep: UInt32      // the darker end of tungsten gradients
     var onTungsten: UInt32        // text/icons drawn on a tungsten fill
-    var velvet: UInt32            // recording and destructive
+    var velvet: UInt32            // recording and destructive (fills, borders, lamps)
     var velvetDeep: UInt32
+    var velvetText: UInt32        // velvet for text on the dark grounds (4.5:1 and up)
     var mint: UInt32              // ready / success
     var footlight: UInt32         // warnings (an orange that stays distinct from tungsten)
     var gel: UInt32               // a lavender lighting gel: voice cues (voice-switch tags), distinct from every other light
@@ -45,12 +85,13 @@ struct Palette: Sendable {
         hairline: 0xF4EDE4,
         textPrimary: 0xF4EDE4,
         textSecondary: 0xA99E92,
-        textTertiary: 0x6F665D,
+        textTertiary: 0x8F857A,   // 4.9:1 on `surface`; the smallest text stays readable
         tungsten: 0xFFB648,
         tungstenDeep: 0xE0821C,
         onTungsten: 0x1C1206,
         velvet: 0xD7263D,
         velvetDeep: 0x8C1426,
+        velvetText: 0xEB5A5F,
         mint: 0x7FD1C7,
         footlight: 0xF2874E,
         gel: 0xC9A7FF
@@ -100,6 +141,8 @@ extension Color {
     static let onTungsten = Color(hex: p.onTungsten)
     static let velvet = Color(hex: p.velvet)
     static let velvetDeep = Color(hex: p.velvetDeep)
+    /// Velvet for text and small glyphs on the dark grounds.
+    static let velvetText = Color(hex: p.velvetText)
     static let mint = Color(hex: p.mint)
     static let footlight = Color(hex: p.footlight)
     /// Voice cues: voice-switch tags and the chips that insert them.
@@ -123,6 +166,7 @@ extension ShapeStyle where Self == Color {
     static var onTungsten: Color { .onTungsten }
     static var velvet: Color { .velvet }
     static var velvetDeep: Color { .velvetDeep }
+    static var velvetText: Color { .velvetText }
     static var mint: Color { .mint }
     static var footlight: Color { .footlight }
     static var gel: Color { .gel }
@@ -151,6 +195,9 @@ enum Tone: Sendable, Hashable {
         case .danger: .velvet
         }
     }
+
+    /// The tone as text or a small glyph on the dark grounds (danger uses the readable red).
+    var textColor: Color { self == .danger ? .velvetText : color }
 
     /// Default SF Symbol for banners and toasts.
     var symbol: String {

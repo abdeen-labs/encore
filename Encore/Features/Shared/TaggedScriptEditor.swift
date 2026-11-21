@@ -46,8 +46,9 @@ import SwiftUI
     }
 }
 
-/// The script editor with live tag highlighting: Encore's pause and voice tags, the model's expressive tags,
-/// and anything tag-shaped the model won't understand (wavy underline), plus underlines for the planner's issues.
+/// The script editor with live tag highlighting in two styles: pause and expressive tags as quiet markup (mono,
+/// secondary text, a faint raised background), voice cues (`[voice: Name]`) in gel. Anything tag-shaped the model
+/// won't understand keeps the footlight underline, and the planner's issues are underlined too.
 /// Highlighting comes from a `ParsedScript` the caller already has (e.g. `ScriptPlan.parsed`), so the editor
 /// shows exactly what will be performed.
 ///
@@ -69,8 +70,9 @@ struct TaggedScriptEditor: View {
             ScriptTextViewRepresentable(text: $text, parsed: parsed, controller: controller, fontSize: fontSize,
                                         onCommandReturn: onCommandReturn, onCommandPeriod: onCommandPeriod)
             if text.isEmpty {
+                // Same face and size as the script it stands in for.
                 Text(placeholder)
-                    .font(.display(18, italic: true))
+                    .font(.ui(fontSize))
                     .foregroundStyle(.textTertiary)
                     .padding(.horizontal, ScriptTextViewRepresentable.inset.width + 2)
                     .padding(.top, ScriptTextViewRepresentable.inset.height - 1)
@@ -80,16 +82,30 @@ struct TaggedScriptEditor: View {
     }
 }
 
-/// Colors for each kind of tag, shared with the tag chips so a chip looks like what it inserts.
+/// How tags look in a script. Two styles: markup (pause, expressive and unrecognized tags: secondary text on a
+/// faint raised background) and voice cues (gel). An unrecognized tag adds `problemColor` as an underline.
+///
+///     a[r].foregroundColor = ScriptTagStyle.color(tag.kind)
+///     a[r].backgroundColor = ScriptTagStyle.background(tag.kind)
 enum ScriptTagStyle {
+    /// The tag's text color.
     static func color(_ kind: ScriptTagKind) -> Color {
         switch kind {
-        case .pause: .mint
         case .voice: .gel
-        case .expressive: .tungsten
-        case .unrecognized: .footlight
+        case .pause, .expressive, .unrecognized: .textSecondary
         }
     }
+
+    /// The faint fill behind the tag.
+    static func background(_ kind: ScriptTagKind) -> Color {
+        switch kind {
+        case .voice: Color.gel.opacity(0.11)
+        case .pause, .expressive, .unrecognized: .surfaceRaised
+        }
+    }
+
+    /// The underline under a tag the model won't understand.
+    static var problemColor: Color { .footlight }
 }
 
 private struct ScriptTextViewRepresentable: NSViewRepresentable {
@@ -174,19 +190,19 @@ private struct ScriptTextViewRepresentable: NSViewRepresentable {
         storage.beginEditing()
         storage.setAttributes(base, range: NSRange(location: 0, length: length))
         if let parsed {
-            let tagFont = NSFont.monospacedSystemFont(ofSize: fontSize - 2.5, weight: .medium)
+            let tagFont = NSFont.monospacedSystemFont(ofSize: fontSize - 2.5, weight: .regular)
             for tag in parsed.tags where NSMaxRange(tag.utf16Range) <= length {
-                let color = NSColor(ScriptTagStyle.color(tag.kind))
-                var attrs: [NSAttributedString.Key: Any] = [.foregroundColor: color, .font: tagFont,
-                                                            .backgroundColor: color.withAlphaComponent(0.11)]
+                var attrs: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor(ScriptTagStyle.color(tag.kind)),
+                                                            .font: tagFont,
+                                                            .backgroundColor: NSColor(ScriptTagStyle.background(tag.kind))]
                 if tag.kind == .unrecognized {
                     attrs[.underlineStyle] = NSUnderlineStyle.single.rawValue | NSUnderlineStyle.patternDot.rawValue
-                    attrs[.underlineColor] = color
+                    attrs[.underlineColor] = NSColor(ScriptTagStyle.problemColor)
                 }
                 storage.addAttributes(attrs, range: tag.utf16Range)
             }
             for issue in parsed.issues where issue.severity != .info && NSMaxRange(issue.utf16Range) <= length {
-                let color = NSColor(issue.severity == .error ? Color.velvet : Color.footlight)
+                let color = NSColor(issue.severity == .error ? Color.velvetText : Color.footlight)
                 storage.addAttributes([.underlineStyle: NSUnderlineStyle.thick.rawValue, .underlineColor: color,
                                        .toolTip: issue.message], range: issue.utf16Range)
             }

@@ -13,7 +13,6 @@ private struct InputWell: ViewModifier {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .strokeBorder(isFocused ? Color.tungsten.opacity(0.75) : (isHovered ? .hairlineStrong : .clear), lineWidth: 1)
             }
-            .shadow(color: .tungsten.opacity(isFocused ? 0.18 : 0), radius: 6)
             .stageAnimation(Theme.Motion.quick, value: isFocused)
     }
 }
@@ -53,7 +52,7 @@ struct StageTextField: View {
                 }
                 TextField(placeholder, text: $text, prompt: Text(placeholder).foregroundStyle(Color.textTertiary))
                     .textFieldStyle(.plain)
-                    .font(.ui(13))
+                    .font(TextRole.body.font)
                     .foregroundStyle(.textPrimary)
                     .focused($isFocused)
                     .onSubmit { onSubmit?() }
@@ -86,7 +85,7 @@ struct SearchField: View {
                 .foregroundStyle(isFocused ? Color.tungsten : .textTertiary)
             TextField(prompt, text: $text, prompt: Text(prompt).foregroundStyle(Color.textTertiary))
                 .textFieldStyle(.plain)
-                .font(.ui(12.5))
+                .font(TextRole.body.font)
                 .foregroundStyle(.textPrimary)
                 .focused($isFocused)
                 .onExitCommand { text = "" }
@@ -137,8 +136,8 @@ struct ScriptEditor: View {
         VStack(spacing: 0) {
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $text)
-                    .font(.ui(14.5))
-                    .lineSpacing(6)
+                    .font(TextRole.script.font)
+                    .lineSpacing(TextRole.script.lineSpacing)
                     .foregroundStyle(.textPrimary)
                     .scrollContentBackground(.hidden)
                     .scrollIndicators(.automatic)
@@ -148,8 +147,7 @@ struct ScriptEditor: View {
                     .tint(.tungsten)
                 if text.isEmpty {
                     Text(placeholder)
-                        .font(.display(17, italic: true))
-                        .foregroundStyle(.textTertiary)
+                        .textRole(.script, color: .textTertiary)
                         .padding(.horizontal, 17)
                         .padding(.top, 12)
                         .allowsHitTesting(false)
@@ -164,12 +162,12 @@ struct ScriptEditor: View {
                     Text("≈ \(readTime)")
                         .foregroundStyle(wordCount > 0 ? Color.textSecondary : .textTertiary)
                 }
-                .font(.mono(10.5))
+                .font(TextRole.monoSmall.font)
                 .foregroundStyle(.textTertiary)
                 .monospacedDigit()
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .overlay(alignment: .top) { Rectangle().fill(Color.hairline).frame(height: 1) }
+                .overlay(alignment: .top) { Hairline() }
             }
         }
         .modifier(InputWell(isFocused: isFocused, isHovered: isHovered, radius: Theme.Radius.m))

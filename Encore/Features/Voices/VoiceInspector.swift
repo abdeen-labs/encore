@@ -35,8 +35,7 @@ struct VoiceInspector: View {
                 VStack(alignment: .leading, spacing: Theme.Space.l) {
                     header
                     if let reference {
-                        WaveformPlayer(url: reference, title: "Reference clip",
-                                       subtitle: String(format: "%.1f s", voice.duration))
+                        WaveformPlayer(url: reference, title: "Reference clip")
                     }
                     actions
                     field("Tags") { TagEditor(tags: binding(\.tags), suggestions: library.allTags) }
@@ -63,19 +62,20 @@ struct VoiceInspector: View {
     // MARK: Sections
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: voice.origin.symbol).font(.system(size: 9.5, weight: .bold))
-                Text("\(voice.origin.label) voice").textRole(.eyebrow, color: .tungsten.opacity(0.8))
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 5) {
+                Image(systemName: voice.origin.symbol)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.textTertiary)
+                Text("\(voice.origin.label) voice").textRole(.caption)
                 Spacer()
                 Button("Close", systemImage: "xmark", action: onClose).buttonStyle(.icon).controlSize(.small)
                     .keyboardShortcut(.cancelAction)
+                    .help("Close")
             }
-            .foregroundStyle(Color.tungsten.opacity(0.8))
             TextField("Name", text: binding(\.name))
                 .textFieldStyle(.plain)
-                .font(.display(26))
-                .foregroundStyle(.textPrimary)
+                .textRole(.heading)
                 .onSubmit(commit)
         }
     }
@@ -98,8 +98,7 @@ struct VoiceInspector: View {
         field("Designed from") {
             VStack(alignment: .leading, spacing: Theme.Space.s) {
                 Text(voice.designPrompt.map { "“\($0)”" } ?? "No description was kept.")
-                    .font(.display(15, italic: true)).foregroundStyle(.textSecondary)
-                    .lineSpacing(3)
+                    .textRole(.body, color: .textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
                 if let prompt = voice.designPrompt {
@@ -119,18 +118,29 @@ struct VoiceInspector: View {
 
     private var facts: some View {
         VStack(alignment: .leading, spacing: 2) {
-            PerforatedDivider().padding(.bottom, Theme.Space.s)
-            KeyValueRow("Length", value: String(format: "%.1f s", voice.duration))
+            Hairline().padding(.bottom, Theme.Space.s)
+            // The player shows the length; it is listed here only when the clip is missing.
+            if reference == nil {
+                KeyValueRow("Length") { Text(String(format: "%.1f s", voice.duration)).textRole(.mono) }
+            }
             KeyValueRow("Added") {
-                Text(VoiceDates.compact(voice.createdAt)).textRole(.mono).textSelection(.enabled)
+                Text(VoiceDates.compact(voice.createdAt)).textRole(.body).textSelection(.enabled)
                     .help(voice.createdAt.formatted(date: .complete, time: .shortened))
             }
             if let id = voice.sourceModelID {
-                KeyValueRow("Made with", value: deps.catalog.model(id)?.name ?? id)
+                KeyValueRow("Made with") {
+                    Text(deps.catalog.model(id)?.name ?? id).textRole(.body).textSelection(.enabled)
+                }
             }
             KeyValueRow("Consent") {
-                Text(consentText).textRole(.mono, color: voice.consentConfirmedAt != nil ? .mint : .textTertiary)
-                    .help(voice.consentConfirmedAt.map { "Confirmed " + $0.formatted(date: .complete, time: .shortened) } ?? "")
+                Group {
+                    if voice.consentConfirmedAt != nil {
+                        StatusBadge(consentText, tone: .success)
+                    } else {
+                        Text(consentText).textRole(.body, color: .textTertiary)
+                    }
+                }
+                .help(voice.consentConfirmedAt.map { "Confirmed " + $0.formatted(date: .complete, time: .shortened) } ?? "")
             }
         }
     }
@@ -142,15 +152,14 @@ struct VoiceInspector: View {
 
     private var saveBar: some View {
         HStack(spacing: Theme.Space.s) {
-            Circle().fill(Color.footlight).frame(width: 6, height: 6).glow(.footlight, radius: 4, intensity: 0.5)
-            Text("Unsaved changes").textRole(.caption)
+            StatusBadge("Unsaved changes", tone: .warning)
             Spacer()
             Button("Revert") { draft = nil }.buttonStyle(.ghost).controlSize(.small)
-            Button("Save", action: commit).buttonStyle(.primary).controlSize(.small)
+            Button("Save", action: commit).buttonStyle(.secondary).controlSize(.small)
                 .keyboardShortcut("s", modifiers: .command)
         }
         .padding(.top, Theme.Space.s)
-        .overlay(alignment: .top) { Rectangle().fill(Color.hairline).frame(height: 1) }
+        .overlay(alignment: .top) { Hairline() }
     }
 
     private func field<C: View>(_ title: String, caption: String? = nil, @ViewBuilder content: () -> C) -> some View {

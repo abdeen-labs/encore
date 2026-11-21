@@ -8,8 +8,9 @@ extension EnvironmentValues {
     @Entry var scaffoldScrollAnchor: UnitPoint? = nil
 }
 
-/// The standard screen frame: a playbill header (display-serif title,
-/// subtitle, trailing actions) above scrolling content.
+/// The standard screen frame: a one-row header (display-serif title, the tagline on its baseline, trailing
+/// actions; about 70pt tall) above scrolling content. The tagline hides, whole, when there's no room for it
+/// beside the actions.
 ///
 ///     ScreenScaffold("Studio", subtitle: "Text to speech") {
 ///         Card { … }
@@ -58,31 +59,68 @@ struct ScreenScaffold<Content: View, Actions: View>: View {
         }
     }
 
+    /// One row: the title, the tagline on the same baseline, then the actions. The tagline yields: when it
+    /// doesn't fit beside the actions it is hidden whole, never truncated.
     private var header: some View {
-        HStack(alignment: .bottom, spacing: Theme.Space.l) {
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .center, spacing: Theme.Space.l) {
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Space.m) {
                 Text(title)
                     .textRole(.marquee)
                     .lineLimit(1)
+                    .layoutPriority(1)
                     .accessibilityAddTraits(.isHeader)
                 if let subtitle {
-                    Text(subtitle).font(.ui(13.5)).foregroundStyle(.textSecondary)
+                    ShownIfItFits() {
+                        Text(subtitle)
+                            .textRole(.body, color: .textSecondary)
+                            .lineLimit(1)
+                    }
+                    .clipped()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            Spacer(minLength: Theme.Space.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: Theme.Space.s) { actions }
-                .padding(.bottom, 4)
+                .fixedSize()
         }
         .padding(.horizontal, Theme.Space.screenInset)
-        .padding(.top, 34)
-        .padding(.bottom, Theme.Space.xl)
+        .padding(.top, 22)
+        .padding(.bottom, Theme.Space.l)
     }
 
     private var contentStack: some View {
         VStack(alignment: .leading, spacing: Theme.Space.l) { content }
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(.horizontal, Theme.Space.screenInset)
-            .padding(.bottom, Theme.Space.xxl)
+            // A screen that fills the height keeps its own bottom edge (a pinned action bar sits close to it).
+            .padding(.bottom, scrolls ? Theme.Space.xxl : Theme.Space.l)
+    }
+}
+
+/// Shows its one subview at its ideal size when that fits the proposed width; otherwise takes no width at all
+/// (clip it to hide the overflow). Keeps the subview's text baselines, so it can sit in a baseline-aligned row.
+private struct ShownIfItFits: Layout {
+    private func fits(_ ideal: CGSize, _ proposal: ProposedViewSize) -> Bool {
+        guard let width = proposal.width else { return true }
+        return ideal.width <= width + 0.5
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let view = subviews.first else { return .zero }
+        let ideal = view.sizeThatFits(.unspecified)
+        return fits(ideal, proposal) ? ideal : CGSize(width: 0, height: ideal.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let view = subviews.first else { return }
+        let ideal = view.sizeThatFits(.unspecified)
+        view.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(ideal))
+    }
+
+    func explicitAlignment(of guide: VerticalAlignment, in bounds: CGRect, proposal: ProposedViewSize,
+                           subviews: Subviews, cache: inout ()) -> CGFloat? {
+        guard let view = subviews.first else { return nil }
+        return bounds.minY + view.dimensions(in: .unspecified)[guide]
     }
 }
 

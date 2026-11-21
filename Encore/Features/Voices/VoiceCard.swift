@@ -1,8 +1,9 @@
 import EncoreCore
 import SwiftUI
 
-/// One voice as a playbill card: origin and language eyebrow, the name in the display face, tags, the reference
-/// clip on a compact player, and its facts along a perforated stub. Lit tungsten when open in the inspector.
+/// One voice as a card: the name in the display face, one caption line (origin icon, origin, language, length),
+/// up to three tags, and the reference clip on a compact player. A tungsten border while it is open in the
+/// inspector or checked for a batch action.
 struct VoiceCard: View {
     let voice: Voice
     let reference: URL?
@@ -17,75 +18,24 @@ struct VoiceCard: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.l, style: .continuous)
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: Theme.Space.s) {
-                HStack(spacing: 6) {
-                    Image(systemName: voice.origin.symbol).font(.system(size: 9, weight: .bold))
-                    Text(eyebrow).lineLimit(1)
-                    Spacer(minLength: 0)
-                }
-                .font(.ui(10, weight: .semibold)).tracking(1.4).textCase(.uppercase)
-                .foregroundStyle(originColor.opacity(0.9))
-                .padding(.trailing, 26)
-                Text(voice.name)
-                    .font(.display(22))
-                    .foregroundStyle(.textPrimary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                if !voice.tags.isEmpty {
-                    HStack(spacing: 5) {
-                        ForEach(voice.tags.prefix(4), id: \.self) { Chip($0) }
-                        if voice.tags.count > 4 { Text("+\(voice.tags.count - 4)").textRole(.monoSmall, color: .textTertiary) }
-                    }
-                    .lineLimit(1)
-                } else if let line = blurb {
-                    Text(line).font(.display(13, italic: true)).foregroundStyle(.textTertiary).lineLimit(1)
-                        .frame(height: 22, alignment: .leading)
-                } else {
-                    Color.clear.frame(height: 22)
-                }
-            }
-            .padding(.horizontal, Theme.Space.l)
-            .padding(.top, Theme.Space.l)
-            .padding(.bottom, Theme.Space.m)
-
-            Group {
-                if let reference {
-                    WaveformPlayer(url: reference, title: "Reference", subtitle: nil, style: .compact)
-                } else {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color.velvet)
-                        Text("Reference clip missing").textRole(.caption)
-                    }
-                    .frame(height: 38)
-                }
-            }
-            .padding(.horizontal, Theme.Space.m)
-
-            PerforatedDivider(bleed: 0)
-                .padding(.top, Theme.Space.s)
-            HStack(spacing: Theme.Space.s) {
-                Text(String(format: "%.1f s", voice.duration))
-                if let l = voice.language { dot; Text(VoiceLanguages.name(l)) }
-                Spacer(minLength: Theme.Space.xs)
-                Text(voice.createdAt.formatted(.dateTime.day().month(.abbreviated).year()))
-            }
-            .font(.mono(10.5))
-            .foregroundStyle(.textTertiary)
-            .lineLimit(1)
-            .padding(.horizontal, Theme.Space.l)
-            .padding(.vertical, 9)
+            Text(voice.name)
+                .textRole(.heading)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .padding(.trailing, 22)
+            facts.padding(.top, 2)
+            tagLine.padding(.top, 2)
+            player.padding(.top, Theme.Space.s)
         }
-        .background {
-            shape.fill(Color.surface)
-                .overlay(shape.fill(LinearGradient(colors: [originColor.opacity(isFocused ? 0.1 : 0.05), .clear],
-                                                   startPoint: .topLeading, endPoint: .center)))
-        }
+        .padding(.horizontal, Theme.Space.m)
+        .padding(.vertical, Theme.Space.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background { shape.fill(Color.surface) }
         .overlay {
             shape.strokeBorder(isFocused || isSelected ? Color.tungsten.opacity(isFocused ? 0.85 : 0.55)
                                : (isHovered ? Color.hairlineStrong : Color.hairline), lineWidth: isFocused ? 1.5 : 1)
         }
-        .overlay(alignment: .topTrailing) { check.padding(Theme.Space.m - 5) }
-        .glow(.tungsten, radius: 14, intensity: isFocused ? 0.18 : 0)
+        .overlay(alignment: .topTrailing) { check.padding(Theme.Space.xs) }
         .contentShape(shape)
         .onTapGesture(perform: onClick)
         .onHover { isHovered = $0 }
@@ -97,20 +47,45 @@ struct VoiceCard: View {
         .help(voice.transcript.isEmpty ? voice.name : "“\(voice.transcript)”")
     }
 
-    private var dot: some View { Text("·") }
-
-    private var eyebrow: String { voice.origin.label }
-
-    private var blurb: String? {
-        if let p = voice.designPrompt, !p.isEmpty { return p }
-        return voice.transcript.isEmpty ? nil : "“\(voice.transcript)”"
+    /// "Cloned · English · 9 s", after a small neutral origin icon.
+    private var facts: some View {
+        HStack(spacing: 5) {
+            Image(systemName: voice.origin.symbol)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Color.textTertiary)
+            Text(factsLine).textRole(.caption).lineLimit(1)
+        }
     }
 
-    private var originColor: Color {
-        switch voice.origin {
-        case .cloned: .tungsten
-        case .designed: .mint
-        case .imported: .textSecondary
+    private var factsLine: String {
+        var parts = [voice.origin.label]
+        if let l = voice.language, !l.isEmpty { parts.append(VoiceLanguages.name(l)) }
+        parts.append("\(max(1, Int(voice.duration.rounded()))) s")
+        return parts.joined(separator: " · ")
+    }
+
+    /// Up to three tags as plain text; the line keeps its height when there are none, so cards in a row line up.
+    private var tagLine: some View {
+        let shown = voice.tags.prefix(3)
+        let more = voice.tags.count - shown.count
+        let text = shown.joined(separator: ", ") + (more > 0 ? " +\(more)" : "")
+        return Text(text.isEmpty ? " " : text)
+            .textRole(.caption, color: .textTertiary)
+            .lineLimit(1)
+            .accessibilityHidden(text.isEmpty)
+    }
+
+    @ViewBuilder private var player: some View {
+        if let reference {
+            WaveformPlayer(url: reference, title: voice.name, style: .compact)
+        } else {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Tone.warning.textColor)
+                Text("Reference clip missing").textRole(.caption)
+            }
+            .frame(height: 38)
         }
     }
 

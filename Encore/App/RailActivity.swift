@@ -44,23 +44,22 @@ struct RailActivity: View {
                         .frame(width: 11)
                 }
                 Text(JobKindStyle.verb(job.kind, running: running))
-                    .font(.ui(9.5, weight: .bold)).tracking(1.2).textCase(.uppercase)
-                    .foregroundStyle(running ? Color.tungsten : .textSecondary)
+                    .textRole(.eyebrow, color: running ? .tungsten : .textSecondary)
                     .lineLimit(1)
                 Spacer(minLength: 2)
                 if let p = job.progress, running {
-                    Text("\(Int((p * 100).rounded()))%").font(.mono(10)).foregroundStyle(.textSecondary).monospacedDigit()
+                    Text("\(Int((p * 100).rounded()))%").textRole(.monoSmall, color: .textSecondary).monospacedDigit()
                 }
             }
             if !compact {
-                Text(job.title).font(.ui(12, weight: .semibold)).foregroundStyle(.textPrimary).lineLimit(1)
+                Text(job.title).textRole(.label, color: .textPrimary).lineLimit(1)
             }
             Text([job.modelName, job.stage].compactMap { $0 }.joined(separator: " · "))
-                .font(.ui(10.5)).foregroundStyle(.textTertiary).lineLimit(1)
+                .textRole(.caption, color: .textTertiary).lineLimit(1)
             HStack(spacing: 6) {
                 ProgressBar(value: running ? job.progress : nil, tone: running ? .accent : .neutral, height: 2.5)
                 if queued > 0 {
-                    Text("+\(queued) queued").font(.mono(9.5)).foregroundStyle(.textSecondary).fixedSize()
+                    Text("+\(queued) queued").textRole(.monoSmall, color: .textSecondary).fixedSize()
                 }
             }
             .frame(height: 11)
@@ -96,7 +95,7 @@ private struct JobList: View {
             PanelHeading(title: "Activity", count: jobs.count)
                 .padding(.horizontal, Theme.Space.xs)
             ForEach(Array(jobs.enumerated()), id: \.element.id) { index, job in
-                if index > 0 { Rectangle().fill(Color.hairline).frame(height: 1).padding(.horizontal, Theme.Space.m) }
+                if index > 0 { Hairline().padding(.horizontal, Theme.Space.m) }
                 row(job, position: index)
             }
             Text("Each screen's Stop button cancels its own job.")
@@ -115,7 +114,7 @@ private struct JobList: View {
         return HStack(alignment: .top, spacing: Theme.Space.s) {
             Group {
                 if running { ActivityIndicator(size: 12) }
-                else { Text("\(position)").font(.mono(10, weight: .semibold)).foregroundStyle(.textTertiary) }
+                else { Text("\(position)").textRole(.monoSmall, color: .textTertiary) }
             }
             .frame(width: 14, height: 16)
             VStack(alignment: .leading, spacing: 3) {

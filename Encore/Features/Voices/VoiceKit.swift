@@ -76,8 +76,7 @@ struct TagEditor: View {
                         .foregroundStyle(focused ? Color.tungsten : .textTertiary)
                     TextField(placeholder, text: $draft, prompt: Text(placeholder).foregroundStyle(Color.textTertiary))
                         .textFieldStyle(.plain)
-                        .font(.ui(11.5, weight: .medium))
-                        .foregroundStyle(.textPrimary)
+                        .textRole(.label)
                         .focused($focused)
                         .frame(width: 92)
                         .onSubmit(commit)
@@ -99,7 +98,7 @@ struct TagEditor: View {
                         Button {
                             withStageAnimation(Theme.Motion.quick) { tags.append(s) }
                         } label: {
-                            Text("+ \(s)").font(.ui(11, weight: .medium)).foregroundStyle(.textSecondary)
+                            Text("+ \(s)").textRole(.label, color: .textSecondary)
                                 .lineLimit(1).fixedSize()
                         }
                         .buttonStyle(.plain)
@@ -151,7 +150,7 @@ struct FlowRow: Layout {
 
 // MARK: - Consent
 
-/// The permission tick: a velvet-edged box that lights mint once ticked, with the statement beside it.
+/// The permission tick: a neutral box that turns mint once ticked, with the statement beside it.
 struct ConsentCheck: View {
     @Binding var isOn: Bool
     var statement: String
@@ -181,10 +180,9 @@ struct ConsentCheck: View {
                     }
                 }
                 .frame(width: 20, height: 20)
-                .glow(.mint, radius: 6, intensity: isOn ? 0.45 : 0)
                 .padding(.top, 1)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(statement).textRole(.headline, color: isOn ? .textPrimary : .textPrimary.opacity(0.9))
+                    Text(statement).textRole(.headline)
                         .fixedSize(horizontal: false, vertical: true)
                     if let detail {
                         Text(detail).textRole(.caption).fixedSize(horizontal: false, vertical: true)
@@ -329,7 +327,7 @@ final class VoiceTryout {
     #endif
 }
 
-/// The panel for `VoiceTryout`: the line, the cloning model, Speak, the result, and where to go next.
+/// The panel for `VoiceTryout`: the line, the cloning model, Perform, the result, and where to go next.
 struct VoiceTryoutPanel: View {
     @Bindable var tryout: VoiceTryout
     var onAnother: (() -> Void)?
@@ -340,34 +338,32 @@ struct VoiceTryoutPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Hear it").textRole(.eyebrow)
-                Spacer()
-                if let m = tryout.manifest {
-                    Text("performed by \(m.name)").textRole(.caption, color: .textTertiary)
-                }
-            }
+            Text("Hear it").textRole(.section)
             StageTextField("A line for the new voice", text: $tryout.line, symbol: "text.quote", onSubmit: tryout.speak)
             if tryout.cloningModels().isEmpty {
-                Banner(.warning, title: "No cloning model on this Mac",
-                       message: "A voice is performed by a model that clones, such as Qwen3-TTS Base or Chatterbox Turbo. Download one to hear it.") {
-                    Button("Open Models") { deps.router.go(.models) }.buttonStyle(.secondary).controlSize(.small)
+                HStack(alignment: .firstTextBaseline, spacing: Theme.Space.xs) {
+                    Text("No cloning model on this Mac yet.").textRole(.caption)
+                    Button { deps.router.go(.models) } label: {
+                        Text("Open Models").textRole(.caption, color: .textPrimary).underline()
+                    }
+                    .buttonStyle(.plain)
+                    .help("A voice is performed by a model that clones, such as Qwen3-TTS Base or Chatterbox Turbo.")
                 }
             } else {
                 ModelPicker(task: .tts, requires: .cloning, feature: .cloning, selection: $tryout.choice)
             }
-            RunSurface(runner: tryout.runner, title: "Speak", systemImage: "waveform",
+            RunSurface(runner: tryout.runner, title: "Perform", systemImage: "waveform",
                        blockedReason: tryout.runner.error == nil ? tryout.blockedReason : nil, action: tryout.speak)
             if let error = tryout.runner.error {
                 ServiceErrorBanner(error: error, onDismiss: { tryout.runner.error = nil }, onRetry: tryout.speak)
             }
             if let record = tryout.result {
-                WaveformPlayer(url: record.audioURL, title: record.title,
-                               subtitle: "\(record.modelName) · made in \(RunSurface.seconds(record.elapsed)) · not saved")
+                WaveformPlayer(url: record.audioURL, title: record.title, subtitle: "Not saved")
+                    .help("\(record.modelName) · made in \(RunSurface.seconds(record.elapsed))")
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
-            PerforatedDivider().padding(.vertical, Theme.Space.xxs)
             FlowRow(spacing: Theme.Space.s, lineSpacing: Theme.Space.s) { followOns }
+                .padding(.top, Theme.Space.xs)
         }
     }
 
@@ -377,7 +373,8 @@ struct VoiceTryoutPanel: View {
                 if let note = deps.castInStudio(voice.id, preferredModel: tryout.choice) { toasts.show(note, tone: .warning) }
                 else { toasts.show("\(voice.name) is cast in Studio", tone: .success, symbol: "person.wave.2") }
             }
-            .buttonStyle(.primary)
+            // Perform is this panel's one lit action.
+            .buttonStyle(.secondary)
             Button("Open in Voices", systemImage: "person.wave.2") {
                 deps.screenModel("Voices") { VoicesModel(deps: deps) }.focus(voice.id)
                 deps.router.go(.voices)

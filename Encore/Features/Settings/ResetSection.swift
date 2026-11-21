@@ -16,12 +16,11 @@ struct ResetSection: View {
     @State private var outcome: ResetOutcome?
 
     var body: some View {
-        SettingsSection(title: "Reset", subtitle: "Start over. Both actions are permanent.",
-                        symbol: "exclamationmark.triangle", accent: .velvet) {
+        SettingsSection(title: "Reset", subtitle: "Start over. Both actions are permanent.") {
             ResetRow(title: "Delete all app data",
                      detail: "Voices, history, presets, pronunciations, settings, drafts and caches. Encore starts over as on first launch; downloaded models stay.",
                      button: "Delete app data…") { showsAppData = true }
-            HLine().stroke(Color.hairline).frame(height: 1)
+            Hairline()
             ResetRow(title: "Delete all downloaded models",
                      detail: "Removes Encore's models from the shared Hugging Face cache — that deletes them from this Mac for every app that uses them, not just for Encore.",
                      button: "Delete models…") { showsModels = true }
@@ -53,7 +52,7 @@ private struct ResetRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: Theme.Space.l) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.ui(13, weight: .semibold)).foregroundStyle(.textPrimary)
+                Text(title).textRole(.headline)
                 Text(detail).textRole(.caption).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Theme.Space.s)
@@ -136,8 +135,22 @@ private struct ResetOutcomeBanner: View {
         case .blocked: .warning
         default: outcome.failures.isEmpty ? .success : .danger
         }
-        Banner(tone, title: outcome.title, message: outcome.message, onDismiss: onDismiss) { EmptyView() }
-            .textSelection(.enabled)
+        if tone == .success {
+            // A finished action is information: a quiet line, not a banner.
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
+                StatusBadge(outcome.title, tone: .success)
+                Text(outcome.message).textRole(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                Spacer(minLength: Theme.Space.s)
+                Button("Dismiss", systemImage: "xmark", action: onDismiss)
+                    .buttonStyle(.icon).controlSize(.small)
+                    .help("Dismiss")
+            }
+        } else {
+            Banner(tone, title: outcome.title, message: outcome.message, onDismiss: onDismiss) { EmptyView() }
+                .textSelection(.enabled)
+        }
     }
 }
 
@@ -162,8 +175,8 @@ private struct TypedConfirmation: View {
 
     var body: some View {
         HStack(spacing: Theme.Space.m) {
-            Text("To confirm, type \(Text(word).font(.mono(12.5, weight: .semibold)).foregroundStyle(Color.velvet))")
-                .font(.ui(12.5)).foregroundStyle(.textSecondary)
+            Text("To confirm, type \(Text(word).font(TextRole.mono.font).foregroundStyle(Color.velvetText))")
+                .textRole(.body, color: .textSecondary)
                 .fixedSize()
             StageTextField(word, text: $text, symbol: matches ? "checkmark" : "keyboard", onSubmit: onSubmit)
         }
@@ -181,7 +194,7 @@ private struct LossList<Rows: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(heading).textRole(.eyebrow, color: .velvet)
+                Text(heading).textRole(.eyebrow, color: .velvetText)
                 Spacer()
                 if let total { Text(total).textRole(.monoSmall, color: .textSecondary) }
             }
@@ -204,10 +217,10 @@ private struct LossRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: symbol).font(.system(size: 11, weight: .medium)).foregroundStyle(.textTertiary)
                 .frame(width: 16)
-            Text(title).font(.ui(12.5, weight: .semibold)).foregroundStyle(.textPrimary)
+            Text(title).textRole(.headline)
                 .fixedSize()
             if let detail {
-                Text(detail).font(.ui(12)).foregroundStyle(.textTertiary).lineLimit(1).truncationMode(.tail)
+                Text(detail).textRole(.caption, color: .textTertiary).lineLimit(1).truncationMode(.tail)
             }
             Spacer(minLength: Theme.Space.s)
             if let value { Text(value).textRole(.mono, color: .textSecondary).fixedSize() }
@@ -225,9 +238,9 @@ private struct ModelCell: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: symbol).font(.system(size: 10.5, weight: .medium)).foregroundStyle(.textTertiary).frame(width: 14)
-            Text(name).font(.ui(12.5, weight: .semibold)).foregroundStyle(.textPrimary).lineLimit(1)
+            Text(name).textRole(.label, color: .textPrimary).lineLimit(1)
                 .layoutPriority(1)
-            Text(detail).font(.ui(11.5)).foregroundStyle(.textTertiary).lineLimit(1)
+            Text(detail).textRole(.caption, color: .textTertiary).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .help("\(name): \(detail)")
@@ -239,7 +252,7 @@ private struct KeepRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.mint).frame(width: 16)
-            text.font(.ui(12)).foregroundStyle(.textSecondary).fixedSize(horizontal: false, vertical: true)
+            text.textRole(.caption).fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -301,7 +314,7 @@ struct ResetAppDataSheet: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Stays on this Mac").textRole(.eyebrow, color: .mint)
                     KeepRow(text: Text("Downloaded models (delete those separately) and files you exported."))
-                    KeepRow(text: Text("The shared token file \(Text(tokenPath).font(.mono(11.5))), so Encore signs in with it again. Sign out (above) removes it."))
+                    KeepRow(text: Text("The shared token file \(Text(tokenPath).font(TextRole.monoSmall.font)), so Encore signs in with it again. Sign out (above) removes it."))
                 }
                 TypedConfirmation(word: "delete", text: $typed, onSubmit: confirm)
             } else {

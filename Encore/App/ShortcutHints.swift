@@ -92,8 +92,7 @@ struct KeycapBadge: View {
 
     var body: some View {
         Text(key)
-            .font(.mono(10.5, weight: .medium))
-            .foregroundStyle(Color.textPrimary)
+            .textRole(.monoSmall, color: .textPrimary)
             .padding(.horizontal, 4)
             .frame(minWidth: 18, minHeight: 18)
             .background {

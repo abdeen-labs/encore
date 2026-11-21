@@ -63,6 +63,17 @@ struct AudioGallerySection: View {
     private static let longFile = AudioFixtures.speechPeaks(duration: 4_334, bucketsPerSecond: 50, seed: 5)
     private static let interview = AudioFixtures.speechPeaks(duration: 48, seed: 9)
 
+    private struct MinimalRow {
+        var title: String
+        var peaks: WaveformPeaks
+        var time: TimeInterval
+    }
+    private static let minimalRows: [MinimalRow] = [
+        MinimalRow(title: "Take 03 — The house lights dim", peaks: take, time: 14.2),
+        MinimalRow(title: "Line 2", peaks: line2, time: 0),
+        MinimalRow(title: "Line 3", peaks: line3, time: 0),
+    ]
+
     @State private var longSelection: ClosedRange<TimeInterval> = 1_812.4...1_822.0
     @State private var tooLong: ClosedRange<TimeInterval> = 3.0...29.5
     @State private var tooShort: ClosedRange<TimeInterval> = 11.2...14.0
@@ -91,6 +102,21 @@ struct AudioGallerySection: View {
                 WaveformPlayer(previewPeaks: Self.line2, title: "Line 2", style: .compact)
                 WaveformPlayer(previewPeaks: Self.line3, title: "Line 3", style: .compact)
             }
+            // `.minimal` in dense rows: just play and the duration.
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Self.minimalRows.indices, id: \.self) { index in
+                    let row = Self.minimalRows[index]
+                    if index > 0 { Hairline() }
+                    HStack(spacing: Theme.Space.m) {
+                        WaveformPlayer(previewPeaks: row.peaks, title: row.title, style: .minimal, time: row.time)
+                        Text(row.title).textRole(.body).lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, Theme.Space.m)
+                    .padding(.vertical, Theme.Space.s)
+                }
+            }
+            .surface(.card)
             WaveformTrimmer(previewPeaks: Self.longFile, selection: $longSelection,
                             title: "Board meeting recording — full.m4a", visible: 1_796...1_838)
             HStack(alignment: .top, spacing: Theme.Space.l) {
@@ -107,8 +133,10 @@ struct AudioGallerySection: View {
                 PlayerDockBar(title: "Take 03 — The house lights dim", subtitle: "Captain · Qwen3-TTS 1.7B",
                               peaks: Self.take, gain: WaveformLoader.gain(for: Self.take),
                               currentTime: 14.2, duration: 42.2, isPlaying: true)
-                Rectangle().fill(Color.hairline).frame(height: 1)
-                PlayerDockBar.idle
+                Hairline()
+                PlayerDockBar(title: "Take 03 — The house lights dim", subtitle: "Captain · Qwen3-TTS 1.7B",
+                              peaks: Self.take, gain: WaveformLoader.gain(for: Self.take),
+                              currentTime: 14.2, duration: 42.2, isPlaying: false)
             }
             .surface(.sunken)
         }

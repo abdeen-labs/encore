@@ -117,7 +117,6 @@ struct StageSlider: View {
                 Capsule()
                     .fill(LinearGradient(colors: [.tungstenDeep, .tungsten], startPoint: .leading, endPoint: .trailing))
                     .frame(width: x + capWidth / 2, height: 5)
-                    .glow(.tungsten, radius: 6, intensity: isDragging ? 0.45 : 0.18)
                 if let defaultValue, range.upperBound > range.lowerBound {
                     let f = (defaultValue - range.lowerBound) / (range.upperBound - range.lowerBound)
                     Rectangle()
@@ -194,7 +193,6 @@ private struct StageToggleBody: View {
                         .fill(on ? AnyShapeStyle(LinearGradient(colors: [.tungstenDeep, .tungsten], startPoint: .leading, endPoint: .trailing))
                                  : AnyShapeStyle(Color.surfaceSunken))
                         .overlay(Capsule().strokeBorder(on ? Color.white.opacity(0.15) : (isHovered ? .hairlineStrong : .hairline), lineWidth: 1))
-                        .glow(.tungsten, radius: 8, intensity: on ? 0.3 : 0)
                     Circle()
                         .fill(on ? Color(hex: 0xFFF6E8) : Color(hex: 0x8A8077))
                         .shadow(color: .black.opacity(0.45), radius: 1.5, y: 1)
@@ -277,7 +275,7 @@ struct NumberField: View {
                     .disabled(value.wrappedValue <= range.lowerBound)
                 TextField("", text: $draft)
                     .textFieldStyle(.plain)
-                    .font(.mono(12))
+                    .font(TextRole.mono.font)
                     .foregroundStyle(.textPrimary)
                     .multilineTextAlignment(.center)
                     .focused($isEditing)
@@ -341,19 +339,17 @@ struct SegmentedControl<Option: Hashable>: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text(title(option))
-                            .font(.ui(controlSize == .small ? 11 : 12, weight: selected ? .semibold : .medium))
-                            .foregroundStyle(selected ? Color.textPrimary : .textSecondary)
+                            .textRole(.label, color: selected ? .textPrimary : .textSecondary)
                             // The lamp sits under the title (not the count), at the segment's foot.
                             .overlay {
                                 if selected {
                                     Capsule().fill(Color.tungsten).frame(width: 14, height: 2)
-                                        .glow(.tungsten, radius: 4, intensity: 0.6)
                                         .offset(y: (Theme.ControlHeight.of(controlSize) - 6) / 2 - 3)
                                         .matchedGeometryEffect(id: "lamp", in: thumb)
                                 }
                             }
                         if let n = count?(option) {
-                            CountBadge(n, isEmphasized: selected)
+                            CountBadge(n)
                         }
                     }
                         .padding(.horizontal, 12)
@@ -419,13 +415,12 @@ struct MenuPicker<Option: Hashable>: View {
             } label: {
                 HStack(spacing: Theme.Space.s) {
                     Text(label(selection))
-                        .font(.ui(12.5, weight: .medium))
-                        .foregroundStyle(.textPrimary)
+                        .textRole(.label, color: .textPrimary)
                         .lineLimit(1)
                     Spacer(minLength: Theme.Space.s)
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(isHovered ? Color.tungsten : .textTertiary)
+                        .foregroundStyle(isHovered ? Color.textSecondary : .textTertiary)
                 }
                 .padding(.horizontal, 11)
                 .frame(height: Theme.ControlHeight.regular)

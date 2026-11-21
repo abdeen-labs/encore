@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Encore's button family. Apply with `.buttonStyle(.primary)`, `.secondary`, `.ghost`,
-/// `.destructive` or `.icon`. Sizes follow `.controlSize(.small / .regular / .large)`.
+/// `.destructive`, `.icon` or `.play(isPlaying:)`. Sizes follow `.controlSize(.small / .regular / .large)`.
+/// Only `.primary` (the next step) and `.play` while playing are lit.
 ///
 ///     Button("Perform", systemImage: "play.fill") { … }.buttonStyle(.primary)
 ///     Button("Delete take", systemImage: "trash") { … }.buttonStyle(.icon)   // icon-only, label kept for VoiceOver
@@ -22,11 +23,12 @@ private struct StageButtonBody: View {
     @State private var isHovered = false
 
     private var height: CGFloat { Theme.ControlHeight.of(controlSize) }
-    private var fontSize: CGFloat {
+    /// The label's role font: `label` (12) small, `headline` (13) regular, `section` (15) large.
+    private var labelFont: Font {
         switch controlSize {
-        case .mini, .small: 11.5
-        case .large, .extraLarge: 14
-        default: 12.5
+        case .mini, .small: TextRole.label.font
+        case .large, .extraLarge: TextRole.section.font
+        default: TextRole.headline.font
         }
     }
     private var hPad: CGFloat {
@@ -41,7 +43,7 @@ private struct StageButtonBody: View {
         let pressed = configuration.isPressed
         configuration.label
             .labelStyle(StageButtonLabelStyle())
-            .font(.ui(fontSize, weight: kind == .ghost ? .medium : .semibold))
+            .font(labelFont)
             .lineLimit(1)
             .foregroundStyle(foreground)
             .padding(.horizontal, hPad)
@@ -61,7 +63,7 @@ private struct StageButtonBody: View {
         case .primary: .onTungsten
         case .secondary: .textPrimary
         case .ghost: isHovered ? .textPrimary : .textSecondary
-        case .destructive: isHovered ? .textPrimary : .velvet
+        case .destructive: isHovered ? .textPrimary : .velvetText
         }
     }
 
@@ -87,7 +89,6 @@ private struct StageButtonBody: View {
                 .fill(isHovered ? AnyShapeStyle(Color.velvet) : AnyShapeStyle(Color.velvet.opacity(0.1)))
                 .overlay(shape.strokeBorder(Color.velvet.opacity(isHovered ? 0 : 0.45), lineWidth: 1))
                 .brightness(pressed ? -0.08 : 0)
-                .glow(.velvet, radius: 10, intensity: isHovered ? 0.35 : 0)
         }
     }
 }
@@ -101,7 +102,7 @@ private struct StageButtonLabelStyle: LabelStyle {
     }
 }
 
-/// Square, icon-only button. The button's title is kept for VoiceOver; add `.help("…")` for a tooltip.
+/// Square, icon-only button. Never lit: play / pause uses `.play(isPlaying:)`. The button's title is kept for VoiceOver; add `.help("…")` for a tooltip.
 ///
 ///     Button("Play", systemImage: "play.fill") { … }.buttonStyle(.icon)
 ///     Button("Stop", systemImage: "stop.fill") { … }.buttonStyle(.icon(tone: .danger, filled: true))
@@ -125,7 +126,7 @@ private struct IconButtonBody: View {
     var body: some View {
         let size = Theme.ControlHeight.of(controlSize)
         let pressed = configuration.isPressed
-        let tint = style.tone == .neutral ? Color.textPrimary : style.tone.color
+        let tint = style.tone == .neutral ? Color.textPrimary : style.tone.textColor
         configuration.label
             .labelStyle(.iconOnly)
             .font(.system(size: size * 0.42, weight: .semibold))
@@ -137,7 +138,6 @@ private struct IconButtonBody: View {
                     Circle()
                         .fill(style.tone == .neutral ? Color.textPrimary : style.tone.color)
                         .brightness(pressed ? -0.1 : (isHovered ? 0.05 : 0))
-                        .glow(style.tone == .neutral ? .textPrimary : style.tone.color, radius: 10, intensity: isHovered ? 0.4 : 0.15)
                 } else {
                     RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
                         .fill(Color.textPrimary.opacity(pressed ? 0.1 : (isHovered ? 0.06 : 0)))
@@ -149,6 +149,61 @@ private struct IconButtonBody: View {
             .onHover { isHovered = $0 }
             .stageAnimation(Theme.Motion.quick, value: pressed)
             .stageAnimation(Theme.Motion.quick, value: isHovered)
+    }
+}
+
+// MARK: - Play
+
+/// Circular transport button for play / pause. Unlit at rest (a raised disc with a hairline border); lit with a
+/// tungsten fill and glow only while `isPlaying`. Sized by `controlSize` like `IconButtonStyle`. The button's
+/// title is kept for VoiceOver.
+///
+///     Button(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill") { toggle() }
+///         .buttonStyle(.play(isPlaying: isPlaying))
+struct PlayButtonStyle: ButtonStyle {
+    var isPlaying: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        PlayButtonBody(isPlaying: isPlaying, configuration: configuration)
+    }
+}
+
+private struct PlayButtonBody: View {
+    let isPlaying: Bool
+    let configuration: ButtonStyleConfiguration
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.controlSize) private var controlSize
+    @State private var isHovered = false
+
+    var body: some View {
+        let size = Theme.ControlHeight.of(controlSize)
+        let pressed = configuration.isPressed
+        configuration.label
+            .labelStyle(.iconOnly)
+            .font(.system(size: size * 0.38, weight: .semibold))
+            .foregroundStyle(isPlaying ? Color.onTungsten : .textPrimary)
+            .frame(width: size, height: size)
+            .background {
+                if isPlaying {
+                    Circle()
+                        .fill(LinearGradient(colors: [Color(hex: 0xFFC669), .tungsten, .tungstenDeep],
+                                             startPoint: .top, endPoint: .bottom))
+                        .brightness(pressed ? -0.08 : (isHovered ? 0.04 : 0))
+                        .glow(.tungsten, radius: 10, intensity: isEnabled ? 0.4 : 0)
+                } else {
+                    Circle()
+                        .fill(Color.surfaceRaised)
+                        .brightness(pressed ? -0.03 : (isHovered ? 0.03 : 0))
+                        .overlay(Circle().strokeBorder(isHovered ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
+                }
+            }
+            .contentShape(Circle())
+            .scaleEffect(pressed ? 0.94 : 1)
+            .opacity(isEnabled ? 1 : 0.38)
+            .onHover { isHovered = $0 }
+            .stageAnimation(Theme.Motion.quick, value: pressed)
+            .stageAnimation(Theme.Motion.quick, value: isHovered)
+            .stageAnimation(Theme.Motion.quick, value: isPlaying)
     }
 }
 
@@ -169,5 +224,12 @@ extension ButtonStyle where Self == IconButtonStyle {
     /// Icon-only button with a tone, optionally on a filled disc.
     static func icon(tone: Tone = .neutral, filled: Bool = false) -> IconButtonStyle {
         .init(tone: tone, filled: filled)
+    }
+}
+
+extension ButtonStyle where Self == PlayButtonStyle {
+    /// Transport button. Unlit at rest; lit (tungsten fill and glow) only while `isPlaying`.
+    static func play(isPlaying: Bool) -> PlayButtonStyle {
+        .init(isPlaying: isPlaying)
     }
 }

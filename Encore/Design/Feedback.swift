@@ -3,27 +3,79 @@ import UniformTypeIdentifiers
 
 // MARK: - Empty state
 
-/// An empty stage: a symbol in a pool of light, a display-serif title, a line of copy and
-/// optional actions.
+/// How an `EmptyState` is staged.
+enum EmptyStateStyle: Sendable, Hashable {
+    /// A symbol in a cone and pool of light, a display-serif title. For a screen's main empty state only
+    /// (the spotlight is the one full-screen decoration).
+    case spotlight
+    /// No cone or pool: a smaller symbol in secondary text, a `section` title, tighter padding. For panels
+    /// and secondary empties.
+    case plain
+}
+
+/// An empty stage: a symbol, a title, a line of copy and optional actions. `.spotlight` (the default) stands
+/// the symbol in a pool of light; `.plain` is the quiet version for panels.
 ///
 ///     EmptyState(symbol: "waveform", title: "No takes yet", message: "Write a line and press Perform.")
 ///     EmptyState(symbol: "person.wave.2", title: "No voices", message: "…") {
 ///         Button("Clone a voice") { router.go(.clone) }.buttonStyle(.primary)
 ///     }
+///     EmptyState(symbol: "magnifyingglass", title: "Nothing matches", style: .plain)
+///     EmptyState(symbol: "waveform", title: "No takes") { … }.emptyStateStyle(.plain)
 struct EmptyState<Actions: View>: View {
+    typealias Style = EmptyStateStyle
+
     let symbol: String
     let title: String
     var message: String?
+    var style: EmptyStateStyle = .spotlight
     @ViewBuilder var actions: Actions
 
-    init(symbol: String, title: String, message: String? = nil, @ViewBuilder actions: () -> Actions) {
+    init(symbol: String, title: String, message: String? = nil, style: EmptyStateStyle = .spotlight,
+         @ViewBuilder actions: () -> Actions) {
         self.symbol = symbol
         self.title = title
         self.message = message
+        self.style = style
         self.actions = actions()
     }
 
+    /// The same empty state, staged in `newStyle`.
+    func emptyStateStyle(_ newStyle: EmptyStateStyle) -> EmptyState {
+        var copy = self
+        copy.style = newStyle
+        return copy
+    }
+
     var body: some View {
+        switch style {
+        case .spotlight: spotlightBody
+        case .plain: plainBody
+        }
+    }
+
+    private var plainBody: some View {
+        VStack(spacing: Theme.Space.m) {
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .light))
+                .foregroundStyle(.textSecondary)
+            VStack(spacing: Theme.Space.xs) {
+                Text(title).textRole(.section).multilineTextAlignment(.center)
+                if let message {
+                    Text(message).textRole(.body, color: .textSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 400)
+                }
+            }
+            HStack(spacing: Theme.Space.s) { actions }
+                .padding(.top, Theme.Space.xxs)
+        }
+        .padding(Theme.Space.xl)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var spotlightBody: some View {
         VStack(spacing: Theme.Space.l) {
             ZStack {
                 // The spot: a cone from above landing in a soft pool.
@@ -41,7 +93,6 @@ struct EmptyState<Actions: View>: View {
                 Image(systemName: symbol)
                     .font(.system(size: 30, weight: .light))
                     .foregroundStyle(LinearGradient(colors: [Color(hex: 0xFFE2B0), .tungsten], startPoint: .top, endPoint: .bottom))
-                    .glow(.tungsten, radius: 12, intensity: 0.35)
             }
             .frame(height: 96)
             VStack(spacing: Theme.Space.s) {
@@ -62,8 +113,8 @@ struct EmptyState<Actions: View>: View {
 }
 
 extension EmptyState where Actions == EmptyView {
-    init(symbol: String, title: String, message: String? = nil) {
-        self.init(symbol: symbol, title: title, message: message) { EmptyView() }
+    init(symbol: String, title: String, message: String? = nil, style: EmptyStateStyle = .spotlight) {
+        self.init(symbol: symbol, title: title, message: message, style: style) { EmptyView() }
     }
 }
 
@@ -107,7 +158,7 @@ struct Banner<Actions: View>: View {
         HStack(alignment: .top, spacing: Theme.Space.m) {
             Image(systemName: tone.symbol)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(tone.color)
+                .foregroundStyle(tone.textColor)
                 .frame(width: 18)
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: 3) {
@@ -132,7 +183,6 @@ struct Banner<Actions: View>: View {
                 .overlay(shape.strokeBorder(tone.color.opacity(0.28), lineWidth: 1))
                 .overlay(alignment: .leading) {
                     Capsule().fill(tone.color).frame(width: 3).padding(.vertical, 9).padding(.leading, 5)
-                        .glow(tone.color, radius: 5, intensity: 0.5)
                 }
         }
         .accessibilityElement(children: .contain)
@@ -189,8 +239,8 @@ struct ToastView: View {
         HStack(spacing: Theme.Space.s) {
             Image(systemName: toast.symbol ?? toast.tone.symbol)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(toast.tone == .neutral ? Color.tungsten : toast.tone.color)
-            Text(toast.message).font(.ui(12.5, weight: .medium)).foregroundStyle(.textPrimary)
+                .foregroundStyle(toast.tone.textColor)
+            Text(toast.message).textRole(.label, color: .textPrimary)
         }
         .padding(.horizontal, Theme.Space.l)
         .frame(height: 36)
@@ -339,12 +389,11 @@ struct DropZone: View {
                 Image(systemName: symbol)
                     .font(.system(size: 24, weight: .light))
                     .foregroundStyle(lit ? Color.tungsten : (isHovered ? .textSecondary : .textTertiary))
-                    .glow(.tungsten, radius: 10, intensity: lit ? 0.6 : 0)
                     .scaleEffect(lit ? 1.12 : 1)
                 Text(lit ? "Release to add" : title)
                     .textRole(.headline, color: lit ? .tungsten : .textPrimary)
                 if let message { Text(message).textRole(.caption).multilineTextAlignment(.center) }
-                Text("or click to browse").font(.ui(11, weight: .medium)).foregroundStyle(.textTertiary)
+                Text("or click to browse").textRole(.caption, color: .textTertiary)
                     .padding(.top, 2)
             }
             .padding(Theme.Space.xl)
