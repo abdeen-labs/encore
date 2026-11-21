@@ -1,0 +1,12 @@
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+.build/
+.swiftpm/
+.venv/
+__pycache__/
+*.pyc
+.claude/worktrees/
+*.profraw
