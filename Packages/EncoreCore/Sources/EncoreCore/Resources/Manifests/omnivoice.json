@@ -1,0 +1,244 @@
+{
+  "id": "omnivoice",
+  "name": "OmniVoice",
+  "family": "OmniVoice",
+  "summary": "k2-fsa's fast diffusion TTS for 600+ languages. Clones a voice, or builds one from attributes like gender, age, pitch and accent.",
+  "tasks": [
+    "tts"
+  ],
+  "engine": "omnivoice",
+  "variants": [
+    {
+      "id": "8bit",
+      "label": "8-bit",
+      "repo": "mlx-community/OmniVoice-8bit",
+      "downloadBytes": 1449000000,
+      "memoryBytes": 4600000000,
+      "recommended": true
+    },
+    {
+      "id": "bf16",
+      "label": "bf16",
+      "repo": "mlx-community/OmniVoice-bf16",
+      "downloadBytes": 1639000000,
+      "memoryBytes": 5200000000
+    }
+  ],
+  "license": {
+    "name": "CC-BY-NC-4.0",
+    "url": "https://huggingface.co/k2-fsa/OmniVoice",
+    "commercialUse": false,
+    "summary": "Non-commercial use only, with credit to the authors (the weights inherit this from their training data). The code is Apache-2.0.",
+    "gated": false
+  },
+  "capabilities": {
+    "cloning": true,
+    "cloningUsesTranscript": true,
+    "voiceDesign": true,
+    "expressiveTags": true
+  },
+  "languages": [
+    {
+      "code": "en",
+      "name": "English"
+    },
+    {
+      "code": "zh",
+      "name": "Chinese"
+    },
+    {
+      "code": "ja",
+      "name": "Japanese"
+    },
+    {
+      "code": "ko",
+      "name": "Korean"
+    },
+    {
+      "code": "de",
+      "name": "German"
+    },
+    {
+      "code": "fr",
+      "name": "French"
+    },
+    {
+      "code": "es",
+      "name": "Spanish"
+    },
+    {
+      "code": "it",
+      "name": "Italian"
+    },
+    {
+      "code": "pt",
+      "name": "Portuguese"
+    },
+    {
+      "code": "ru",
+      "name": "Russian"
+    },
+    {
+      "code": "ar",
+      "name": "Arabic"
+    },
+    {
+      "code": "hi",
+      "name": "Hindi"
+    },
+    {
+      "code": "nl",
+      "name": "Dutch"
+    },
+    {
+      "code": "pl",
+      "name": "Polish"
+    },
+    {
+      "code": "tr",
+      "name": "Turkish"
+    },
+    {
+      "code": "vi",
+      "name": "Vietnamese"
+    },
+    {
+      "code": "th",
+      "name": "Thai"
+    },
+    {
+      "code": "id",
+      "name": "Indonesian"
+    },
+    {
+      "code": "sv",
+      "name": "Swedish"
+    },
+    {
+      "code": "uk",
+      "name": "Ukrainian"
+    }
+  ],
+  "presetVoices": [],
+  "expressiveTags": [
+    {
+      "tag": "[laughter]",
+      "label": "Laughter"
+    },
+    {
+      "tag": "[sigh]",
+      "label": "Sigh"
+    },
+    {
+      "tag": "[confirmation-en]",
+      "label": "Agreeing “mm-hm”"
+    },
+    {
+      "tag": "[question-en]",
+      "label": "Questioning “hm?”"
+    },
+    {
+      "tag": "[surprise-ah]",
+      "label": "Surprised “ah!”"
+    },
+    {
+      "tag": "[dissatisfaction-hnn]",
+      "label": "Unimpressed “hnn”"
+    }
+  ],
+  "parameters": [
+    {
+      "key": "num_steps",
+      "label": "Quality steps",
+      "type": "int",
+      "tier": "basic",
+      "help": "More steps sound cleaner but take longer. 16 is quick, 32 is the sweet spot, 64 is best.",
+      "min": 4,
+      "max": 64,
+      "step": 1,
+      "default": 32
+    },
+    {
+      "key": "guidance_scale",
+      "label": "Guidance",
+      "type": "float",
+      "tier": "basic",
+      "help": "How strictly the voice follows the text and the voice prompt. Too high can sound strained.",
+      "min": 1.0,
+      "max": 5.0,
+      "step": 0.1,
+      "default": 2.0
+    },
+    {
+      "key": "duration_s",
+      "label": "Fixed length",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Force the clip to this many seconds (speeds up or slows down the delivery). 0 lets the model decide.",
+      "min": 0.0,
+      "max": 60.0,
+      "step": 0.5,
+      "unit": "s",
+      "default": 0.0
+    },
+    {
+      "key": "t_shift",
+      "label": "Time shift",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Shapes the diffusion schedule. Lower settles detail earlier; leave it unless you're experimenting.",
+      "min": 0.01,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.1
+    },
+    {
+      "key": "position_temperature",
+      "label": "Timing randomness",
+      "type": "float",
+      "tier": "advanced",
+      "help": "How freely the model picks which parts of the audio to fill in first. Higher varies rhythm more.",
+      "min": 0.0,
+      "max": 10.0,
+      "step": 0.5,
+      "default": 5.0
+    },
+    {
+      "key": "class_temperature",
+      "label": "Sound randomness",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Randomness when choosing each sound. 0 always takes the most likely one.",
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.05,
+      "default": 0.0
+    },
+    {
+      "key": "layer_penalty_factor",
+      "label": "Layer penalty",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Makes the model settle coarse sound layers before fine ones. Leave at 5 unless experimenting.",
+      "min": 0.0,
+      "max": 10.0,
+      "step": 0.5,
+      "default": 5.0
+    },
+    {
+      "key": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "tier": "advanced",
+      "help": "Fix this to get the same take again from the same settings. Leave empty for a fresh take each time."
+    }
+  ],
+  "reference": {
+    "minSeconds": 3,
+    "maxSeconds": 10,
+    "transcript": "recommended"
+  },
+  "maxChunkCharacters": 300,
+  "sampleRate": 24000,
+  "homepage": "https://github.com/k2-fsa/OmniVoice"
+}

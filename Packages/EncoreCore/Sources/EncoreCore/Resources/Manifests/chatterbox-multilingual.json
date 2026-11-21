@@ -1,0 +1,234 @@
+{
+  "id": "chatterbox-multilingual",
+  "name": "Chatterbox Multilingual",
+  "family": "Chatterbox",
+  "summary": "Resemble AI's voice cloner for 23 languages, with an emotion-intensity control. Clones from a short clip; no transcript needed. Runs in the Python helper.",
+  "tasks": [
+    "tts"
+  ],
+  "engine": "chatterbox",
+  "variants": [
+    {
+      "id": "v3",
+      "label": "Multilingual v3",
+      "repo": "mlx-community/chatterbox-multilingual-v3",
+      "companionRepos": [
+        "mlx-community/S3TokenizerV2"
+      ],
+      "allowPatterns": [
+        "*.json",
+        "*.safetensors"
+      ],
+      "companionAllowPatterns": {
+        "mlx-community/S3TokenizerV2": [
+          "model.safetensors",
+          "config.json"
+        ]
+      },
+      "downloadBytes": 3207973708,
+      "memoryBytes": 5000000000,
+      "recommended": true
+    }
+  ],
+  "license": {
+    "name": "MIT",
+    "url": "https://huggingface.co/ResembleAI/chatterbox",
+    "commercialUse": true,
+    "summary": "Free to use, change and sell, including commercially. Keep the copyright notice if you redistribute the model.",
+    "gated": false
+  },
+  "capabilities": {
+    "cloning": true
+  },
+  "languages": [
+    {
+      "code": "ar",
+      "name": "Arabic"
+    },
+    {
+      "code": "da",
+      "name": "Danish"
+    },
+    {
+      "code": "de",
+      "name": "German"
+    },
+    {
+      "code": "el",
+      "name": "Greek"
+    },
+    {
+      "code": "en",
+      "name": "English"
+    },
+    {
+      "code": "es",
+      "name": "Spanish"
+    },
+    {
+      "code": "fi",
+      "name": "Finnish"
+    },
+    {
+      "code": "fr",
+      "name": "French"
+    },
+    {
+      "code": "he",
+      "name": "Hebrew"
+    },
+    {
+      "code": "hi",
+      "name": "Hindi"
+    },
+    {
+      "code": "it",
+      "name": "Italian"
+    },
+    {
+      "code": "ja",
+      "name": "Japanese"
+    },
+    {
+      "code": "ko",
+      "name": "Korean"
+    },
+    {
+      "code": "ms",
+      "name": "Malay"
+    },
+    {
+      "code": "nl",
+      "name": "Dutch"
+    },
+    {
+      "code": "no",
+      "name": "Norwegian"
+    },
+    {
+      "code": "pl",
+      "name": "Polish"
+    },
+    {
+      "code": "pt",
+      "name": "Portuguese"
+    },
+    {
+      "code": "ru",
+      "name": "Russian"
+    },
+    {
+      "code": "sv",
+      "name": "Swedish"
+    },
+    {
+      "code": "sw",
+      "name": "Swahili"
+    },
+    {
+      "code": "tr",
+      "name": "Turkish"
+    },
+    {
+      "code": "zh",
+      "name": "Chinese"
+    }
+  ],
+  "presetVoices": [],
+  "expressiveTags": [],
+  "parameters": [
+    {
+      "key": "exaggeration",
+      "label": "Emotion",
+      "type": "float",
+      "tier": "basic",
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.05,
+      "default": 0.5,
+      "help": "How expressive the delivery is. Around 0.5 is natural; higher is more dramatic and tends to speed speech up (lower Pace to balance it)."
+    },
+    {
+      "key": "cfg_weight",
+      "label": "Pace",
+      "type": "float",
+      "tier": "basic",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 0.5,
+      "help": "Guidance strength. Lower gives slower, more deliberate speech; 0 also reduces the reference's accent carrying into other languages."
+    },
+    {
+      "key": "temperature",
+      "label": "Variation",
+      "type": "float",
+      "tier": "basic",
+      "min": 0.05,
+      "max": 2.0,
+      "step": 0.05,
+      "default": 0.8,
+      "help": "Higher sounds livelier and less predictable; lower sounds steadier."
+    },
+    {
+      "key": "repetition_penalty",
+      "label": "Repetition penalty",
+      "type": "float",
+      "tier": "advanced",
+      "min": 1.0,
+      "max": 2.0,
+      "step": 0.05,
+      "default": 1.2,
+      "help": "Discourages the model from looping on the same sounds."
+    },
+    {
+      "key": "min_p",
+      "label": "Min-p",
+      "type": "float",
+      "tier": "advanced",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.05,
+      "help": "Drops unlikely tokens relative to the most likely one. Higher is safer; 0 turns the filter off."
+    },
+    {
+      "key": "top_p",
+      "label": "Top-p",
+      "type": "float",
+      "tier": "advanced",
+      "min": 0.1,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 1.0,
+      "help": "Only tokens within this share of probability are considered. Lower is safer; 1 turns the filter off."
+    },
+    {
+      "key": "max_new_tokens",
+      "label": "Max length",
+      "type": "int",
+      "tier": "advanced",
+      "min": 100,
+      "max": 2000,
+      "step": 50,
+      "default": 1000,
+      "unit": "tokens",
+      "help": "Upper limit on speech tokens (25 per second) for one chunk of text."
+    },
+    {
+      "key": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "tier": "advanced",
+      "help": "Fix this to get the same take again from the same settings. Leave empty for a fresh take each time."
+    }
+  ],
+  "reference": {
+    "minSeconds": 5,
+    "maxSeconds": 10,
+    "transcript": "unused"
+  },
+  "maxChunkCharacters": 300,
+  "sampleRate": 24000,
+  "homepage": "https://github.com/resemble-ai/chatterbox"
+}

@@ -1,0 +1,56 @@
+{
+  "id": "parakeet-tdt-v2",
+  "name": "Parakeet TDT v2",
+  "family": "Parakeet",
+  "summary": "NVIDIA's English-only Parakeet: very fast and accurate, with punctuation and sentence timestamps.",
+  "tasks": [
+    "stt"
+  ],
+  "engine": "parakeet",
+  "variants": [
+    {
+      "id": "0.6b",
+      "label": "0.6B · bf16",
+      "repo": "mlx-community/parakeet-tdt-0.6b-v2",
+      "downloadBytes": 2472000000,
+      "memoryBytes": 3800000000,
+      "recommended": true
+    }
+  ],
+  "license": {
+    "name": "CC-BY-4.0",
+    "url": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2",
+    "commercialUse": true,
+    "summary": "Free to use, change and sell, including commercially, as long as you credit NVIDIA.",
+    "gated": false
+  },
+  "capabilities": {
+    "segmentTimestamps": true,
+    "wordTimestamps": true
+  },
+  "languages": [
+    {
+      "code": "en",
+      "name": "English"
+    }
+  ],
+  "presetVoices": [],
+  "expressiveTags": [],
+  "parameters": [
+    {
+      "key": "chunk_duration",
+      "label": "Chunk length",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Long recordings are transcribed in overlapping pieces of this many seconds. Shorter uses less memory.",
+      "min": 10.0,
+      "max": 1200.0,
+      "step": 10.0,
+      "unit": "s",
+      "default": 120.0
+    }
+  ],
+  "maxChunkCharacters": 0,
+  "sampleRate": 16000,
+  "homepage": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2"
+}

@@ -52,6 +52,9 @@ public struct ModelVariant: Codable, Identifiable, Sendable, Hashable {
     /// Rough resident memory once loaded.
     public var memoryBytes: Int64
     public var recommended: Bool?
+    /// Glob patterns per companion repo; a companion missing here is downloaded whole.
+    /// (`allowPatterns` applies to the primary repo only.)
+    public var companionAllowPatterns: [String: [String]]?
 
     public var allRepos: [String] { [repo] + (companionRepos ?? []) }
 }

@@ -1,0 +1,198 @@
+{
+  "id": "voxcpm2",
+  "name": "VoxCPM2",
+  "family": "VoxCPM",
+  "summary": "OpenBMB's 2B multilingual model with 48 kHz studio-quality output: clones a voice or designs one from a description, in 30 languages.",
+  "tasks": [
+    "tts"
+  ],
+  "engine": "voxcpm2",
+  "variants": [
+    {
+      "id": "8bit",
+      "label": "8-bit",
+      "repo": "mlx-community/VoxCPM2-8bit",
+      "downloadBytes": 3227000000,
+      "memoryBytes": 9100000000,
+      "recommended": true
+    },
+    {
+      "id": "4bit",
+      "label": "4-bit",
+      "repo": "mlx-community/VoxCPM2-4bit",
+      "downloadBytes": 2302000000,
+      "memoryBytes": 8100000000
+    },
+    {
+      "id": "bf16",
+      "label": "bf16",
+      "repo": "mlx-community/VoxCPM2-bf16",
+      "downloadBytes": 4960140841,
+      "memoryBytes": 10900000000
+    }
+  ],
+  "license": {
+    "name": "Apache-2.0",
+    "url": "https://huggingface.co/openbmb/VoxCPM2",
+    "commercialUse": true,
+    "summary": "Free to use, change and sell, including commercially. Keep the licence notice if you redistribute the model.",
+    "gated": false
+  },
+  "capabilities": {
+    "cloning": true,
+    "voiceDesign": true
+  },
+  "languages": [
+    {
+      "code": "en",
+      "name": "English"
+    },
+    {
+      "code": "zh",
+      "name": "Chinese"
+    },
+    {
+      "code": "ar",
+      "name": "Arabic"
+    },
+    {
+      "code": "my",
+      "name": "Burmese"
+    },
+    {
+      "code": "da",
+      "name": "Danish"
+    },
+    {
+      "code": "nl",
+      "name": "Dutch"
+    },
+    {
+      "code": "fi",
+      "name": "Finnish"
+    },
+    {
+      "code": "fr",
+      "name": "French"
+    },
+    {
+      "code": "de",
+      "name": "German"
+    },
+    {
+      "code": "el",
+      "name": "Greek"
+    },
+    {
+      "code": "he",
+      "name": "Hebrew"
+    },
+    {
+      "code": "hi",
+      "name": "Hindi"
+    },
+    {
+      "code": "id",
+      "name": "Indonesian"
+    },
+    {
+      "code": "it",
+      "name": "Italian"
+    },
+    {
+      "code": "ja",
+      "name": "Japanese"
+    },
+    {
+      "code": "km",
+      "name": "Khmer"
+    },
+    {
+      "code": "ko",
+      "name": "Korean"
+    },
+    {
+      "code": "lo",
+      "name": "Lao"
+    },
+    {
+      "code": "ms",
+      "name": "Malay"
+    },
+    {
+      "code": "no",
+      "name": "Norwegian"
+    },
+    {
+      "code": "pl",
+      "name": "Polish"
+    },
+    {
+      "code": "pt",
+      "name": "Portuguese"
+    },
+    {
+      "code": "ru",
+      "name": "Russian"
+    },
+    {
+      "code": "es",
+      "name": "Spanish"
+    },
+    {
+      "code": "sw",
+      "name": "Swahili"
+    },
+    {
+      "code": "sv",
+      "name": "Swedish"
+    },
+    {
+      "code": "tl",
+      "name": "Tagalog"
+    },
+    {
+      "code": "th",
+      "name": "Thai"
+    },
+    {
+      "code": "tr",
+      "name": "Turkish"
+    },
+    {
+      "code": "vi",
+      "name": "Vietnamese"
+    }
+  ],
+  "presetVoices": [],
+  "expressiveTags": [],
+  "parameters": [
+    {
+      "key": "max_tokens",
+      "label": "Length limit",
+      "type": "int",
+      "tier": "advanced",
+      "help": "Hard cap on how much audio one pass may generate. Lower it only to stop runaway output.",
+      "min": 50,
+      "max": 4000,
+      "step": 10,
+      "unit": "steps",
+      "default": 2000
+    },
+    {
+      "key": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "tier": "advanced",
+      "help": "Fix this to get the same take again from the same settings. Leave empty for a fresh take each time."
+    }
+  ],
+  "reference": {
+    "minSeconds": 5,
+    "maxSeconds": 15,
+    "transcript": "unused"
+  },
+  "maxChunkCharacters": 300,
+  "sampleRate": 48000,
+  "homepage": "https://github.com/OpenBMB/VoxCPM"
+}

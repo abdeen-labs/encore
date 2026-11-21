@@ -140,6 +140,7 @@ struct ComponentGallery: View {
                     ToastView(toast: Toast(message: "Saved to History", tone: .success))
                 }
             }
+            group("Audio") { AudioGallerySection() }
             group("Drop zone") {
                 DropZone(title: "Drop a reference clip", message: "WAV, MP3 or M4A · 5–30 seconds of clean speech",
                          allowedTypes: [.audio]) { _ in }

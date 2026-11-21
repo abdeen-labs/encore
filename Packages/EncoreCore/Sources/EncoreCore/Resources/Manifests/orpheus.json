@@ -1,0 +1,191 @@
+{
+  "id": "orpheus",
+  "name": "Orpheus",
+  "family": "Orpheus",
+  "summary": "Canopy Labs' 3B English model: eight lifelike voices with laughs, sighs and other sounds written inline.",
+  "tasks": [
+    "tts"
+  ],
+  "engine": "llama",
+  "variants": [
+    {
+      "id": "4bit",
+      "label": "3B · 4-bit",
+      "repo": "mlx-community/orpheus-3b-0.1-ft-4bit",
+      "companionRepos": [
+        "mlx-community/snac_24khz"
+      ],
+      "downloadBytes": 1964775495,
+      "memoryBytes": 2800000000,
+      "recommended": true
+    },
+    {
+      "id": "8bit",
+      "label": "3B · 8-bit",
+      "repo": "mlx-community/orpheus-3b-0.1-ft-8bit",
+      "companionRepos": [
+        "mlx-community/snac_24khz"
+      ],
+      "downloadBytes": 3615121731,
+      "memoryBytes": 4500000000
+    }
+  ],
+  "license": {
+    "name": "Apache-2.0",
+    "url": "https://huggingface.co/canopylabs/orpheus-3b-0.1-ft",
+    "commercialUse": true,
+    "summary": "Released under Apache-2.0 (free to use, change and sell). It is fine-tuned from Meta's Llama 3.2, whose licence terms may also apply. The original repo asks you to accept its terms on Hugging Face.",
+    "gated": true
+  },
+  "capabilities": {
+    "presetVoices": true,
+    "expressiveTags": true
+  },
+  "languages": [
+    {
+      "code": "en",
+      "name": "English"
+    }
+  ],
+  "presetVoices": [
+    {
+      "id": "tara",
+      "name": "Tara",
+      "language": "en",
+      "gender": "female"
+    },
+    {
+      "id": "leah",
+      "name": "Leah",
+      "language": "en",
+      "gender": "female"
+    },
+    {
+      "id": "jess",
+      "name": "Jess",
+      "language": "en",
+      "gender": "female"
+    },
+    {
+      "id": "leo",
+      "name": "Leo",
+      "language": "en",
+      "gender": "male"
+    },
+    {
+      "id": "dan",
+      "name": "Dan",
+      "language": "en",
+      "gender": "male"
+    },
+    {
+      "id": "mia",
+      "name": "Mia",
+      "language": "en",
+      "gender": "female"
+    },
+    {
+      "id": "zac",
+      "name": "Zac",
+      "language": "en",
+      "gender": "male"
+    },
+    {
+      "id": "zoe",
+      "name": "Zoe",
+      "language": "en",
+      "gender": "female"
+    }
+  ],
+  "expressiveTags": [
+    {
+      "tag": "<laugh>",
+      "label": "Laugh"
+    },
+    {
+      "tag": "<chuckle>",
+      "label": "Chuckle"
+    },
+    {
+      "tag": "<sigh>",
+      "label": "Sigh"
+    },
+    {
+      "tag": "<cough>",
+      "label": "Cough"
+    },
+    {
+      "tag": "<sniffle>",
+      "label": "Sniffle"
+    },
+    {
+      "tag": "<groan>",
+      "label": "Groan"
+    },
+    {
+      "tag": "<yawn>",
+      "label": "Yawn"
+    },
+    {
+      "tag": "<gasp>",
+      "label": "Gasp"
+    }
+  ],
+  "parameters": [
+    {
+      "key": "temperature",
+      "label": "Variation",
+      "type": "float",
+      "tier": "basic",
+      "help": "Higher sounds livelier and less predictable; lower sounds steadier.",
+      "min": 0.1,
+      "max": 1.5,
+      "step": 0.05,
+      "default": 0.6
+    },
+    {
+      "key": "top_p",
+      "label": "Top-p",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Only tokens within this share of probability are considered. Lower is safer; 1 turns the filter off.",
+      "min": 0.1,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 0.8
+    },
+    {
+      "key": "repetition_penalty",
+      "label": "Repetition penalty",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Discourages the model from looping on the same sounds. Raise it if output stutters or repeats.",
+      "min": 1.0,
+      "max": 2.0,
+      "step": 0.05,
+      "default": 1.3
+    },
+    {
+      "key": "max_tokens",
+      "label": "Length limit",
+      "type": "int",
+      "tier": "advanced",
+      "help": "Hard cap on generated audio per pass (about 85 tokens per second of speech).",
+      "min": 100,
+      "max": 8192,
+      "step": 10,
+      "unit": "tokens",
+      "default": 2400
+    },
+    {
+      "key": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "tier": "advanced",
+      "help": "Fix this to get the same take again from the same settings. Leave empty for a fresh take each time."
+    }
+  ],
+  "maxChunkCharacters": 300,
+  "sampleRate": 24000,
+  "homepage": "https://github.com/canopyai/Orpheus-TTS"
+}

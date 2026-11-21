@@ -14,14 +14,12 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/Neywa-Labs/mlx-audio-swift.git", from: "0.2.1"),
-        .package(url: "https://github.com/huggingface/swift-huggingface.git", from: "1.0.1"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.12.0"),
     ],
     targets: [
         .target(
             name: "EncoreCore",
             dependencies: [
-                .product(name: "HuggingFace", package: "swift-huggingface"),
                 .product(name: "GRDB", package: "GRDB.swift"),
             ],
             resources: [.copy("Resources/Manifests")]

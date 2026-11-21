@@ -1,0 +1,93 @@
+{
+  "id": "soprano",
+  "name": "Soprano",
+  "family": "Soprano",
+  "summary": "A tiny (80M) English voice that runs many times faster than real time. One voice, no cloning.",
+  "tasks": [
+    "tts"
+  ],
+  "engine": "soprano",
+  "variants": [
+    {
+      "id": "bf16",
+      "label": "1.1 · bf16",
+      "repo": "mlx-community/Soprano-1.1-80M-bf16",
+      "downloadBytes": 283883377,
+      "memoryBytes": 500000000,
+      "recommended": true
+    }
+  ],
+  "license": {
+    "name": "Apache-2.0",
+    "url": "https://huggingface.co/ekwek/Soprano-1.1-80M",
+    "commercialUse": true,
+    "summary": "Free to use, change and sell, including commercially. Keep the licence notice if you redistribute the model.",
+    "gated": false
+  },
+  "capabilities": {},
+  "languages": [
+    {
+      "code": "en",
+      "name": "English"
+    }
+  ],
+  "presetVoices": [],
+  "expressiveTags": [],
+  "parameters": [
+    {
+      "key": "temperature",
+      "label": "Variation",
+      "type": "float",
+      "tier": "basic",
+      "help": "Higher sounds livelier and less predictable; lower sounds steadier.",
+      "min": 0.05,
+      "max": 1.5,
+      "step": 0.05,
+      "default": 0.3
+    },
+    {
+      "key": "top_p",
+      "label": "Top-p",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Only tokens within this share of probability are considered. Lower is safer; 1 turns the filter off.",
+      "min": 0.1,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 0.95
+    },
+    {
+      "key": "repetition_penalty",
+      "label": "Repetition penalty",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Discourages the model from looping on the same sounds. 1 turns it off.",
+      "min": 1.0,
+      "max": 2.0,
+      "step": 0.05,
+      "default": 1.0
+    },
+    {
+      "key": "max_tokens",
+      "label": "Length limit",
+      "type": "int",
+      "tier": "advanced",
+      "help": "Hard cap on generated audio per pass. Lower it only to stop runaway output.",
+      "min": 32,
+      "max": 2048,
+      "step": 16,
+      "unit": "tokens",
+      "default": 512
+    },
+    {
+      "key": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "tier": "advanced",
+      "help": "Fix this to get the same take again from the same settings. Leave empty for a fresh take each time."
+    }
+  ],
+  "maxChunkCharacters": 250,
+  "sampleRate": 32000,
+  "homepage": "https://github.com/ekwek1/soprano"
+}

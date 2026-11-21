@@ -1,0 +1,225 @@
+{
+  "id": "qwen3-tts-customvoice",
+  "name": "Qwen3-TTS CustomVoice",
+  "family": "Qwen3-TTS",
+  "summary": "Nine premium built-in Qwen3-TTS voices you can steer with a plain-language style instruction.",
+  "tasks": [
+    "tts"
+  ],
+  "engine": "qwen3_tts",
+  "variants": [
+    {
+      "id": "1.7b-8bit",
+      "label": "1.7B · 8-bit",
+      "repo": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+      "downloadBytes": 3080000000,
+      "memoryBytes": 8900000000,
+      "recommended": true
+    },
+    {
+      "id": "1.7b-bf16",
+      "label": "1.7B · bf16",
+      "repo": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16",
+      "downloadBytes": 4520195613,
+      "memoryBytes": 10400000000
+    },
+    {
+      "id": "1.7b-4bit",
+      "label": "1.7B · 4-bit",
+      "repo": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+      "downloadBytes": 2312059416,
+      "memoryBytes": 8000000000
+    }
+  ],
+  "license": {
+    "name": "Apache-2.0",
+    "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+    "commercialUse": true,
+    "summary": "Free to use, change and sell, including commercially. Keep the licence notice if you redistribute the model.",
+    "gated": false
+  },
+  "capabilities": {
+    "presetVoices": true,
+    "styleInstruction": true
+  },
+  "languages": [
+    {
+      "code": "auto",
+      "name": "Detect automatically"
+    },
+    {
+      "code": "english",
+      "name": "English"
+    },
+    {
+      "code": "chinese",
+      "name": "Chinese"
+    },
+    {
+      "code": "japanese",
+      "name": "Japanese"
+    },
+    {
+      "code": "korean",
+      "name": "Korean"
+    },
+    {
+      "code": "german",
+      "name": "German"
+    },
+    {
+      "code": "french",
+      "name": "French"
+    },
+    {
+      "code": "spanish",
+      "name": "Spanish"
+    },
+    {
+      "code": "italian",
+      "name": "Italian"
+    },
+    {
+      "code": "portuguese",
+      "name": "Portuguese"
+    },
+    {
+      "code": "russian",
+      "name": "Russian"
+    }
+  ],
+  "presetVoices": [
+    {
+      "id": "vivian",
+      "name": "Vivian",
+      "language": "chinese",
+      "gender": "female",
+      "note": "Bright, slightly edgy young woman"
+    },
+    {
+      "id": "serena",
+      "name": "Serena",
+      "language": "chinese",
+      "gender": "female",
+      "note": "Warm, gentle young woman"
+    },
+    {
+      "id": "uncle_fu",
+      "name": "Uncle Fu",
+      "language": "chinese",
+      "gender": "male",
+      "note": "Seasoned man with a low, mellow voice"
+    },
+    {
+      "id": "dylan",
+      "name": "Dylan",
+      "language": "chinese",
+      "gender": "male",
+      "note": "Youthful Beijing man (Beijing dialect)"
+    },
+    {
+      "id": "eric",
+      "name": "Eric",
+      "language": "chinese",
+      "gender": "male",
+      "note": "Lively Chengdu man (Sichuan dialect)"
+    },
+    {
+      "id": "ryan",
+      "name": "Ryan",
+      "language": "english",
+      "gender": "male",
+      "note": "Dynamic man with strong rhythm"
+    },
+    {
+      "id": "aiden",
+      "name": "Aiden",
+      "language": "english",
+      "gender": "male",
+      "note": "Sunny American man with a clear midrange"
+    },
+    {
+      "id": "ono_anna",
+      "name": "Ono Anna",
+      "language": "japanese",
+      "gender": "female",
+      "note": "Playful Japanese woman"
+    },
+    {
+      "id": "sohee",
+      "name": "Sohee",
+      "language": "korean",
+      "gender": "female",
+      "note": "Warm Korean woman"
+    }
+  ],
+  "expressiveTags": [],
+  "parameters": [
+    {
+      "key": "temperature",
+      "label": "Variation",
+      "type": "float",
+      "tier": "basic",
+      "help": "Higher sounds livelier and less predictable; lower sounds steadier. Too high can garble words.",
+      "min": 0.1,
+      "max": 1.5,
+      "step": 0.05,
+      "default": 0.9
+    },
+    {
+      "key": "top_k",
+      "label": "Top-k",
+      "type": "int",
+      "tier": "advanced",
+      "help": "Only the k most likely sound tokens are considered at each step. Lower is safer, higher more varied.",
+      "min": 1,
+      "max": 200,
+      "step": 1,
+      "default": 50
+    },
+    {
+      "key": "top_p",
+      "label": "Top-p",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Only tokens within this share of probability are considered. 1 turns the filter off.",
+      "min": 0.1,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 1.0
+    },
+    {
+      "key": "repetition_penalty",
+      "label": "Repetition penalty",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Discourages the model from looping on the same sounds. Raise it slightly if output stutters or repeats.",
+      "min": 1.0,
+      "max": 2.0,
+      "step": 0.01,
+      "default": 1.05
+    },
+    {
+      "key": "max_tokens",
+      "label": "Length limit",
+      "type": "int",
+      "tier": "advanced",
+      "help": "Hard cap on generated audio, in tokens of 1/12.5 s (4096 ≈ 5.5 minutes). The model also caps it by text length.",
+      "min": 75,
+      "max": 8192,
+      "step": 1,
+      "unit": "tokens",
+      "default": 4096
+    },
+    {
+      "key": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "tier": "advanced",
+      "help": "Fix this to get the same take again from the same settings. Leave empty for a fresh take each time."
+    }
+  ],
+  "maxChunkCharacters": 400,
+  "sampleRate": 24000,
+  "homepage": "https://github.com/QwenLM/Qwen3-TTS"
+}

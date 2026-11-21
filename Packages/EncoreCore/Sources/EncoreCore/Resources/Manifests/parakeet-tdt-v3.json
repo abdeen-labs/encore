@@ -1,0 +1,152 @@
+{
+  "id": "parakeet-tdt-v3",
+  "name": "Parakeet TDT v3",
+  "family": "Parakeet",
+  "summary": "NVIDIA's very fast, accurate recogniser for 25 European languages, with punctuation and sentence timestamps.",
+  "tasks": [
+    "stt"
+  ],
+  "engine": "parakeet",
+  "variants": [
+    {
+      "id": "0.6b",
+      "label": "0.6B · bf16",
+      "repo": "mlx-community/parakeet-tdt-0.6b-v3",
+      "downloadBytes": 2509000000,
+      "memoryBytes": 3800000000,
+      "recommended": true
+    }
+  ],
+  "license": {
+    "name": "CC-BY-4.0",
+    "url": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3",
+    "commercialUse": true,
+    "summary": "Free to use, change and sell, including commercially, as long as you credit NVIDIA.",
+    "gated": false
+  },
+  "capabilities": {
+    "segmentTimestamps": true,
+    "wordTimestamps": true
+  },
+  "languages": [
+    {
+      "code": "en",
+      "name": "English"
+    },
+    {
+      "code": "bg",
+      "name": "Bulgarian"
+    },
+    {
+      "code": "hr",
+      "name": "Croatian"
+    },
+    {
+      "code": "cs",
+      "name": "Czech"
+    },
+    {
+      "code": "da",
+      "name": "Danish"
+    },
+    {
+      "code": "nl",
+      "name": "Dutch"
+    },
+    {
+      "code": "et",
+      "name": "Estonian"
+    },
+    {
+      "code": "fi",
+      "name": "Finnish"
+    },
+    {
+      "code": "fr",
+      "name": "French"
+    },
+    {
+      "code": "de",
+      "name": "German"
+    },
+    {
+      "code": "el",
+      "name": "Greek"
+    },
+    {
+      "code": "hu",
+      "name": "Hungarian"
+    },
+    {
+      "code": "it",
+      "name": "Italian"
+    },
+    {
+      "code": "lv",
+      "name": "Latvian"
+    },
+    {
+      "code": "lt",
+      "name": "Lithuanian"
+    },
+    {
+      "code": "mt",
+      "name": "Maltese"
+    },
+    {
+      "code": "pl",
+      "name": "Polish"
+    },
+    {
+      "code": "pt",
+      "name": "Portuguese"
+    },
+    {
+      "code": "ro",
+      "name": "Romanian"
+    },
+    {
+      "code": "ru",
+      "name": "Russian"
+    },
+    {
+      "code": "sk",
+      "name": "Slovak"
+    },
+    {
+      "code": "sl",
+      "name": "Slovenian"
+    },
+    {
+      "code": "es",
+      "name": "Spanish"
+    },
+    {
+      "code": "sv",
+      "name": "Swedish"
+    },
+    {
+      "code": "uk",
+      "name": "Ukrainian"
+    }
+  ],
+  "presetVoices": [],
+  "expressiveTags": [],
+  "parameters": [
+    {
+      "key": "chunk_duration",
+      "label": "Chunk length",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Long recordings are transcribed in overlapping pieces of this many seconds. Shorter uses less memory.",
+      "min": 10.0,
+      "max": 1200.0,
+      "step": 10.0,
+      "unit": "s",
+      "default": 120.0
+    }
+  ],
+  "maxChunkCharacters": 0,
+  "sampleRate": 16000,
+  "homepage": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3"
+}

@@ -1,0 +1,187 @@
+{
+  "id": "qwen3-tts-base",
+  "name": "Qwen3-TTS",
+  "family": "Qwen3-TTS",
+  "summary": "Alibaba's expressive multilingual TTS. Clones a voice from a few seconds of audio and its transcript, in 10 languages.",
+  "tasks": [
+    "tts"
+  ],
+  "engine": "qwen3_tts",
+  "variants": [
+    {
+      "id": "1.7b-8bit",
+      "label": "1.7B · 8-bit",
+      "repo": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit",
+      "downloadBytes": 3104000000,
+      "memoryBytes": 8900000000,
+      "recommended": true
+    },
+    {
+      "id": "1.7b-bf16",
+      "label": "1.7B · bf16",
+      "repo": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+      "downloadBytes": 4544212739,
+      "memoryBytes": 10400000000
+    },
+    {
+      "id": "1.7b-4bit",
+      "label": "1.7B · 4-bit",
+      "repo": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit",
+      "downloadBytes": 2336076686,
+      "memoryBytes": 8000000000
+    },
+    {
+      "id": "0.6b-8bit",
+      "label": "0.6B · 8-bit",
+      "repo": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit",
+      "downloadBytes": 1991000000,
+      "memoryBytes": 7800000000
+    },
+    {
+      "id": "0.6b-bf16",
+      "label": "0.6B · bf16",
+      "repo": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
+      "downloadBytes": 2516143009,
+      "memoryBytes": 8300000000
+    },
+    {
+      "id": "0.6b-4bit",
+      "label": "0.6B · 4-bit",
+      "repo": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit",
+      "downloadBytes": 1711328624,
+      "memoryBytes": 7400000000
+    }
+  ],
+  "license": {
+    "name": "Apache-2.0",
+    "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+    "commercialUse": true,
+    "summary": "Free to use, change and sell, including commercially. Keep the licence notice if you redistribute the model.",
+    "gated": false
+  },
+  "capabilities": {
+    "cloning": true,
+    "cloningUsesTranscript": true
+  },
+  "languages": [
+    {
+      "code": "auto",
+      "name": "Detect automatically"
+    },
+    {
+      "code": "english",
+      "name": "English"
+    },
+    {
+      "code": "chinese",
+      "name": "Chinese"
+    },
+    {
+      "code": "japanese",
+      "name": "Japanese"
+    },
+    {
+      "code": "korean",
+      "name": "Korean"
+    },
+    {
+      "code": "german",
+      "name": "German"
+    },
+    {
+      "code": "french",
+      "name": "French"
+    },
+    {
+      "code": "spanish",
+      "name": "Spanish"
+    },
+    {
+      "code": "italian",
+      "name": "Italian"
+    },
+    {
+      "code": "portuguese",
+      "name": "Portuguese"
+    },
+    {
+      "code": "russian",
+      "name": "Russian"
+    }
+  ],
+  "presetVoices": [],
+  "expressiveTags": [],
+  "parameters": [
+    {
+      "key": "temperature",
+      "label": "Variation",
+      "type": "float",
+      "tier": "basic",
+      "help": "Higher sounds livelier and less predictable; lower sounds steadier. Too high can garble words.",
+      "min": 0.1,
+      "max": 1.5,
+      "step": 0.05,
+      "default": 0.9
+    },
+    {
+      "key": "top_k",
+      "label": "Top-k",
+      "type": "int",
+      "tier": "advanced",
+      "help": "Only the k most likely sound tokens are considered at each step. Lower is safer, higher more varied.",
+      "min": 1,
+      "max": 200,
+      "step": 1,
+      "default": 50
+    },
+    {
+      "key": "top_p",
+      "label": "Top-p",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Only tokens within this share of probability are considered. 1 turns the filter off.",
+      "min": 0.1,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 1.0
+    },
+    {
+      "key": "repetition_penalty",
+      "label": "Repetition penalty",
+      "type": "float",
+      "tier": "advanced",
+      "help": "Discourages the model from looping on the same sounds. Raise it slightly if output stutters or repeats.",
+      "min": 1.0,
+      "max": 2.0,
+      "step": 0.01,
+      "default": 1.05
+    },
+    {
+      "key": "max_tokens",
+      "label": "Length limit",
+      "type": "int",
+      "tier": "advanced",
+      "help": "Hard cap on generated audio, in tokens of 1/12.5 s (4096 ≈ 5.5 minutes). The model also caps it by text length.",
+      "min": 75,
+      "max": 8192,
+      "step": 1,
+      "unit": "tokens",
+      "default": 4096
+    },
+    {
+      "key": "seed",
+      "label": "Seed",
+      "type": "seed",
+      "tier": "advanced",
+      "help": "Fix this to get the same take again from the same settings. Leave empty for a fresh take each time."
+    }
+  ],
+  "reference": {
+    "minSeconds": 3,
+    "maxSeconds": 15,
+    "transcript": "recommended"
+  },
+  "maxChunkCharacters": 400,
+  "sampleRate": 24000,
+  "homepage": "https://github.com/QwenLM/Qwen3-TTS"
+}

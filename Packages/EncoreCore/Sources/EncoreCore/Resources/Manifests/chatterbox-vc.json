@@ -1,0 +1,78 @@
+{
+  "id": "chatterbox-vc",
+  "name": "Chatterbox Voice Changer",
+  "family": "Chatterbox",
+  "summary": "Speech-to-speech: re-voices a recording in a chosen voice while keeping the words and timing. Uses Chatterbox's S3 speech tokens and S3Gen decoder; runs in the Python helper.",
+  "tasks": [
+    "voiceConversion"
+  ],
+  "engine": "chatterbox_vc",
+  "variants": [
+    {
+      "id": "multilingual-v3",
+      "label": "Multilingual v3",
+      "repo": "mlx-community/chatterbox-multilingual-v3",
+      "companionRepos": [
+        "mlx-community/S3TokenizerV2"
+      ],
+      "allowPatterns": [
+        "*.json",
+        "*.safetensors"
+      ],
+      "downloadBytes": 3207973708,
+      "memoryBytes": 2800000000,
+      "recommended": true,
+      "companionAllowPatterns": {
+        "mlx-community/S3TokenizerV2": [
+          "model.safetensors",
+          "config.json"
+        ]
+      }
+    }
+  ],
+  "license": {
+    "name": "MIT",
+    "url": "https://huggingface.co/ResembleAI/chatterbox",
+    "commercialUse": true,
+    "summary": "Free to use, including commercially. Only convert voices you have permission to use.",
+    "gated": false
+  },
+  "capabilities": {
+    "cloning": true
+  },
+  "languages": [],
+  "presetVoices": [],
+  "expressiveTags": [],
+  "parameters": [
+    {
+      "key": "n_timesteps",
+      "label": "Quality steps",
+      "help": "Flow-matching steps when rendering the new voice. Fewer is faster; in Encore's tests the result changed little between 4 and 30 steps, and 2 was still intelligible.",
+      "type": "int",
+      "tier": "advanced",
+      "min": 2,
+      "max": 30,
+      "step": 1,
+      "default": 10
+    },
+    {
+      "key": "cfg_rate",
+      "label": "Voice guidance",
+      "help": "Classifier-free guidance toward the target voice. Its effect is subtle: in Encore's tests, 0 to 1.5 all kept the words and landed close to the target voice.",
+      "type": "float",
+      "tier": "advanced",
+      "min": 0.0,
+      "max": 1.5,
+      "step": 0.05,
+      "default": 0.7
+    }
+  ],
+  "reference": {
+    "minSeconds": 3,
+    "maxSeconds": 10,
+    "transcript": "unused"
+  },
+  "maxChunkCharacters": 0,
+  "sampleRate": 24000,
+  "homepage": "https://github.com/resemble-ai/chatterbox"
+}
