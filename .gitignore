@@ -13,3 +13,7 @@ __pycache__/
 
 # Python helper runtime (Scripts/setup-python-runtime.sh)
 PythonHelper/.runtime/
+
+# Releases (docs/RELEASING.md): the exported app and what publish-release.sh makes
+/Encore.app
+/dist/

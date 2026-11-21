@@ -31,6 +31,12 @@ count=$(wc -l < "$list" | tr -d ' ')
 echo "Signing $count Mach-O files in $dir as \"$identity\" ($timestamp)…"
 
 sign() { tr '\n' '\0' | xargs -0 -n 1 -P 8 codesign --force --sign "$identity" --options runtime $timestamp ${entitlements[@]+"${entitlements[@]}"} 2>&1 | grep -v "replacing existing signature" || true; }
+# One file alone first: the Keychain asks once to let codesign use the key, instead of once per parallel signer.
+first="$(head -n 1 "$list")"
+if [[ -n "$first" ]]; then
+    codesign --force --sign "$identity" --options runtime $timestamp ${entitlements[@]+"${entitlements[@]}"} "$first" 2>&1 \
+        | grep -v "replacing existing signature" || true
+fi
 if [[ -n "$libraries" ]]; then printf '%s\n' "$libraries" | sign; fi
 if [[ -n "$executables" ]]; then printf '%s\n' "$executables" | sign; fi
 

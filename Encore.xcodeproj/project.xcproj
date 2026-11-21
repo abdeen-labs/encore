@@ -36,6 +36,13 @@
         "compile-sources",
         "frameworks",
         "resources",
+        {
+          "kind": "script",
+          "name": "Embed Python",
+          "run-on-every-build": true,
+          "shell": "/bin/bash",
+          "script": "\"$SRCROOT/Scripts/embed-python-runtime.sh\"\n",
+        },
       ],
       "package-product-members": [
         {
@@ -45,6 +52,10 @@
         }, {
           "package": "EncoreCore",
           "product-name": "EncoreMLX",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "EncoreCore",
+          "product-name": "EncoreUpdates",
           "build-phase": { "build-phase": "frameworks" },
         },
       ],
@@ -59,9 +70,11 @@
         "ENABLE_HARDENED_RUNTIME": "YES",
         "ENABLE_PREVIEWS": "YES",
         "ENABLE_RESOURCE_ACCESS_AUDIO_INPUT": "YES",
+        "ENABLE_USER_SCRIPT_SANDBOXING": "NO",
         "GENERATE_INFOPLIST_FILE": "YES",
+        "INFOPLIST_FILE": "Config/Info.plist",
         "INFOPLIST_KEY_LSApplicationCategoryType": "public.app-category.music",
-        "INFOPLIST_KEY_NSHumanReadableCopyright": "",
+        "INFOPLIST_KEY_NSHumanReadableCopyright": "© 2026 Abdeen Industries",
         "INFOPLIST_KEY_NSMicrophoneUsageDescription": "Encore records your microphone to capture reference clips for voice cloning and audio to transcribe. Recordings stay on this Mac.",
         "LD_RUNPATH_SEARCH_PATHS": [
           "$(inherited)",
@@ -134,7 +147,7 @@
     "GCC_WARN_UNUSED_FUNCTION": "YES",
     "GCC_WARN_UNUSED_VARIABLE": "YES",
     "LOCALIZATION_PREFERS_STRING_CATALOGS": "YES",
-    "MACOSX_DEPLOYMENT_TARGET": "27.2",
+    "MACOSX_DEPLOYMENT_TARGET": "27.0",
     "MTL_ENABLE_DEBUG_INFO[config=Debug]": "INCLUDE_SOURCE",
     "MTL_ENABLE_DEBUG_INFO[config=Release]": "NO",
     "MTL_FAST_MATH": "YES",

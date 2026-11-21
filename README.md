@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <sub>macOS 27.2 or later · Apple Silicon · Free and open source under the MIT license</sub>
+  <sub>macOS 27 or later · Apple Silicon · Free and open source under the MIT license</sub>
 </p>
 
 <p align="center">
@@ -118,7 +118,7 @@ Models are stored in the standard Hugging Face cache (`~/.cache/huggingface`), s
 
 ## Build it
 
-There is no download yet; Encore is built from source. You need an Apple Silicon Mac, macOS 27.2 and Xcode 27.2.
+There is no download yet; Encore is built from source. You need an Apple Silicon Mac, macOS 27 and Xcode 27.2.
 
 1. Install Apple's Metal Toolchain once (MLX's shaders don't compile without it):
 
@@ -197,7 +197,7 @@ build/app/Build/Products/Debug/Encore.app/Contents/MacOS/Encore --snapshot /tmp/
 | `Packages/EncoreCore/Sources/EncoreMLX/` | The in-process MLX Swift engines. |
 | `Packages/EncoreCore/Sources/encore-cli/` | The developer CLI. |
 | `PythonHelper/` | The Python worker for models with no Swift port. |
-| `Scripts/` | Python runtime setup, and the release scripts. |
+| `Scripts/` | Python runtime setup, embedding it in the app, and publishing a release ([docs/RELEASING.md](docs/RELEASING.md)). |
 | `docs/screenshots/` | The images in this README. |
 
 All generation goes through `EncoreService` (`Service/EncoreService.swift`). Its request and event types are `Codable`, so a local HTTP API can wrap it directly.

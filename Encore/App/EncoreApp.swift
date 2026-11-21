@@ -1,4 +1,5 @@
 import AppKit
+import EncoreUpdates
 import SwiftUI
 
 /// Entry point. `--snapshot <dir>` renders screens to PNG headlessly and exits (see
@@ -24,6 +25,8 @@ enum Main {
 struct EncoreApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var deps = AppDependencies()
+    /// Sparkle; starts with the main window, in Release builds only.
+    @State private var updater = Updater()
 
     /// Default and minimum window sizes. Snapshots render at `defaultWindowSize`.
     static let defaultWindowSize = CGSize(width: 1180, height: 780)
@@ -34,12 +37,13 @@ struct EncoreApp: App {
             RootView()
                 .appDependencies(deps)
                 .frame(minWidth: Self.minimumWindowSize.width, minHeight: Self.minimumWindowSize.height)
+                .onAppear { updater.start() }
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
         .defaultSize(Self.defaultWindowSize)
         .windowBackgroundDragBehavior(.enabled)
-        .commands { EncoreCommands(router: deps.router) }
+        .commands { EncoreCommands(router: deps.router, updater: updater) }
     }
 }
 
@@ -50,11 +54,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Menu commands: Settings on ⌘, and a Go menu with ⌘1…⌘9.
+/// Menu commands: Check for Updates…, Settings on ⌘, and a Go menu with ⌘1…⌘9.
 struct EncoreCommands: Commands {
     let router: Router
+    let updater: Updater
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") { updater.checkForUpdates() }
+                .disabled(!updater.canCheckForUpdates)
+        }
         CommandGroup(replacing: .appSettings) {
             Button("Settings…") { router.go(.settings) }
                 .keyboardShortcut(",", modifiers: .command)
