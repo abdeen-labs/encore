@@ -18,7 +18,11 @@ public actor PythonBackend: EngineBackend {
         public var ffmpegDirectory: URL?
         /// Use this runtime instead of looking one up.
         public var runtime: PythonRuntime?
+        /// Asked each time the helper starts: may it see the shared Hugging Face token file? False while the
+        /// user is signed out of Encore only (`HubTokenStore.isSignedOutOfEncoreOnly`).
+        public var usesSharedHubToken: @Sendable () -> Bool = { true }
         public init() {}
+        public init(usesSharedHubToken: @escaping @Sendable () -> Bool) { self.usesSharedHubToken = usesSharedHubToken }
     }
 
     /// What the helper said about itself at startup.
@@ -88,7 +92,7 @@ public actor PythonBackend: EngineBackend {
     }
 
     /// What the shipped helper reports in its handshake (`engines` in PythonHelper/encore_helper/engines.py, minus
-    /// what the bundled runtime doesn't install: Kokoro needs misaki, which pulls in torch). Keep the two in step;
+    /// anything whose extra Python packages the bundled runtime doesn't install). Keep the two in step;
     /// `PythonBackendTests.staticEnginesMatchHandshake` compares them against a real helper. If an install turns
     /// out to lack an engine, `load` throws `.unsupported` and the service falls through to the next backend.
     public static let expectedEngines: [String: EngineFeatures] = [
@@ -190,6 +194,13 @@ public actor PythonBackend: EngineBackend {
         return MemoryStats(active: n("active"), cache: n("cache"), peak: n("peak"), peakResident: n("peak_rss"))
     }
 
+    /// Stops the helper if no job is running, so its next start picks up a changed configuration (such as
+    /// `usesSharedHubToken`). A busy helper keeps going and picks it up after its idle stop.
+    public func shutdownIfIdle() async {
+        guard pending.isEmpty, startTask == nil else { return }
+        await shutdown()
+    }
+
     /// Stops the helper now (models are freed). It starts again on next use.
     public func shutdown() async {
         guard let helper else { return }
@@ -228,7 +239,8 @@ public actor PythonBackend: EngineBackend {
         let process: PythonHelperProcess
         do {
             process = try PythonHelperProcess(runtime: runtime,
-                                              environment: runtime.environment(ffmpegDirectory: configuration.ffmpegDirectory))
+                                              environment: runtime.environment(ffmpegDirectory: configuration.ffmpegDirectory,
+                                                                               sharedHubToken: configuration.usesSharedHubToken()))
         } catch {
             lastFailure = "Encore couldn't start its Python helper: \(error.localizedDescription)"
             throw EngineError.backendUnavailable(lastFailure!)

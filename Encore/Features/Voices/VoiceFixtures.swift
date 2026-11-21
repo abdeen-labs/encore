@@ -8,8 +8,9 @@ import SwiftUI
 ///     Encore --snapshot <dir> --snapshot-only Clone --voice-fixture clone-good [--snapshot-size 940x600]
 ///
 /// Clone: clone-empty, clone-record, clone-good, clone-tooLong, clone-tooShort, clone-transcribing, clone-noSTT,
-///        clone-consented, clone-saved.
-/// Voices: voices-empty, voices-grid, voices-filtered, voices-detail, voices-multi, voices-import.
+///        clone-consented, clone-saved, clone-wholeFile, clone-wholeFileUsed.
+/// Voices: voices-empty, voices-grid, voices-filtered, voices-detail, voices-multi, voices-picked, voices-import
+///         (the import consent sheet itself: `--snapshot-only Voices-ImportConsent,Voices-ImportConsent-Ticked,Voices-ImportConsent-One`).
 /// Design: design-empty, design-running, design-ready, design-saving, design-kept, design-noModel.
 /// Nothing here touches the user's data, a model or the microphone: snapshot stores are temporary, and the
 /// recording panel is drawn from made-up state.
@@ -28,7 +29,7 @@ enum VoiceFixtures {
             .appendingPathComponent("EncoreSnapshot-voicefx-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString.prefix(6))")
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
-        var models = ["kokoro", "qwen3-tts-base", "chatterbox-turbo", "qwen3-tts-voicedesign", "voxcpm2", "whisper-large-v3-turbo"]
+        var models = ["soprano", "qwen3-tts-base", "chatterbox-turbo", "qwen3-tts-voicedesign", "voxcpm2", "whisper-large-v3-turbo"]
         if state == "clone-noSTT" { models.removeAll { $0.hasPrefix("whisper") } }
         if state == "design-noModel" { models.removeAll { $0 == "qwen3-tts-voicedesign" || $0 == "voxcpm2" } }
         markDownloaded(models, deps: deps)
@@ -69,6 +70,16 @@ enum VoiceFixtures {
                                        sampleRate: 24_000, hasVideo: false, fileSize: Int64(long.samples.count * 2 + 44))
         let words = "Honestly, the first time I walked on stage I forgot every single line. So I just started talking to the audience, and they laughed, and that was it — I was hooked."
         switch state {
+        case "clone-wholeFile", "clone-wholeFileUsed":
+            // A file that's already a good length (12.4 s): the trimmer offers "Use whole file"; once used, it's all selected.
+            let shortURL = folder.appendingPathComponent("Ines voice memo.wav")
+            let short = StudioFixtures.speechLike(seconds: 12.4, seed: 6, pitch: 168)
+            try? AudioExporter.writeWAV(short, to: shortURL)
+            let memo = CloneModel.Source(url: shortURL, name: "Ines voice memo.wav", kind: .file, duration: 12.4,
+                                         sampleRate: 24_000, hasVideo: false, fileSize: Int64(short.samples.count * 2 + 44))
+            let used = state == "clone-wholeFileUsed"
+            model.debugSetSource(memo, selection: used ? 0...12.4 : 1.3...11.3)
+            if used { model.debugSetTranscript(words, state: .ready(0...12.4, modelName: "Whisper Large v3 Turbo")) }
         case "clone-tooLong":
             model.debugSetSource(source, selection: 58.0...96.4)
         case "clone-tooShort":
@@ -122,6 +133,9 @@ enum VoiceFixtures {
             model.focus(ids[0])
         case "voices-multi":
             model.selection = Set(ids.prefix(3))
+        case "voices-picked":
+            // One card checked with its circle (the batch bar shows for a single voice too).
+            model.toggle(ids[1])
         case "voices-import":
             // A real round trip through the importer: two voices exported and imported back, and a file that isn't one.
             let archive = folder.appendingPathComponent("Radio Drama Cast.encorevoice")
@@ -129,6 +143,9 @@ enum VoiceFixtures {
             let junk = folder.appendingPathComponent("holiday-photos.encorevoice")
             try? Data("not a voice file".utf8).write(to: junk)
             await model.importFiles([archive, junk])
+            // The voices are clones, so the consent sheet asked first; this state shows the result once confirmed.
+            model.pendingImport?.consent = true
+            await model.confirmImport()
         default:
             break
         }
@@ -183,6 +200,88 @@ enum VoiceFixtures {
             model.debugSet(auditions: a, round: 2)
             model.runner.debugShow(.idle, identity: nil, lastOutcome: .finished(elapsed: 11.2))
         }
+    }
+
+    // MARK: Inspector alone
+
+    /// The inspector drawn on its own at full height so its facts rows show (`--snapshot-only Voices-Inspector,…`):
+    /// at the real panel width (340) and squeezed (290) with a long model name and last year's date.
+    static var inspectorFixtures: [FeatureFixture] {
+        [("Voices-Inspector", 340.0, false), ("Voices-Inspector-Narrow", 290.0, true)].map { name, width, old in
+            FeatureFixture(name: name, section: .voices, size: CGSize(width: width + 2 * Theme.Space.m, height: 1240),
+                           prepare: { _ in .init() },
+                           sheet: { deps, _ in
+                               AnyView(Group {
+                                   if let v = deps.voices.voices.first(where: { $0.sourceModelID == (old ? "chatterbox-multilingual" : "qwen3-tts-base") }) {
+                                       VoiceInspector(voice: v, reference: deps.voices.referenceAudioURL(for: v.id), onClose: {}, onCast: {},
+                                                      onDuplicate: {}, onExport: {}, onDelete: {})
+                                           .frame(width: width)
+                                           .padding(Theme.Space.m)
+                                   }
+                               })
+                           },
+                           seed: { deps in
+                               let folder = FileManager.default.temporaryDirectory
+                                   .appendingPathComponent("EncoreSnapshot-inspector-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString.prefix(6))")
+                               try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                               let url = folder.appendingPathComponent("ref.wav")
+                               try? AudioExporter.writeWAV(StudioFixtures.speechLike(seconds: 9.4, seed: 3, pitch: 108), to: url)
+                               // 22:40 on a fixed day, so the 12/24-hour setting shows.
+                               var c = DateComponents(); c.year = old ? 2025 : Calendar.current.component(.year, from: Date())
+                               c.month = 11; c.day = 20; c.hour = 22; c.minute = 40
+                               let when = Calendar.current.date(from: c) ?? Date()
+                               let v = Voice(name: "Captain Reyes", tags: ["narration", "warm"], origin: .cloned,
+                                             transcript: "Steady as she goes. We'll make port by morning if this wind holds.",
+                                             language: "en", sourceModelID: old ? "chatterbox-multilingual" : "qwen3-tts-base", duration: 9.4,
+                                             createdAt: when, consentConfirmedAt: when)
+                               _ = try? await deps.voices.add(v, referenceAudio: url, move: true)
+                           })
+        } + importConsentFixtures
+    }
+
+    // MARK: Import consent sheet
+
+    /// The import consent sheet on its own (`--snapshot-only Voices-ImportConsent,…`): a file with two cloned voices
+    /// and a designed one plus a file that isn't a voice file, before and after the tick; and a single cloned voice.
+    static var importConsentFixtures: [FeatureFixture] {
+        [("Voices-ImportConsent", false, false), ("Voices-ImportConsent-Ticked", true, false), ("Voices-ImportConsent-One", false, true)]
+            .map { name, ticked, one in
+                FeatureFixture(name: name, section: .voices, size: CGSize(width: 480, height: one ? 470 : 600),
+                               prepare: { _ in .init() },
+                               sheet: { deps, _ in AnyView(ImportConsentSheet(model: deps.screenModel("Voices") { VoicesModel(deps: deps) })) },
+                               seed: { deps in
+                                   let folder = FileManager.default.temporaryDirectory
+                                       .appendingPathComponent("EncoreSnapshot-import-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString.prefix(6))")
+                                   try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                                   // The file is made by a separate "sender" library in the temporary folder.
+                                   let sender = VoiceLibrary(directory: folder.appendingPathComponent("Sender"), deletesToTrash: false)
+                                   let cast = [
+                                       Voice(name: "Captain Reyes", origin: .cloned, transcript: "Steady as she goes.", language: "en", duration: 9.4,
+                                             consentConfirmedAt: Date().addingTimeInterval(-40 * 86_400)),
+                                       Voice(name: "Hélène", origin: .cloned, transcript: "Il était une fois…", language: "fr", duration: 12.8,
+                                             consentConfirmedAt: Date().addingTimeInterval(-60 * 86_400)),
+                                       Voice(name: "Night Desk", origin: .designed, transcript: "You're listening to the night desk.", language: "en",
+                                             designPrompt: "A calm, low-voiced late-night radio host.", duration: 7.3),
+                                   ]
+                                   var ids: [UUID] = []
+                                   for (i, v) in cast.prefix(one ? 1 : 3).enumerated() {
+                                       let clip = folder.appendingPathComponent("send-\(i).wav")
+                                       try? AudioExporter.writeWAV(StudioFixtures.speechLike(seconds: v.duration, seed: 50 + i, pitch: [108, 190, 120][i]), to: clip)
+                                       if let saved = try? await sender.add(v, referenceAudio: clip, move: true) { ids.append(saved.id) }
+                                   }
+                                   let archive = folder.appendingPathComponent(one ? "Captain Reyes.encorevoice" : "Radio Drama Cast.encorevoice")
+                                   try? await sender.export(ids, to: archive)
+                                   var files = [archive]
+                                   if !one {
+                                       let junk = folder.appendingPathComponent("holiday-photos.encorevoice")
+                                       try? Data("not a voice file".utf8).write(to: junk)
+                                       files.append(junk)
+                                   }
+                                   let model = deps.screenModel("Voices") { VoicesModel(deps: deps) }
+                                   await model.importFiles(files)
+                                   if ticked { model.pendingImport?.consent = true }
+                               })
+            }
     }
 
     // MARK: Seeding

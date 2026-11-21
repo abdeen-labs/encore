@@ -2,6 +2,7 @@
   "id": "whisper-tiny",
   "name": "Whisper tiny",
   "family": "Whisper",
+  "author": "OpenAI",
   "summary": "The smallest Whisper. Quick and light, but noticeably less accurate; good for drafts and testing.",
   "tasks": [
     "stt"
@@ -13,8 +14,7 @@
       "label": "fp16",
       "repo": "mlx-community/whisper-tiny-asr-fp16",
       "downloadBytes": 78774283,
-      "memoryBytes": 200000000,
-      "recommended": true
+      "memoryBytes": 200000000
     }
   ],
   "license": {

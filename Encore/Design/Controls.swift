@@ -314,17 +314,21 @@ struct NumberField: View {
 ///
 ///     SegmentedControl(selection: $mode, options: Mode.allCases) { $0.title }
 ///     SegmentedControl(selection: $fmt, options: ["WAV", "MP3", "FLAC"]) { $0 }
+///     SegmentedControl(selection: $kind, options: kinds, count: { counts[$0] }) { $0.title }   // "Speech ⁽¹²⁾"
 struct SegmentedControl<Option: Hashable>: View {
     @Binding var selection: Option
     let options: [Option]
     let title: (Option) -> String
+    /// A number shown after the title as a `CountBadge`; nil shows none.
+    let count: ((Option) -> Int?)?
     @Namespace private var thumb
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.controlSize) private var controlSize
 
-    init(selection: Binding<Option>, options: [Option], title: @escaping (Option) -> String) {
+    init(selection: Binding<Option>, options: [Option], count: ((Option) -> Int?)? = nil, title: @escaping (Option) -> String) {
         self._selection = selection
         self.options = options
+        self.count = count
         self.title = title
     }
 
@@ -335,9 +339,23 @@ struct SegmentedControl<Option: Hashable>: View {
                 Button {
                     withStageAnimation(Theme.Motion.standard) { selection = option }
                 } label: {
-                    Text(title(option))
-                        .font(.ui(controlSize == .small ? 11 : 12, weight: selected ? .semibold : .medium))
-                        .foregroundStyle(selected ? Color.textPrimary : .textSecondary)
+                    HStack(spacing: 6) {
+                        Text(title(option))
+                            .font(.ui(controlSize == .small ? 11 : 12, weight: selected ? .semibold : .medium))
+                            .foregroundStyle(selected ? Color.textPrimary : .textSecondary)
+                            // The lamp sits under the title (not the count), at the segment's foot.
+                            .overlay {
+                                if selected {
+                                    Capsule().fill(Color.tungsten).frame(width: 14, height: 2)
+                                        .glow(.tungsten, radius: 4, intensity: 0.6)
+                                        .offset(y: (Theme.ControlHeight.of(controlSize) - 6) / 2 - 3)
+                                        .matchedGeometryEffect(id: "lamp", in: thumb)
+                                }
+                            }
+                        if let n = count?(option) {
+                            CountBadge(n, isEmphasized: selected)
+                        }
+                    }
                         .padding(.horizontal, 12)
                         .frame(maxWidth: .infinity)
                         .frame(height: Theme.ControlHeight.of(controlSize) - 6)
@@ -345,11 +363,6 @@ struct SegmentedControl<Option: Hashable>: View {
                             if selected {
                                 RoundedRectangle(cornerRadius: Theme.Radius.s - 2, style: .continuous)
                                     .fill(Color.surfaceRaised)
-                                    .overlay(alignment: .bottom) {
-                                        Capsule().fill(Color.tungsten).frame(width: 14, height: 2)
-                                            .glow(.tungsten, radius: 4, intensity: 0.6)
-                                            .padding(.bottom, 2)
-                                    }
                                     .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s - 2).strokeBorder(Color.hairlineStrong, lineWidth: 1))
                                     .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
                                     .matchedGeometryEffect(id: "thumb", in: thumb)

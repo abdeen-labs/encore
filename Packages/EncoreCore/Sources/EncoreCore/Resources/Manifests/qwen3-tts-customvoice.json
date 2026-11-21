@@ -2,6 +2,7 @@
   "id": "qwen3-tts-customvoice",
   "name": "Qwen3-TTS CustomVoice",
   "family": "Qwen3-TTS",
+  "author": "Qwen, Alibaba Cloud",
   "summary": "Nine premium built-in Qwen3-TTS voices you can steer with a plain-language style instruction.",
   "tasks": [
     "tts"
@@ -13,8 +14,7 @@
       "label": "1.7B · 8-bit",
       "repo": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
       "downloadBytes": 3080000000,
-      "memoryBytes": 8900000000,
-      "recommended": true
+      "memoryBytes": 8900000000
     },
     {
       "id": "1.7b-bf16",

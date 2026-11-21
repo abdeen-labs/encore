@@ -22,7 +22,7 @@ let package = Package(
             dependencies: [
                 .product(name: "GRDB", package: "GRDB.swift"),
             ],
-            resources: [.copy("Resources/Manifests")]
+            resources: [.copy("Resources/Manifests"), .copy("Resources/Licenses")]
         ),
         .target(
             name: "EncoreMLX",

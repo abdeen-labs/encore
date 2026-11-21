@@ -15,16 +15,37 @@ import Testing
         #expect(Set(ids).count == ids.count, "duplicate manifest ids: \(ids)")
     }
 
+    @Test func creditsCoverEveryFamilyOnce() {
+        let models = catalog.catalog.models
+        let credits = catalog.catalog.credits
+        #expect(credits.map(\.family) == Set(models.map(\.family)).sorted { $0.localizedStandardCompare($1) == .orderedAscending })
+        for c in credits {
+            #expect(c.authors.count == 1, "\(c.family) authors \(c.authors)")
+            #expect(!c.licenses.isEmpty, "\(c.family) licenses")
+        }
+        // A family's models can be under different licenses (Whisper large-v3 turbo is MIT, the others Apache-2.0).
+        #expect(credits.first { $0.family == "Whisper" }?.licenses == ["Apache-2.0", "MIT"])
+        #expect(credits.first { $0.family == "Whisper" }?.authors == ["OpenAI"])
+        #expect(catalog.catalog.weightPublishers.contains("mlx-community"))
+    }
+
     @Test(arguments: ModelCatalog.bundled().catalog.models)
     func manifestIsSane(_ m: ModelManifest) {
         #expect(!m.name.isEmpty && !m.summary.isEmpty && !m.engine.isEmpty, "\(m.id)")
+        #expect(!(m.author ?? "").isEmpty, "\(m.id) needs an author for the credits")
         #expect(!m.tasks.isEmpty, "\(m.id) has no tasks")
         #expect(m.sampleRate > 0, "\(m.id) sample rate")
 
         // Variants
         #expect(!m.variants.isEmpty, "\(m.id) has no variants")
         #expect(Set(m.variants.map(\.id)).count == m.variants.count, "\(m.id) duplicate variant ids")
-        #expect(m.variants.filter { $0.recommended == true }.count <= 1, "\(m.id) more than one recommended variant")
+        #expect(m.variants.contains(m.defaultVariant), "\(m.id) default variant is one of its own")
+        if m.variants.count > 1 {
+            // The RAM-based recommendation ranks variants by size and precision read from their labels/ids.
+            for v in m.variants { #expect(v.precisionBits != nil, "\(m.id)/\(v.id) names no precision") }
+            let named = Set(m.variants.map { $0.parameterBillions != nil })
+            #expect(named.count == 1, "\(m.id) names a model size on some variants but not others")
+        }
         for v in m.variants {
             #expect(v.repo.split(separator: "/").count == 2, "\(m.id)/\(v.id) repo \(v.repo)")
             #expect(v.downloadBytes > 0 && v.memoryBytes > 0, "\(m.id)/\(v.id) sizes")

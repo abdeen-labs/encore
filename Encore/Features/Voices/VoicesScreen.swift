@@ -61,6 +61,9 @@ struct VoicesStage: View {
         .fileImporter(isPresented: $model.showImporter, allowedContentTypes: [.encoreVoice], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { Task { await model.importFiles(urls) } }
         }
+        .stageSheet(isPresented: Binding(get: { model.pendingImport != nil }, set: { if !$0 { model.cancelImport() } })) {
+            ImportConsentSheet(model: model)
+        }
         .confirmationDialog(deleteTitle, isPresented: Binding(get: { !model.pendingDelete.isEmpty }, set: { if !$0 { model.pendingDelete = [] } })) {
             Button("Move to Trash", role: .destructive) {
                 let n = model.delete(model.pendingDelete)
@@ -120,7 +123,7 @@ struct VoicesStage: View {
                 Banner(.warning, title: "Some voice folders couldn't be read",
                        message: library.problems.prefix(3).joined(separator: "\n"))
             }
-            if model.selection.count > 1 { bulkBar }
+            if model.showsChecks { bulkBar }
             if list.isEmpty {
                 VStack(spacing: Theme.Space.s) {
                     Text("No voices match").textRole(.headline, color: .textSecondary)
@@ -135,8 +138,8 @@ struct VoicesStage: View {
                         ForEach(list) { voice in
                             VoiceCard(voice: voice, reference: library.referenceAudioURL(for: voice.id),
                                       isFocused: model.focused == voice.id,
-                                      isSelected: model.selection.count > 1 && model.selection.contains(voice.id),
-                                      showsCheck: model.selection.count > 1,
+                                      isSelected: model.isChecked(voice.id),
+                                      showsCheck: model.showsChecks,
                                       onClick: { model.click(voice.id, modifiers: NSEvent.modifierFlags, in: list) },
                                       onToggle: { model.toggle(voice.id) })
                                 .contextMenu { contextMenu(voice) }
@@ -170,10 +173,8 @@ struct VoicesStage: View {
     }
 
     private var originControl: some View {
-        SegmentedControl(selection: $model.origin, options: VoicesModel.OriginFilter.allCases) { o in
-            let n = model.count(o)
-            return o == .all ? "All \(n)" : (n > 0 ? "\(o.rawValue) \(n)" : o.rawValue)
-        }
+        SegmentedControl(selection: $model.origin, options: VoicesModel.OriginFilter.allCases,
+                         count: { o in let n = model.count(o); return o == .all || n > 0 ? n : nil }) { $0.rawValue }
         .controlSize(.small)
     }
 
@@ -207,13 +208,13 @@ struct VoicesStage: View {
         let ids = Array(model.selection)
         return HStack(spacing: Theme.Space.m) {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.tungsten)
-            Text("\(ids.count) voices selected").textRole(.headline)
+            Text(ids.count == 1 ? "1 voice selected" : "\(ids.count) voices selected").textRole(.headline)
             Spacer(minLength: Theme.Space.s)
             Button("Export…", systemImage: "square.and.arrow.up") { model.exportWithPanel(ids) }
                 .buttonStyle(.secondary).controlSize(.small)
             Button("Move to Trash…", systemImage: "trash") { model.pendingDelete = ids }
                 .buttonStyle(.destructive).controlSize(.small)
-            Button("Done") { model.selection = [] ; model.focused = nil }
+            Button("Done") { model.endPicking() }
                 .buttonStyle(.ghost).controlSize(.small)
         }
         .padding(.horizontal, Theme.Space.l)
@@ -228,11 +229,11 @@ struct VoicesStage: View {
         Button("Use in Studio", systemImage: "text.bubble") { cast(voice) }
         Button("Duplicate", systemImage: "plus.square.on.square") { Task { _ = await model.duplicate(voice.id) } }
         Button("Export…", systemImage: "square.and.arrow.up") {
-            model.exportWithPanel(model.selection.contains(voice.id) && model.selection.count > 1 ? Array(model.selection) : [voice.id])
+            model.exportWithPanel(model.isChecked(voice.id) ? Array(model.selection) : [voice.id])
         }
         Divider()
         Button("Move to Trash…", systemImage: "trash", role: .destructive) {
-            model.pendingDelete = model.selection.contains(voice.id) && model.selection.count > 1 ? Array(model.selection) : [voice.id]
+            model.pendingDelete = model.isChecked(voice.id) ? Array(model.selection) : [voice.id]
         }
     }
 
@@ -330,5 +331,100 @@ struct ImportReportBanner: View {
         if report.imported.count > 1 { lines.append(report.imported.map(\.name).joined(separator: ", ")) }
         for r in report.refused { lines.append(r.reason.contains(r.file) ? r.reason : "\(r.file): \(r.reason)") }
         return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
+}
+
+// MARK: - Import consent
+
+/// Comes up when an import holds a cloned voice: what's in the files, and the same consent tick Clone asks for.
+/// The sender's consent doesn't carry over, so nothing is imported until the importer confirms their own; one tick
+/// covers every voice in the batch.
+struct ImportConsentSheet: View {
+    @Bindable var model: VoicesModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        if let pending = model.pendingImport {
+            content(pending)
+        }
+    }
+
+    private func content(_ pending: VoicesModel.PendingImport) -> some View {
+        let voices = pending.voices
+        let clones = pending.clones.count
+        return SheetContainer(title: voices.count == 1 ? "Import “\(voices[0].name)”" : "Import \(voices.count) voices",
+                              subtitle: source(pending), width: 480) {
+            Text(intro(voices: voices.count, clones: clones))
+                .textRole(.body, color: .textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            voiceList(voices)
+            ConsentCheck(isOn: Binding(get: { model.pendingImport?.consent ?? false },
+                                       set: { model.pendingImport?.consent = $0 }),
+                         statement: ConsentCheck.cloneStatement(voices: clones), detail: ConsentCheck.cloneDetail)
+                .padding(Theme.Space.m)
+                .background {
+                    let shape = RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
+                    shape.fill((pending.consent ? Color.mint : .velvet).opacity(0.06))
+                        .overlay(shape.strokeBorder((pending.consent ? Color.mint : Color.velvet).opacity(0.25), lineWidth: 1))
+                }
+                .stageAnimation(Theme.Motion.standard, value: pending.consent)
+            if !pending.refused.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(pending.refused, id: \.self) { r in
+                        Label(r.reason.contains(r.file) ? r.reason : "\(r.file): \(r.reason)", systemImage: "exclamationmark.triangle.fill")
+                            .textRole(.caption, color: .footlight)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        } actions: {
+            Button("Cancel") { dismiss() }
+                .buttonStyle(.ghost)
+                .keyboardShortcut(.cancelAction)
+            Button(voices.count == 1 ? "Import voice" : "Import \(voices.count) voices", systemImage: "square.and.arrow.down") {
+                Task { await model.confirmImport() }
+            }
+            .buttonStyle(.primary)
+            .disabled(!pending.consent)
+            .keyboardShortcut(.defaultAction)
+        }
+    }
+
+    private func intro(voices: Int, clones: Int) -> String {
+        let what: String
+        if voices == 1 { what = "This voice was cloned from a real person's recording." }
+        else if clones == voices { what = "These voices were cloned from real people's recordings." }
+        else if clones == 1 { what = "One of these voices was cloned from a real person's recording." }
+        else { what = "\(clones) of these voices were cloned from real people's recordings." }
+        return what + " The permission the sender confirmed doesn't carry over, so Encore asks for yours."
+    }
+
+    private func source(_ pending: VoicesModel.PendingImport) -> String {
+        pending.files.count == 1 ? "From \(pending.files[0].url.lastPathComponent)" : "From \(pending.files.count) voice files"
+    }
+
+    private func voiceList(_ voices: [Voice]) -> some View {
+        let shown = Array(voices.prefix(5))
+        return VStack(alignment: .leading, spacing: 7) {
+            ForEach(shown, id: \.id) { v in
+                HStack(spacing: Theme.Space.s) {
+                    Image(systemName: v.needsSpeakerConsent ? "person.wave.2" : "wand.and.stars")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(v.needsSpeakerConsent ? Color.tungsten : Color.mint)
+                        .frame(width: 18)
+                    Text(v.name).textRole(.label).lineLimit(1)
+                    Spacer(minLength: Theme.Space.s)
+                    Text((v.needsSpeakerConsent ? "Cloned" : "Designed") + String(format: " · %.1f s", v.duration))
+                        .textRole(.caption, color: .textTertiary)
+                        .fixedSize()
+                }
+            }
+            if voices.count > shown.count {
+                Text("and \(voices.count - shown.count) more").textRole(.caption, color: .textTertiary).padding(.leading, 26)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.Space.m)
+        .surface(.sunken, radius: Theme.Radius.m)
     }
 }

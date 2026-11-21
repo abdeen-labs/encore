@@ -78,7 +78,9 @@ public struct PythonRuntime: Sendable, Equatable {
 
     /// The helper's environment, built from scratch so nothing from the user's shell (PYTHONPATH, a
     /// conda env, …) leaks in. Nothing here points inside the app bundle for writing.
-    func environment(ffmpegDirectory: URL?, offline: Bool = true) -> [String: String] {
+    /// `sharedHubToken: false` (signed out of Encore only) hides the shared token file from huggingface_hub,
+    /// which would otherwise read it on its own.
+    func environment(ffmpegDirectory: URL?, offline: Bool = true, sharedHubToken: Bool = true) -> [String: String] {
         let inherited = ProcessInfo.processInfo.environment
         var pathDirs = [executable.deletingLastPathComponent().path]
         if let ffmpegDirectory { pathDirs.append(ffmpegDirectory.path) }
@@ -105,6 +107,11 @@ public struct PythonRuntime: Sendable, Equatable {
         if offline {
             env["HF_HUB_OFFLINE"] = "1"
             env["TRANSFORMERS_OFFLINE"] = "1"
+        }
+        if !sharedHubToken {
+            // huggingface_hub reads HF_TOKEN_PATH and treats an empty file as no token; /dev/null can't be written to.
+            env["HF_TOKEN_PATH"] = "/dev/null"
+            env["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
         }
         for key in ["USER", "LOGNAME", "SHELL", "__CF_USER_TEXT_ENCODING"] { env[key] = inherited[key] }
         return env.compactMapValues { $0 }

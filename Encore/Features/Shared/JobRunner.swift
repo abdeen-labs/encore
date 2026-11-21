@@ -59,7 +59,7 @@ final class JobRunner {
     }
 
     private(set) var phase: Phase = .idle
-    /// The latest stage message ("Loading Kokoro…", "Generating 2 of 5").
+    /// The latest stage message ("Loading Soprano…", "Generating 2 of 5").
     private(set) var stage: String?
     /// 0…1, nil until the job reports progress.
     private(set) var progress: Double?
@@ -80,7 +80,18 @@ final class JobRunner {
     @ObservationIgnored private var pending: (() -> Void)?
     @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
 
-    init(runtime: ModelRuntime) { self.runtime = runtime }
+    /// Every runner alive, so Settings → Reset can stop them all.
+    private static let all = NSHashTable<JobRunner>.weakObjects()
+
+    init(runtime: ModelRuntime) {
+        self.runtime = runtime
+        Self.all.add(self)
+    }
+
+    /// Cancels every runner's job (Settings → Reset, before deleting anything).
+    static func cancelAll() {
+        for runner in all.allObjects { runner.cancel() }
+    }
 
     /// Starts a job (after the memory check). Ignored while another job of this runner is busy.
     /// - Parameters:

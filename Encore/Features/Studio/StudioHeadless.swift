@@ -6,7 +6,7 @@ import Foundation
 /// DEBUG only: drives the Studio screen's own model (`StudioModel` + `JobRunner`, the same objects the screen uses)
 /// through a real generation inside the app process, without opening a window or playing audio:
 ///
-///     HF_HUB_OFFLINE=1 Encore.app/Contents/MacOS/Encore --studio-headless [--model kokoro] [--voice af_heart]
+///     HF_HUB_OFFLINE=1 Encore.app/Contents/MacOS/Encore --studio-headless [--model <id>] [--voice <preset id>]   (default: the smallest speech model)
 ///
 /// Stores live in a temporary folder (deleted at the end, unless --keep); the real Hugging Face cache is used read-only.
 /// Run 1 performs a short tagged script and prints the record. Run 2 starts a long script, cancels it mid-generation,
@@ -65,10 +65,11 @@ enum StudioHeadless {
         await model.prepare()
         log("shelf: \(shelf.downloaded.count) downloaded variants; starting model: \(model.choice?.modelID ?? "none")")
 
-        let modelID = arg("--model") ?? "kokoro"
-        guard let manifest = catalog.model(modelID) else { log("FAIL unknown model \(modelID)"); return 1 }
-        let choice = ModelChoice(modelID: modelID, variantID: shelf.preferredVariant(manifest).id)
-        let voice: VoiceSelection = arg("--voice").map { .preset($0) } ?? (manifest.presetVoices.isEmpty ? .automatic : .preset(manifest.presetVoices.first { $0.id == "af_heart" }?.id ?? manifest.presetVoices[0].id))
+        // The smallest speech model unless one is asked for (see ProofModels).
+        guard let manifest = arg("--model").map({ catalog.model($0) }) ?? ProofModels.speech(catalog) else { log("FAIL unknown model \(arg("--model") ?? "-")"); return 1 }
+        guard shelf.isAnyVariantDownloaded(manifest) else { log("FAIL not downloaded: \(manifest.name)"); return 1 }
+        let choice = ProofModels.choice(manifest, shelf: shelf)
+        let voice: VoiceSelection = arg("--voice").map { .preset($0) } ?? (manifest.presetVoices.isEmpty ? .automatic : .preset(manifest.presetVoices[0].id))
 
         // Run 1: perform.
         let script = "Welcome to Encore. [pause 0.4s] This line was performed by the Studio, from inside the app."

@@ -125,8 +125,8 @@ import Testing
 
     @Test func recordsWrittenBeforeTheNewFieldsStillDecode() throws {
         let old = """
-        {"id":"7B4C1F3E-2A4B-4C5D-9E6F-1A2B3C4D5E6F","kind":"speech","title":"Old","text":"Hello","modelID":"kokoro",
-         "modelName":"Kokoro","parameters":{},"audioPath":"/tmp/x.wav","duration":1.5,"sampleRate":24000,
+        {"id":"7B4C1F3E-2A4B-4C5D-9E6F-1A2B3C4D5E6F","kind":"speech","title":"Old","text":"Hello","modelID":"soprano",
+         "modelName":"Soprano","parameters":{},"audioPath":"/tmp/x.wav","duration":1.5,"sampleRate":24000,
          "createdAt":700000000,"elapsed":0.4,"favorite":true}
         """
         let r = try JSONDecoder().decode(GenerationRecord.self, from: Data(old.utf8))

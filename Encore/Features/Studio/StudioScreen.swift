@@ -51,7 +51,12 @@ struct StudioStage: View {
                     .buttonStyle(.ghost)
                 Button {
                     withStageAnimation { if drawerOpen && model.wingsTab == .takes { drawerOpen = false } else { model.wingsTab = .takes; drawerOpen = true } }
-                } label: { Label(model.takesTotal > 0 ? "Takes \(model.takesTotal)" : "Takes", systemImage: "square.stack") }
+                } label: {
+                    HStack(spacing: 6) {
+                        Label("Takes", systemImage: "square.stack")
+                        if model.takesTotal > 0 { CountBadge(model.takesTotal) }
+                    }
+                }
                     .buttonStyle(.ghost)
             }
             Button {
@@ -196,6 +201,10 @@ private struct DeskView: View {
         if let error = model.runner.error {
             ServiceErrorBanner(error: error, onDismiss: { withStageAnimation { model.runner.error = nil } },
                                onRetry: model.perform)
+        } else if model.draftModelRetired {
+            Banner(.neutral, title: "The model this draft used is no longer in Encore",
+                   message: "Your script is kept. Its voice and settings went with that model, so it's set to \(manifest.name) now.",
+                   onDismiss: { withStageAnimation { model.draftModelRetired = false } })
         } else if model.shelf.hasScanned, !model.isDownloaded {
             Banner(.warning, title: "\(manifest.name) isn't downloaded yet",
                    message: "Get the \(manifest.variant(model.choice?.variantID).label) variant (\(MemoryGauge.bytes(manifest.variant(model.choice?.variantID).downloadBytes))) in Models, or pick a model that's on this Mac.") {
@@ -297,9 +306,8 @@ private struct Wings: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
             HStack {
-                SegmentedControl(selection: $model.wingsTab, options: StudioModel.WingsTab.allCases) { tab in
-                    tab == .takes && model.takesTotal > 0 ? "Takes  \(model.takesTotal)" : tab.rawValue
-                }
+                SegmentedControl(selection: $model.wingsTab, options: StudioModel.WingsTab.allCases,
+                                 count: { $0 == .takes && model.takesTotal > 0 ? model.takesTotal : nil }) { $0.rawValue }
                 .controlSize(.small)
                 Spacer()
                 if let onClose {
@@ -352,9 +360,9 @@ private struct TakesPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
             if showsTitle {
-                HStack(alignment: .firstTextBaseline) {
+                HStack {
                     Text("Takes").textRole(.heading)
-                    if model.takesTotal > 0 { Text("\(model.takesTotal)").textRole(.mono, color: .textTertiary) }
+                    if model.takesTotal > 0 { CountBadge(model.takesTotal) }
                     Spacer()
                 }
             }
@@ -407,14 +415,14 @@ private struct FirstRunStage: View {
     @Environment(Router.self) private var router
 
     private var starters: [ModelManifest] {
-        ["kokoro", "qwen3-tts-base", "chatterbox-turbo"].compactMap { model.service.catalog.model($0) }
+        ["soprano", "qwen3-tts-base", "chatterbox-turbo"].compactMap { model.service.catalog.model($0) }
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Space.xl) {
                 EmptyState(symbol: "theatermasks", title: "The stage is dark",
-                           message: "Encore performs with models that run on this Mac. Download one to start: Kokoro is small and quick, the others can clone a voice.") {
+                           message: "Encore performs with models that run on this Mac. Download one to start: Soprano is small and quick, the others can clone a voice.") {
                     Button("Open Models", systemImage: "arrow.down.circle") { router.go(.models) }
                         .buttonStyle(.primary)
                         .controlSize(.large)

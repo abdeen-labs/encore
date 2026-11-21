@@ -194,6 +194,21 @@ public final class VoiceLibrary {
         mutate { $0[id] = nil }
     }
 
+    /// Removes every voice permanently (never to the Trash), along with anything else in `directory`
+    /// (leftover staging folders, unreadable voices). Returns how many library voices were removed and the
+    /// items that couldn't be. The library re-reads the folder afterwards, so it shows exactly what is left.
+    @discardableResult
+    public func deleteAllPermanently() -> (removed: Int, failures: [String]) {
+        let before = Set(voices.map(\.id))
+        let fm = FileManager.default
+        var failures: [String] = []
+        for item in (try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [] {
+            do { try fm.removeItem(at: item) } catch { failures.append("\(item.path): \(error.localizedDescription)") }
+        }
+        reload()
+        return (before.subtracting(voices.map(\.id)).count, failures)
+    }
+
     // MARK: Import / export
 
     /// Writes one `.encorevoice` file holding the given voices.
@@ -227,17 +242,35 @@ public final class VoiceLibrary {
         try fm.moveItem(at: tmpZip, to: url)
     }
 
+    /// The voices a `.encorevoice` file holds, without adding anything (the same checks as `importVoices`).
+    /// Lets the UI see whether the file holds cloned voices, and ask for consent, before importing.
+    public func inspectArchive(_ url: URL) async throws -> [Voice] {
+        let fm = FileManager.default
+        let unpacked = fm.temporaryDirectory.appendingPathComponent("encorevoice-peek-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: unpacked) }
+        return try await Self.readArchive(url, into: unpacked).map { $0.0 }
+    }
+
     /// Adds the voices in a `.encorevoice` file. A voice whose id is already in the library gets a new id
     /// (the existing voice is never touched). Imported voices are marked `.imported`.
+    ///
+    /// Consent dates in the file are the exporter's and are never kept. A voice cloned from a recording of a person
+    /// (`Voice.needsSpeakerConsent`) is imported only when the importer confirms the speaker's permission:
+    /// `consentConfirmedAt` becomes its consent date. Without it, a file holding such a voice is refused with
+    /// `StoreError.consentRequired` and nothing is added. Designed voices need no consent and get none.
     @discardableResult
-    public func importVoices(from url: URL) async throws -> [Voice] {
+    public func importVoices(from url: URL, consentConfirmedAt: Date? = nil) async throws -> [Voice] {
         let fm = FileManager.default
         let unpacked = fm.temporaryDirectory.appendingPathComponent("encorevoice-in-\(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: unpacked) }
         let found = try await Self.readArchive(url, into: unpacked)
+        if consentConfirmedAt == nil, found.contains(where: { $0.0.needsSpeakerConsent }) {
+            throw StoreError.consentRequired("“\(url.lastPathComponent)” holds a cloned voice. Confirm you have the speaker's permission to import it.")
+        }
         var imported: [Voice] = []
         for (voice, reference) in found {
             var v = voice
+            v.consentConfirmedAt = voice.needsSpeakerConsent ? consentConfirmedAt : nil
             v.origin = .imported
             if snapshot.withLock({ $0[v.id] != nil }) || imported.contains(where: { $0.id == v.id }) { v.id = UUID() }
             imported.append(try await add(v, referenceAudio: reference))
@@ -368,5 +401,18 @@ public final class VoiceLibrary {
         var n = 2
         while names.contains("\(base) \(n)".lowercased()) { n += 1 }
         return "\(base) \(n)"
+    }
+}
+
+extension Voice {
+    /// True for a voice cloned from a recording of a real person, which needs the speaker's permission (on Clone,
+    /// and again on import). Designed voices don't. An imported voice counts as a clone unless it carries the
+    /// description it was designed from.
+    public var needsSpeakerConsent: Bool {
+        switch origin {
+        case .cloned: true
+        case .designed: false
+        case .imported: designPrompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+        }
     }
 }

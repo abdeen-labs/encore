@@ -59,7 +59,7 @@ struct TakeCard: View {
             .confirmationDialog("Delete “\(item.title)”?", isPresented: $confirmingDelete) {
                 Button("Delete take", role: .destructive, action: onDelete)
             } message: {
-                Text("The audio file is deleted too. This can't be undone.")
+                Text("It's removed from history, and its audio file goes to the Trash.")
             }
     }
 

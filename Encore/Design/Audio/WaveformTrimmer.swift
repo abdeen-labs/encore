@@ -22,6 +22,8 @@ struct WaveformTrimmer: View {
     var title: String?
     /// Suggest the best-sounding stretch once the file is read (off when the caller's selection should stay).
     var suggestsSelection = true
+    /// When the whole file's length falls in this range, a "Use whole file" action selects all of it in one click.
+    var wholeFileRange: ClosedRange<TimeInterval>?
 
     @State private var loader: WaveformLoader
     @State private var visible: ClosedRange<TimeInterval>?
@@ -39,23 +41,25 @@ struct WaveformTrimmer: View {
     private enum Mode { case start, end, body, pan }
 
     init(url: URL, selection: Binding<ClosedRange<TimeInterval>>, target: ClosedRange<TimeInterval> = 5...15, title: String? = nil,
-         suggestsSelection: Bool = true) {
+         suggestsSelection: Bool = true, wholeFileRange: ClosedRange<TimeInterval>? = nil) {
         source = .file(url)
         _selection = selection
         self.target = target
         self.title = title ?? url.lastPathComponent
         _loader = State(initialValue: WaveformLoader())
         self.suggestsSelection = suggestsSelection
+        self.wholeFileRange = wholeFileRange
         _didSuggest = State(initialValue: !suggestsSelection)
     }
 
     /// Static peaks (previews, the gallery). Play is disabled.
     init(previewPeaks: WaveformPeaks, selection: Binding<ClosedRange<TimeInterval>>, target: ClosedRange<TimeInterval> = 5...15,
-         title: String? = nil, visible: ClosedRange<TimeInterval>? = nil) {
+         title: String? = nil, visible: ClosedRange<TimeInterval>? = nil, wholeFileRange: ClosedRange<TimeInterval>? = nil) {
         source = .preview(previewPeaks)
         _selection = selection
         self.target = target
         self.title = title
+        self.wholeFileRange = wholeFileRange
         _loader = State(initialValue: WaveformLoader(peaks: previewPeaks))
         _visible = State(initialValue: visible)
         _didSuggest = State(initialValue: true)
@@ -72,6 +76,12 @@ struct WaveformTrimmer: View {
         return .good
     }
     private var tone: Color { verdict == .good ? .mint : .footlight }
+    /// The file is already a usable length on its own: offer to take all of it.
+    private var offersWholeFile: Bool {
+        guard let wholeFileRange, duration > 0 else { return false }
+        return wholeFileRange.contains(duration)
+    }
+    private var isWholeFile: Bool { selection.lowerBound <= 0.01 && selection.upperBound >= duration - 0.01 }
     private var isPlaying: Bool { player?.isPlaying ?? false && player?.activeRange != nil }
 
     private enum Verdict { case good, tooShort, tooLong, recordingTooShort }
@@ -93,7 +103,14 @@ struct WaveformTrimmer: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
             header
-            guidance
+            if offersWholeFile && !isWholeFile {
+                HStack(alignment: .center, spacing: Theme.Space.m) {
+                    guidance.frame(maxWidth: .infinity, alignment: .leading)
+                    wholeFileButton
+                }
+            } else {
+                guidance
+            }
             overview
             editor
             footer
@@ -173,6 +190,14 @@ struct WaveformTrimmer: View {
         }
         return Text(text).textRole(.caption, color: verdict == .good ? .textSecondary : .footlight.opacity(0.9))
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var wholeFileButton: some View {
+        Button("Use whole file", systemImage: "arrow.left.and.right") { useWholeFile() }
+            .buttonStyle(.secondary)
+            .controlSize(.small)
+            .fixedSize()
+            .help("The whole file is \(Timecode.seconds(duration)), already a good length: use all of it without moving the handles.")
     }
 
     /// The whole recording, small, with the selection and the visible window marked. Drag to move the view.
@@ -391,6 +416,18 @@ struct WaveformTrimmer: View {
             player = p
             p.play(range: selection)
         }
+    }
+
+    /// Selects the entire file. A suggestion still on its way won't replace it.
+    private func useWholeFile() {
+        guard duration > 0 else { return }
+        didSuggest = true
+        if isPlaying { player?.stop() }
+        withStageAnimation(Theme.Motion.quick) {
+            selection = 0...duration
+            visible = nil
+        }
+        active = .body
     }
 
     private func suggestIfNeeded() {

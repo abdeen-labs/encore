@@ -86,12 +86,15 @@ public enum StoreError: LocalizedError, Equatable {
     case notFound(String)
     case invalidFile(String)
     case toolFailed(String)
+    /// The action needs the user to confirm the speaker's permission first (importing a cloned voice).
+    case consentRequired(String)
 
     public var errorDescription: String? {
         switch self {
         case .notFound(let what): "\(what) couldn't be found."
         case .invalidFile(let why): why
         case .toolFailed(let why): why
+        case .consentRequired(let why): why
         }
     }
 }

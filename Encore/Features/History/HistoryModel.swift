@@ -212,7 +212,7 @@ final class HistoryModel {
     /// Asks before deleting (the confirmation is the screen's sheet).
     func requestDelete(_ ids: [UUID]) { pendingDelete = ids }
 
-    /// Deletes items and their audio files for good (history has no trash). Returns how many went.
+    /// Deletes items; their audio files go to the Trash. Returns how many went.
     @discardableResult
     func confirmDelete() async throws -> Int {
         let ids = pendingDelete
@@ -270,14 +270,26 @@ final class HistoryModel {
 
     // MARK: Export
 
-    struct ExportResult: Equatable { var written: [URL]; var failures: [String] }
+    struct ExportResult: Equatable {
+        var written: [URL]
+        var failures: [String]
+        /// Stopped part-way (the progress card's cancel button); files already written stay.
+        var canceled = false
+    }
 
     /// Writes each item into `folder`: audio in `format` (the WAV master is copied as is), transcripts as text.
-    /// Existing files are never overwritten; a number is added instead.
+    /// Existing files are never overwritten; a number is added instead. `progress` covers the whole batch, each item
+    /// an equal share. Canceling the task stops at once: the file in progress is never left half-written; the ones
+    /// before it stay.
     func export(_ items: [HistoryItem], format: AudioFileFormat, transcriptFormat: TranscriptFormat = .text,
-                to folder: URL) async -> ExportResult {
+                to folder: URL, progress: ExportProgress? = nil) async -> ExportResult {
         var result = ExportResult(written: [], failures: [])
-        for item in items {
+        let share = 1 / Double(max(1, items.count))
+        for (index, item) in items.enumerated() {
+            if Task.isCancelled { result.canceled = true; break }
+            let done = Double(index) * share
+            let itemProgress: ExportProgress? = progress.map { p in { @Sendable f in p(done + share * f) } }
+            defer { progress?(done + share) }
             var base = AudioExportActions.sanitized(item.title)
             // A transcript's title is usually its source file name: drop that file's extension.
             let ext = (base as NSString).pathExtension
@@ -289,13 +301,16 @@ final class HistoryModel {
                 case .generation(let g):
                     let url = Self.unique(folder.appendingPathComponent(base).appendingPathExtension(format.fileExtension))
                     if format == .wav { try FileManager.default.copyItem(at: g.audioURL, to: url) }
-                    else { try await AudioExporter.convert(g.audioURL, to: url, format: format) }
+                    else { try await AudioExporter.convert(g.audioURL, to: url, format: format, progress: itemProgress) }
                     result.written.append(url)
                 case .transcription(let t):
                     let url = Self.unique(folder.appendingPathComponent(base).appendingPathExtension(transcriptFormat.fileExtension))
                     try TranscriptFormatter().data(t.transcript, as: transcriptFormat).write(to: url, options: .withoutOverwriting)
                     result.written.append(url)
                 }
+            } catch is CancellationError {
+                result.canceled = true
+                break
             } catch {
                 result.failures.append("\(item.title): \(error.localizedDescription)")
             }

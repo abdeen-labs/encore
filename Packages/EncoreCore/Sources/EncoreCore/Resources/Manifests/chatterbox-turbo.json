@@ -2,6 +2,7 @@
   "id": "chatterbox-turbo",
   "name": "Chatterbox Turbo",
   "family": "Chatterbox",
+  "author": "Resemble AI",
   "summary": "Resemble AI's fast English voice cloner with inline sound effects like [laugh] and [sigh]. Has a built-in voice too.",
   "tasks": [
     "tts"
@@ -16,8 +17,7 @@
         "mlx-community/S3TokenizerV2"
       ],
       "downloadBytes": 1203000000,
-      "memoryBytes": 3300000000,
-      "recommended": true
+      "memoryBytes": 3300000000
     },
     {
       "id": "fp16",

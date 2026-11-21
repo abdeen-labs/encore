@@ -15,7 +15,7 @@ struct RunSurface: View {
     var systemImage: String = "play.fill"
     /// When non-nil the action is disabled and this says why.
     var blockedReason: String?
-    /// Idle caption shown when nothing else needs saying (e.g. "3 chunks · Kokoro").
+    /// Idle caption shown when nothing else needs saying (e.g. "3 chunks · Soprano").
     var idleNote: String?
     let action: () -> Void
 

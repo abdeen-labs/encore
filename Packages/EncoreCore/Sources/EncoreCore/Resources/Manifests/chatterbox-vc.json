@@ -2,6 +2,7 @@
   "id": "chatterbox-vc",
   "name": "Chatterbox Voice Changer",
   "family": "Chatterbox",
+  "author": "Resemble AI",
   "summary": "Speech-to-speech: re-voices a recording in a chosen voice while keeping the words and timing. Uses Chatterbox's S3 speech tokens and S3Gen decoder; runs in the Python helper.",
   "tasks": [
     "voiceConversion"
@@ -21,7 +22,6 @@
       ],
       "downloadBytes": 3207973708,
       "memoryBytes": 2800000000,
-      "recommended": true,
       "companionAllowPatterns": {
         "mlx-community/S3TokenizerV2": [
           "model.safetensors",

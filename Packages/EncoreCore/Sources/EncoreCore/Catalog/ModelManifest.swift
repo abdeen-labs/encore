@@ -7,9 +7,11 @@ public struct ModelManifest: Codable, Identifiable, Sendable, Hashable {
     public var id: String
     public var name: String
     public var family: String
+    /// Who made the model (the upstream organization or person, from its model card), for the credits in About.
+    public var author: String?
     public var summary: String
     public var tasks: [ModelTask]
-    /// Key that engine backends use to pick their adapter (e.g. "kokoro", "qwen3_tts", "whisper").
+    /// Key that engine backends use to pick their adapter (e.g. "qwen3_tts", "zonos3", "whisper").
     public var engine: String
     public var variants: [ModelVariant]
     public var license: ModelLicense
@@ -28,7 +30,8 @@ public struct ModelManifest: Codable, Identifiable, Sendable, Hashable {
     /// How this model wants a voice description (voice design), when it is particular about it.
     public var descriptionHelp: String?
 
-    public var defaultVariant: ModelVariant { variants.first(where: { $0.recommended == true }) ?? variants[0] }
+    /// The variant recommended for this Mac's RAM (see `VariantRecommendation`); used whenever no variant is named.
+    public var defaultVariant: ModelVariant { recommendedVariant() }
     public func variant(_ id: String?) -> ModelVariant { variants.first(where: { $0.id == id }) ?? defaultVariant }
     public var defaultParameters: ParamValues {
         Dictionary(uniqueKeysWithValues: parameters.compactMap { p in p.defaultValue.map { (p.key, $0) } })
@@ -53,7 +56,6 @@ public struct ModelVariant: Codable, Identifiable, Sendable, Hashable {
     public var downloadBytes: Int64
     /// Rough resident memory once loaded.
     public var memoryBytes: Int64
-    public var recommended: Bool?
     /// Glob patterns per companion repo; a companion missing here is downloaded whole.
     /// (`allowPatterns` applies to the primary repo only.)
     public var companionAllowPatterns: [String: [String]]?

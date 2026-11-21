@@ -42,8 +42,6 @@ ENGINES = {
     "zonos3": EngineSpec("tts", "tts/models/zonos3", (SYNTH, CLONE)),
     "soprano": EngineSpec("tts", "tts/models/soprano", (SYNTH,)),
     "pocket_tts": EngineSpec("tts", "tts/models/pocket_tts", (SYNTH, CLONE)),
-    "kokoro": EngineSpec("tts", "tts/models/kokoro", (SYNTH,), needs=("misaki",),
-                         note="Kokoro's Python text front end (misaki) pulls in torch; it runs in MLX Swift instead."),
     "whisper": EngineSpec("stt", "stt/models/whisper", (STT, WORDS)),
     "parakeet": EngineSpec("stt", "stt/models/parakeet", (STT,)),
     "chatterbox_vc": EngineSpec("vc", "tts/models/chatterbox", (VC,)),

@@ -2,6 +2,7 @@
   "id": "chatterbox-multilingual",
   "name": "Chatterbox Multilingual",
   "family": "Chatterbox",
+  "author": "Resemble AI",
   "summary": "Resemble AI's voice cloner for 23 languages, with an emotion-intensity control. Clones from a short clip; no transcript needed. Runs in the Python helper.",
   "tasks": [
     "tts"
@@ -26,8 +27,7 @@
         ]
       },
       "downloadBytes": 3207973708,
-      "memoryBytes": 5000000000,
-      "recommended": true
+      "memoryBytes": 5000000000
     }
   ],
   "license": {

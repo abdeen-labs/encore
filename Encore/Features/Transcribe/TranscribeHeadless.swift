@@ -14,7 +14,7 @@ enum TranscribeHeadless {
         let log = ProduceHeadless.log
         log("== Transcribe ==")
         let clip: URL
-        do { clip = try await h.speak(script.replacingOccurrences(of: ". ", with: ". [pause 0.7s] "), voice: "bm_george", name: "rehearsal.wav") }
+        do { clip = try await h.speak(script.replacingOccurrences(of: ". ", with: ". [pause 0.7s] "), voice: 3, name: "rehearsal.wav") }
         catch { log("FAIL synthesizing: \(error)"); return false }
         // A small video: a black frame with the clip as its soundtrack.
         let video = h.media.appendingPathComponent("rehearsal.mp4")
@@ -29,7 +29,7 @@ enum TranscribeHeadless {
 
         let model = TranscribeModel(service: h.service, settings: h.settings, shelf: h.shelf, drafts: nil)
         await model.prepare()
-        guard let whisper = h.catalog.model("whisper-large-v3-turbo") else { log("FAIL no whisper manifest"); return false }
+        guard let whisper = ProofModels.transcription(h.catalog) else { log("FAIL no transcription model in the catalog"); return false }
         var ok = true
 
         ok = await transcribe(model, h: h, media: clip, model: whisper, timestamps: .segment, label: "clip/segments") && ok

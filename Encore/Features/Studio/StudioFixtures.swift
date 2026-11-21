@@ -27,7 +27,7 @@ enum StudioFixtures {
         let shelf = deps.modelShelf
         shelf.rescan()
         await shelf.waitForScan()
-        for (id, runtime) in ["kokoro": EngineRuntime.mlxSwift, "chatterbox-turbo": .mlxSwift, "qwen3-tts-base": .mlxSwift,
+        for (id, runtime) in ["chatterbox-turbo": EngineRuntime.mlxSwift, "qwen3-tts-base": .mlxSwift,
                               "voxcpm2": .mlxSwift, "omnivoice": .mlxSwift, "chatterbox-multilingual": .python,
                               "qwen3-tts-customvoice": .mlxSwift, "qwen3-tts-voicedesign": .mlxSwift, "orpheus": .mlxSwift,
                               "soprano": .mlxSwift, "zonos3-mini": .mlxSwift] {
@@ -49,7 +49,7 @@ enum StudioFixtures {
         // Models "on disk": a snapshot folder with one file per repo is enough for the service to accept them.
         let layout = deps.service.hub.layout
         let commit = String(repeating: "f1", count: 20)
-        let downloaded: [(String, String?)] = [("kokoro", nil), ("chatterbox-turbo", nil), ("qwen3-tts-base", nil),
+        let downloaded: [(String, String?)] = [("zonos3-mini", nil), ("chatterbox-turbo", nil), ("qwen3-tts-base", nil),
                                                ("voxcpm2", nil), ("omnivoice", nil), ("chatterbox-multilingual", nil)]
         for (id, variantID) in downloaded {
             guard let m = catalog.model(id) else { continue }
@@ -96,7 +96,7 @@ enum StudioFixtures {
 
         // Takes: real WAVs in the temp history.
         let takes: [(String, String, String, String?, Double, Double, Bool)] = [
-            ("The house lights dim", "The house lights dim. A single spot finds the center of the stage.", "kokoro", "Heart", 4.2, 0.9, false),
+            ("The house lights dim", "The house lights dim. A single spot finds the center of the stage.", "zonos3-mini", "Imogen", 4.2, 0.9, false),
             ("Ladies and gentlemen, tonight", "Ladies and gentlemen, tonight [pause 0.5s] the role of the Captain will be played by…", "chatterbox-turbo", "Captain Reyes", 6.8, 3.1, true),
             ("Chapter one. It was raining", "Chapter one. It was raining in the way it only rains in port towns.", "qwen3-tts-base", "Captain Reyes", 5.1, 4.4, false),
             ("Hello there, I'm Mira", "Hello there, I'm Mira. [laugh] I wasn't expecting you so soon.", "chatterbox-turbo", "Mira", 3.6, 1.8, false),
@@ -153,8 +153,8 @@ enum StudioFixtures {
     private static func configure(_ model: StudioModel, deps: AppDependencies, ids: Seeded) {
         let tagged = "Ladies and gentlemen, [pause 0.6s] tonight's performance begins. [laugh] Please silence your phones.\n\n[voice: Mira] Wait, has anyone seen the Captain? [whisper] He was here a minute ago…\n\n[voice: Captain Reyes] I'm right behind you, Dr. Nguyen."
         let turbo = ModelChoice(modelID: "chatterbox-turbo", variantID: deps.catalog.model("chatterbox-turbo")?.defaultVariant.id)
-        let kokoro = ModelChoice(modelID: "kokoro", variantID: "bf16")
-        let kokoroScript = "The house lights dim. A single spot finds the center of the stage, and the voice begins: low, unhurried, certain of its audience. [pause 1s] This is the line we will perform."
+        let zonos = ModelChoice(modelID: "zonos3-mini", variantID: "bf16")
+        let narrationScript = "The house lights dim. A single spot finds the center of the stage, and the voice begins: low, unhurried, certain of its audience. [pause 1s] This is the line we will perform."
         model.wingsTab = .tuning
         switch state {
         case "ready", nil:
@@ -164,12 +164,12 @@ enum StudioFixtures {
                            parameters: ["temperature": .double(0.95), "top_p": .double(0.9), "seed": .int(424_242)])
             model.showAdvanced = true
         case "running":
-            model.debugSet(choice: kokoro, voice: .preset("af_heart"), script: kokoroScript, parameters: ["speed": .double(1.1)])
+            model.debugSet(choice: zonos, voice: .preset("imogen"), script: narrationScript, parameters: ["speed": .double(1.1)])
             model.wingsTab = .takes
-            model.runner.debugShow(.running, identity: .init(kind: .speech, modelID: "kokoro", modelName: "Kokoro"),
+            model.runner.debugShow(.running, identity: .init(kind: .speech, modelID: "zonos3-mini", modelName: "Zonos3 Mini"),
                                    stage: "Generating 2 of 3", progress: 0.46, startedAt: Date().addingTimeInterval(-4))
         case "takes":
-            model.debugSet(choice: kokoro, voice: .preset("af_heart"), script: kokoroScript)
+            model.debugSet(choice: zonos, voice: .preset("imogen"), script: narrationScript)
             model.wingsTab = .takes
             if let first = ids.takes.first { model.debugMarkSessionTake(first) }
             model.runner.debugShow(.idle, identity: nil, lastOutcome: .finished(elapsed: 1.4))
@@ -181,14 +181,14 @@ enum StudioFixtures {
         case "memory":
             let m = deps.catalog.model("voxcpm2")
             let bf16 = m?.variants.first { $0.label.lowercased().contains("bf16") }
-            model.debugSet(choice: ModelChoice(modelID: "voxcpm2", variantID: bf16?.id), voice: .library(ids.captain), script: kokoroScript,
+            model.debugSet(choice: ModelChoice(modelID: "voxcpm2", variantID: bf16?.id), voice: .library(ids.captain), script: narrationScript,
                            instruct: "")
             model.runner.debugShow(.confirmMemory(fakeAssessment(m, bf16)), identity: .init(kind: .speech, modelID: "voxcpm2", modelName: "VoxCPM2"))
         case "notDownloaded":
-            model.debugSet(choice: ModelChoice(modelID: "qwen3-tts-voicedesign"), script: kokoroScript,
+            model.debugSet(choice: ModelChoice(modelID: "qwen3-tts-voicedesign"), script: narrationScript,
                            instruct: "A warm, raspy older man, slow and deliberate")
         case "pronunciations":
-            model.debugSet(choice: kokoro, voice: .preset("af_heart"), script: kokoroScript)
+            model.debugSet(choice: zonos, voice: .preset("imogen"), script: narrationScript)
             model.wingsTab = .takes
         case "modelPicker", "voicePicker":
             model.debugSet(choice: turbo, voice: .library(ids.captain), script: tagged)

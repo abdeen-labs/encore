@@ -14,9 +14,9 @@ import Testing
     }
 
     @Test func requestsRoundTrip() throws {
-        var speech = SpeechRequest(modelID: "kokoro", text: "Hello [pause 1s] world")
-        speech.variantID = "bf16"; speech.voice = .preset("af_heart"); speech.instruct = "calm"; speech.language = "en"
-        speech.parameters = ["speed": .double(1.1), "seed": .int(3), "flag": .bool(true), "mode": .string("x")]
+        var speech = SpeechRequest(modelID: "qwen3-tts-customvoice", text: "Hello [pause 1s] world")
+        speech.variantID = "1.7b-8bit"; speech.voice = .preset("ryan"); speech.instruct = "calm"; speech.language = "en"
+        speech.parameters = ["temperature": .double(0.8), "seed": .int(3), "flag": .bool(true), "mode": .string("x")]
         speech.post.removeSilence = true; speech.post.targetLUFS = -20; speech.autoChunk = false
         speech.applyPronunciations = false; speech.chunkGapSeconds = 0.3; speech.title = "T"
         let s2 = try roundTrip(speech)
@@ -53,7 +53,7 @@ import Testing
     }
 
     @Test func minimalBodiesDecodeWithDefaults() throws {
-        let s = try JSONDecoder().decode(SpeechRequest.self, from: Data(#"{"modelID":"kokoro","text":"Hi"}"#.utf8))
+        let s = try JSONDecoder().decode(SpeechRequest.self, from: Data(#"{"modelID":"soprano","text":"Hi"}"#.utf8))
         #expect(s.voice == .automatic && s.autoChunk && s.applyPronunciations && s.post == PostProcessingOptions() && s.parameters.isEmpty)
         let p = try JSONDecoder().decode(SpeechRequest.self, from: Data(#"{"modelID":"k","text":"Hi","voice":{"preset":"af_heart"},"post":{"removeSilence":true}}"#.utf8))
         #expect(p.voice == .preset("af_heart") && p.post.removeSilence && p.post.normalizeLoudness)

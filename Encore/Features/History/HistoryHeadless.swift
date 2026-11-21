@@ -8,7 +8,7 @@ import Foundation
 ///
 ///     HF_HUB_OFFLINE=1 Encore.app/Contents/MacOS/Encore --history-headless [--keep]
 ///
-/// Makes two Kokoro takes and a transcription (of one take) through `EncoreService`, then drives search, filters,
+/// Makes two preset-voice takes and a transcription (of one take) through `EncoreService`, then drives search, filters,
 /// rename, favorite, export, reuse in Studio (variant, language, post-processing restored) and delete (audio file
 /// removed). Also checks that planning runtimes (model pickers, Models screen) never starts the Python helper.
 /// Stores live in a temporary folder, deleted at the end unless --keep. Exit status 0 when everything holds.
@@ -54,7 +54,9 @@ enum HistoryHeadless {
 
         let settings = AppSettings(defaults: ThrowawayDefaults.make("EncoreHistoryHeadless").defaults, key: "settings")
         let history: HistoryDatabase
-        do { history = try HistoryDatabase(directory: root.appendingPathComponent("History")) } catch { log("FAIL history: \(error)"); return 1 }
+        // Deleted audio goes to a temp folder standing in for the Trash, never the user's.
+        let trash = root.appendingPathComponent("Trash")
+        do { history = try HistoryDatabase(directory: root.appendingPathComponent("History"), trash: .folder(trash)) } catch { log("FAIL history: \(error)"); return 1 }
         let voices = VoiceLibrary(directory: root.appendingPathComponent("Voices"), deletesToTrash: false)
         let pronunciations = PronunciationStore(directory: root)
         let (catalog, _) = ModelCatalog.bundled()
@@ -98,18 +100,27 @@ enum HistoryHeadless {
         }
 
         // 2. Real records through the service.
-        guard let kokoro = catalog.model("kokoro") else { log("FAIL no kokoro"); return 1 }
+        // On the smallest models that can do it (see ProofModels).
+        guard let speakers = ProofModels.speakers(catalog) else { log("FAIL no model with preset voices"); return 1 }
+        let missing = ProofModels.seed(settings, catalog: catalog, shelf: shelf, features: [.transcription], also: [speakers])
+        guard missing.isEmpty else { log("FAIL not downloaded: \(missing.joined(separator: ", "))"); return 1 }
+        let variantID = ProofModels.choice(speakers, shelf: shelf).variantID ?? speakers.defaultVariant.id
+        let voiceA = speakers.presetVoices[0], voiceB = speakers.presetVoices[1]
+        let spoken = speakers.languages.first?.code
+        let tuning: ParamValues = speakers.parameters.contains { $0.key == "temperature" } ? ["temperature": .double(0.8)] : [:]
+        log("models: \(speakers.name) (\(variantID)), voices \(voiceA.name) and \(voiceB.name)")
         var post = PostProcessingOptions()
         post.removeSilence = true
         post.targetLUFS = -20
-        var r1 = SpeechRequest(modelID: "kokoro", text: "The captain walked onto the stage and the house lights dimmed.")
-        r1.variantID = kokoro.defaultVariant.id
-        r1.voice = .preset("bf_emma")
-        r1.language = "b"
-        r1.parameters = ["speed": .double(1.15)]
+        var r1 = SpeechRequest(modelID: speakers.id, text: "The captain walked onto the stage and the house lights dimmed.")
+        r1.variantID = variantID
+        r1.voice = .preset(voiceA.id)
+        r1.language = spoken
+        r1.parameters = tuning
         r1.post = post
-        var r2 = SpeechRequest(modelID: "kokoro", text: "Ladies and gentlemen, please take your seats.")
-        r2.voice = .preset("af_heart")
+        var r2 = SpeechRequest(modelID: speakers.id, text: "Ladies and gentlemen, please take your seats.")
+        r2.variantID = variantID
+        r2.voice = .preset(voiceB.id)
         var takes: [GenerationRecord] = []
         for r in [r1, r2] {
             do {
@@ -119,12 +130,10 @@ enum HistoryHeadless {
         guard takes.count == 2 else { log("FAIL takes \(takes.count)"); return 1 }
         let t1 = takes[0]
         log("take 1: \(t1.title) · \(t1.voiceName ?? "-") · variant \(t1.variantID ?? "nil") · language \(t1.language ?? "nil") · runtime \(t1.runtime?.rawValue ?? "nil") · post \(t1.post.map { "removeSilence \($0.removeSilence), \($0.targetLUFS) LUFS" } ?? "nil") · \(String(format: "%.2f", t1.duration)) s")
-        check(t1.variantID == kokoro.defaultVariant.id && t1.language == "b" && t1.post == post && t1.runtime == .mlxSwift,
+        check(t1.variantID == variantID && t1.language == spoken && t1.post == post && t1.runtime == .mlxSwift,
               "speech record stores variant, language, post-processing and runtime")
 
-        let sttID = ["whisper-large-v3-turbo", "whisper-tiny", "parakeet-tdt-v3"].first { id in
-            catalog.model(id).map { service.isDownloaded($0) } ?? false
-        }
+        let sttID = ProofModels.transcription(catalog)?.id
         var transcript: TranscriptionRecord?
         if let sttID {
             var tr = TranscriptionRequest(modelID: sttID, mediaPath: t1.audioPath)
@@ -159,10 +168,10 @@ enum HistoryHeadless {
         model.search = "capt"
         await settle(model)
         check(model.items.contains { $0.id == t1.id }, "search matches word prefixes as you type (“capt”)")
-        model.search = "emma"
+        model.search = voiceA.name.lowercased()
         await settle(model)
-        check(model.items.map(\.id) == [t1.id], "search finds voice names (“emma” → \(model.items.map(\.title)))")
-        model.search = "kokoro"
+        check(model.items.map(\.id) == [t1.id], "search finds voice names (“\(model.search)” → \(model.items.map(\.title)))")
+        model.search = speakers.name.lowercased().split(separator: " ").first.map(String.init) ?? speakers.id
         await settle(model)
         check(model.items.filter { $0.generation != nil }.count == 2, "search finds model names")
         if let t = transcript {
@@ -176,11 +185,11 @@ enum HistoryHeadless {
         await settle(model)
         check(model.items.allSatisfy { $0.kind == .transcription } && model.items.count == (transcript == nil ? 0 : 1), "kind filter: transcripts only")
         model.kind = .all
-        model.voice = model.facets.voices.first { $0.name.lowercased().contains("emma") }
+        model.voice = model.facets.voices.first { $0.name.lowercased().contains(voiceA.name.lowercased()) }
         await settle(model)
         check(model.items.map(\.id) == [t1.id], "voice filter (preset voice, by name)")
         model.clearFilters()
-        model.modelID = "kokoro"
+        model.modelID = speakers.id
         model.date = .today
         await settle(model)
         check(model.items.count == 2, "model + date filters")
@@ -210,16 +219,16 @@ enum HistoryHeadless {
         check(exported.failures.isEmpty && exported.written.count == total, "multi-export writes every item (audio as M4A, transcripts as text)")
 
         // Reuse in Studio.
-        studio.debugSet(choice: ModelChoice(modelID: "kokoro"), script: "something else")
+        studio.debugSet(choice: ModelChoice(modelID: speakers.id), script: "something else")
         if let item = model.items.first(where: { $0.id == t1.id }), model.canReuse(item) {
             let problem = model.reuseInStudio(item)
             log("Studio after reuse: model \(studio.choice?.modelID ?? "-") variant \(studio.choice?.variantID ?? "-") voice \(studio.voice) language \(studio.language ?? "nil") parameters \(studio.parameters) post removeSilence \(studio.post.removeSilence) \(studio.post.targetLUFS) LUFS")
-            check(problem == nil && studio.choice?.variantID == t1.variantID && studio.language == "b" && studio.post == post
-                    && studio.voice == .preset("bf_emma") && studio.parameters["speed"] == .double(1.15) && studio.script == t1.text,
+            check(problem == nil && studio.choice?.variantID == t1.variantID && studio.language == spoken && studio.post == post
+                    && studio.voice == .preset(voiceA.id) && studio.parameters["temperature"] == tuning["temperature"] && studio.script == t1.text,
                   "reuse in Studio restores model, variant, voice, language, parameters, post-processing and script")
         } else { check(false, "the take can be reused") }
 
-        // Delete (permanent; audio file goes).
+        // Delete (the row goes; the audio file goes to the Trash).
         check(fm.fileExists(atPath: t1.audioPath), "audio file exists before delete")
         model.focusedID = t1.id
         model.click(model.items.first { $0.id == takes[1].id }!, command: true)
@@ -227,15 +236,20 @@ enum HistoryHeadless {
         let deleted = (try? await model.confirmDelete()) ?? 0
         await settle(model)
         check(deleted == 1 && !fm.fileExists(atPath: t1.audioPath) && model.focusedID == nil, "delete removes the item and its audio file, and closes the detail")
+        let audioName = URL(fileURLWithPath: t1.audioPath).lastPathComponent
+        check(fm.fileExists(atPath: trash.appendingPathComponent(audioName).path), "the deleted take's audio is in the Trash, recoverable")
         let gone = (try? await history.item(t1.id)) == nil
         check(model.items.count == total - 1 && gone, "the record is gone from the database")
         check(fm.fileExists(atPath: takes[1].audioPath), "the other take's audio is untouched")
 
+        // Whisper's segment timings run in the Python helper when it is set up, so one may be running by now.
+        // Stop it, and make sure nothing of ours outlives the run.
+        await runtime.unloadAll()
+        await python.shutdown()
         try? await Task.sleep(for: .milliseconds(300))
         let end = helperProcesses(ownOnly: true)
         log("this process's encore_helper processes at the end: \(end.isEmpty ? "none" : end)")
-        check(end.isEmpty, "no encore_helper of ours is running at the end")
-        await runtime.unloadAll()
+        check(end.isEmpty, "no encore_helper of ours is left running at the end")
         log(failures.isEmpty ? "PASS: History model drove real records end to end" : "FAIL: \(failures.count) check(s): \(failures)")
         return failures.isEmpty ? 0 : 1
     }

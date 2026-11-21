@@ -63,8 +63,7 @@ final class TranscribeModel {
     }
 
     convenience init(deps: AppDependencies) {
-        let live = SnapshotConfig(arguments: CommandLine.arguments) == nil
-        self.init(service: deps.service, settings: deps.settings, shelf: deps.modelShelf, drafts: live ? .standard : nil)
+        self.init(service: deps.service, settings: deps.settings, shelf: deps.modelShelf, drafts: deps.drafts)
     }
 
     isolated deinit { recentTask?.cancel(); probeTask?.cancel() }
@@ -96,6 +95,21 @@ final class TranscribeModel {
     var plannedRuntime: RuntimeVerdict? {
         guard timestamps == .word else { return nil }
         return manifest.flatMap { shelf.runtime(for: $0, requiring: requirement) }
+    }
+
+    /// Where segment timings will run, once asked. Whisper's go to the Python helper when it is set up, because
+    /// it returns sentence-length segments; otherwise they run natively.
+    private(set) var segmentRuntime: RuntimeVerdict?
+
+    func refreshSegmentRuntime() async {
+        guard timestamps == .segment, let id = manifest?.id else { segmentRuntime = nil; return }
+        let planned = await service.plannedRuntime(modelID: id, needs: .transcription,
+                                                   prefers: EncoreService.transcriptionPreference(.segment))
+        guard timestamps == .segment, manifest?.id == id else { return }
+        switch planned {
+        case .success(let runtime): segmentRuntime = .runs(runtime)
+        case .failure(let error): segmentRuntime = .blocked(error)
+        }
     }
 
     var blockedReason: String? {

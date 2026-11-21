@@ -9,7 +9,7 @@ import Foundation
 ///     HF_HUB_OFFLINE=1 ENCORE_PYTHON_HOME=… Encore.app/Contents/MacOS/Encore --produce-headless changer|conversations|transcribe|all [--keep]
 ///
 /// Stores live in a temporary folder (deleted at the end unless --keep); the real Hugging Face cache is read only.
-/// Test audio is synthesized with Kokoro. Exit status 0 when every check passes.
+/// Everything runs on the smallest models that can do it (see ProofModels). Exit status 0 when every check passes.
 @MainActor
 enum ProduceHeadless {
     static var isRequested: Bool { CommandLine.arguments.contains("--produce-headless") }
@@ -110,6 +110,9 @@ enum ProduceHeadless {
             shelf = ModelShelf(service: service, downloads: ModelDownloadCenter(catalog: catalog))
             await shelf.waitForScan()
             ProduceHeadless.log("data root: \(root.path) (temporary); \(shelf.downloaded.count) variants on disk; python: \(PythonRuntime.locate())")
+            // Every screen model here starts on the smallest model that can do its job (see ProofModels).
+            let missing = ProofModels.seed(settings, catalog: catalog, shelf: shelf, features: [.conversation, .voiceChange, .transcription])
+            guard missing.isEmpty else { throw ServiceError.generationFailed("Not downloaded: \(missing.joined(separator: ", "))") }
         }
 
         func cleanUp() {
@@ -118,11 +121,13 @@ enum ProduceHeadless {
             ThrowawayDefaults.remove(suite)
         }
 
-        /// Speaks `text` with Kokoro and returns a copy of the WAV in the media folder (the take itself stays in the temp history).
-        func speak(_ text: String, voice: String, name: String, speed: Double = 1.0) async throws -> URL {
-            var r = SpeechRequest(modelID: "kokoro", text: text)
-            r.voice = .preset(voice)
-            r.parameters = speed == 1 ? [:] : ["speed": .double(speed)]
+        /// Speaks `text` with preset voice number `voice` of the smallest model that has several, and returns a copy
+        /// of the WAV in the media folder (the take itself stays in the temp history).
+        func speak(_ text: String, voice: Int, name: String) async throws -> URL {
+            guard let m = ProofModels.speakers(catalog) else { throw ServiceError.generationFailed("no model with preset voices") }
+            var r = SpeechRequest(modelID: m.id, text: text)
+            r.variantID = ProofModels.choice(m, shelf: shelf).variantID
+            r.voice = ProofModels.voice(voice, of: m)
             var record: GenerationRecord?
             for try await event in service.speak(r) {
                 if case .finished(let rec) = event { record = rec }
@@ -136,7 +141,7 @@ enum ProduceHeadless {
 
         /// Transcribes without saving (the reference-transcription path), for checking what audio says.
         func hear(_ url: URL) async -> String {
-            (try? await service.transcribeReference(url, modelID: "whisper-large-v3-turbo").text) ?? "(transcription failed)"
+            (try? await service.transcribeReference(url, modelID: ProofModels.transcription(catalog)?.id).text) ?? "(transcription failed)"
         }
     }
 

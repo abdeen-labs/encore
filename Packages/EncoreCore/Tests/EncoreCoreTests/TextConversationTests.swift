@@ -82,6 +82,73 @@ import Testing
         #expect(turns(r) == ["Speaker 1: Hello there, friend.", "Speaker 2: Hi yourself.", "Speaker 1: Bye."])
     }
 
+    // MARK: Scripts without speaker names
+
+    @Test func onlyScriptsWithoutNamesAsk() {
+        // No names, several paragraphs: ask.
+        #expect(ConversationImporter.parse("Hello there.\n\nHi yourself.\n\nBye.").asksAboutSpeakers)
+        // Words that look like labels but aren't speakers don't count as names.
+        #expect(ConversationImporter.parse("Note: read slowly.\n\nThe ferry left at dawn.\n\nNobody waved.").asksAboutSpeakers)
+        // Named scripts import as before, without a question.
+        #expect(!ConversationImporter.parse("Alice: Hi.\nBob: Hello.").asksAboutSpeakers)
+        #expect(!ConversationImporter.parse("Narrator: Once upon a time.\n\nIt was dark.").asksAboutSpeakers)
+        let screenplay = "INT. KITCHEN - NIGHT\n\nJOHN\nYou're late.\n\nMARY\nThe bridge was out."
+        #expect(ConversationImporter.parse(screenplay).layout == .screenplay)
+        #expect(!ConversationImporter.parse(screenplay).asksAboutSpeakers)
+        // A single paragraph has one reader either way.
+        let single = ConversationImporter.parse("Just one paragraph,\nwrapped over two lines.")
+        #expect(single.layout == .paragraphs && !single.asksAboutSpeakers)
+        #expect(single.script.speakers.count == 1 && single.script.lines.count == 1)
+    }
+
+    @Test func unnamedScriptReadByOneVoice() {
+        let text = "The ferry left at dawn.\n\nNobody waved. [pause 2s]\n\nThe gulls followed."
+        let r = ConversationImporter.parse(text, unnamed: .oneVoice)
+        #expect(r.layout == .paragraphs)
+        #expect(names(r) == [ConversationImporter.oneVoiceName])
+        #expect(turns(r) == ["Narrator: The ferry left at dawn.", "Narrator: Nobody waved.", "Narrator: The gulls followed."])
+        #expect(r.script.lines[1].pauseAfter == 2)
+        #expect(r.notes == ["No speaker names were found, so one voice reads every paragraph."])
+    }
+
+    @Test func unnamedScriptAlternatesSpeakers() {
+        let r = ConversationImporter.parse("A.\n\nB.\n\nC.\n\nD.", unnamed: .alternating)
+        #expect(names(r) == ["Speaker 1", "Speaker 2"])
+        #expect(turns(r) == ["Speaker 1: A.", "Speaker 2: B.", "Speaker 1: C.", "Speaker 2: D."])
+        #expect(r.notes == ["No speaker names were found, so paragraphs alternate between two speakers."])
+    }
+
+    @Test func choosingAfterImportSwitchesBothWays() throws {
+        let dir = try TempDir()
+        let url = dir.url.appendingPathComponent("Ferry.txt")
+        try "The ferry left at dawn.\n\nNobody waved.\n\nThe gulls followed.".write(to: url, atomically: true, encoding: .utf8)
+        let imported = try ConversationImporter.importFile(at: url)
+        #expect(imported.asksAboutSpeakers)
+        #expect(imported.script.title == "Ferry")
+
+        let one = imported.withUnnamedSpeakers(.oneVoice)
+        #expect(names(one) == ["Narrator"] && one.script.lines.count == 3)
+        #expect(one.script.lines.map(\.id) == imported.script.lines.map(\.id))   // same lines, only re-cast
+        #expect(one.notes.count == 1 && one.notes[0].contains("one voice"))
+
+        let two = one.withUnnamedSpeakers(.alternating)
+        #expect(turns(two) == ["Speaker 1: The ferry left at dawn.", "Speaker 2: Nobody waved.", "Speaker 1: The gulls followed."])
+        #expect(two.notes.count == 1 && two.notes[0].contains("alternate"))
+
+        // A script with names is never re-cast.
+        let named = ConversationImporter.parse("Alice: Hi.\nBob: Hello.")
+        #expect(turns(named.withUnnamedSpeakers(.oneVoice)) == turns(named))
+    }
+
+    @Test func unnamedPDFAsksToo() throws {
+        let dir = try TempDir()
+        let url = dir.url.appendingPathComponent("prose.pdf")
+        Self.makePDF([[("The ferry left at dawn.", 72, 700), ("Nobody waved.", 72, 640)]], at: url)
+        let r = try ConversationImporter.importFile(at: url, unnamed: .oneVoice)
+        #expect(r.layout == .paragraphs)
+        #expect(names(r) == ["Narrator"])
+    }
+
     @Test func speakersInOrderOfFirstAppearance() {
         let r = ConversationImporter.parse("Zed: a\nAmy: b\nZED: c\nMo: d")
         #expect(names(r) == ["Zed", "Amy", "Mo"])

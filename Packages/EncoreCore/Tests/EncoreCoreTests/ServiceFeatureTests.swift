@@ -120,6 +120,34 @@ import Testing
         #expect(record.voiceName == "Old Sailor")
     }
 
+    @Test func voiceTryoutsStayOutOfHistory() async throws {
+        let backend = FakeBackend(.mlxSwift, features: ["speaker": [.synthesis, .cloning, .voiceDesign]])
+        let w = try ServiceWorld(models: [Self.speaker, Self.designer], backends: [backend])
+        // Keeping a designed voice adds one History record: the kept audition, with its own copy of the clip.
+        var d = VoiceDesignRequest(modelID: "designer", description: "Bright.", sampleText: "Hello there, nice to meet you.")
+        d.candidates = 1
+        let events = try await collect(w.service.designVoice(d))
+        let candidate = try #require(events.compactMap { if case .candidate(let c) = $0 { c } else { nil } }.first)
+        let designed = try await w.service.saveDesignedVoice(candidate, name: "Bright One")
+        w.service.discardDesignCandidates([candidate])
+        #expect(try await w.history.count() == 1)
+        #expect(try await w.history.count(HistoryQuery(kinds: [.voiceDesign])) == 1)
+        let cloned = try await w.addVoice("Ann")
+
+        // "Hear it" try-outs of either voice add nothing; their takes are scratch files the caller deletes.
+        for voice in [designed, cloned] {
+            let request = SpeechRequest.voiceTryout(voice, modelID: "speaker", variantID: nil,
+                                                    text: "Hello, I'm \(voice.name).", language: nil)
+            #expect(!request.saveToHistory && request.voice == .library(voice.id))
+            let take = try #require(finishedRecord(try await collect(w.service.speak(request))))
+            #expect(take.voiceID == voice.id && take.title == "\(voice.name) — first words")
+            #expect(take.audioURL.deletingLastPathComponent().standardizedFileURL == w.service.unsavedDirectory.standardizedFileURL)
+            #expect(FileManager.default.fileExists(atPath: take.audioURL.path))
+        }
+        #expect(try await w.history.count() == 1)
+        #expect(try await w.history.count(HistoryQuery(kinds: [.speech])) == 0)
+    }
+
     @Test func designOnAModelWithoutDesignIsATypedError() async throws {
         let w = try ServiceWorld(models: [Self.speaker], backends: [FakeBackend(.mlxSwift, features: ["speaker": .synthesis])])
         await #expect(throws: ServiceError.featureUnsupported(modelID: "speaker", modelName: "Speaker", feature: .voiceDesign,

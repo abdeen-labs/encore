@@ -8,18 +8,59 @@ import Foundation
 ///   hyphenation undone); after a blank line they start a new line for the same speaker.
 /// - Screenplay: a speaker cue in capitals on its own line (`JOHN`, `MARY (V.O.)`, `DR. SMITH (CONT'D)`), dialogue
 ///   beneath, parentheticals dropped. Scene headings, transitions and action are skipped.
-/// - No speaker names at all: each blank-line-separated paragraph is a turn, alternating between two speakers.
+/// - No speaker names at all: each blank-line-separated paragraph is a turn, read by one voice or alternating between
+///   two speakers (`UnnamedSpeakers`). There's no telling which the writer meant, so the app asks
+///   (`Result.asksAboutSpeakers`) and applies the answer with `Result.withUnnamedSpeakers(_:)`.
 /// A `Title: …` line (or a lone first line before any dialogue) becomes the title. A trailing `[pause 1.2s]`
 /// on a line becomes that line's `pauseAfter`.
 public enum ConversationImporter {
     public enum Layout: String, Sendable, Codable { case labeled, screenplay, paragraphs }
+
+    /// Who reads a script that names no speakers.
+    public enum UnnamedSpeakers: String, Sendable, Codable, CaseIterable {
+        /// One speaker reads every paragraph.
+        case oneVoice
+        /// Paragraphs alternate between two speakers.
+        case alternating
+    }
+
+    /// The speaker name a one-voice script gets.
+    public static let oneVoiceName = "Narrator"
 
     public struct Result: Sendable {
         public var script: ConversationScript
         public var layout: Layout
         /// Things the user may want to check ("Skipped 12 lines of stage directions.").
         public var notes: [String]
+
+        /// True when the script names no speakers and has more than one paragraph, so one voice and alternating
+        /// speakers give different casts: the user should choose. Scripts with names never ask.
+        public var asksAboutSpeakers: Bool { layout == .paragraphs && script.lines.count > 1 }
+
+        /// The same script with its unnamed paragraphs given to one voice or to two alternating speakers. Lines,
+        /// text, pauses and title stay as they are. A script with speaker names comes back unchanged.
+        public func withUnnamedSpeakers(_ choice: UnnamedSpeakers) -> Result {
+            guard layout == .paragraphs, !script.lines.isEmpty else { return self }
+            var r = self
+            let speakers: [ConversationScript.Speaker] = switch choice {
+            case .oneVoice: [.init(name: ConversationImporter.oneVoiceName)]
+            case .alternating: script.lines.count > 1 ? [.init(name: "Speaker 1"), .init(name: "Speaker 2")] : [.init(name: "Speaker 1")]
+            }
+            r.script.speakers = speakers
+            for i in r.script.lines.indices { r.script.lines[i].speakerID = speakers[i % speakers.count].id }
+            r.notes = notes.filter { !ConversationImporter.unnamedNotes.contains($0) }
+            if script.lines.count > 1 { r.notes.append(ConversationImporter.unnamedNote(choice)) }
+            return r
+        }
     }
+
+    static func unnamedNote(_ choice: UnnamedSpeakers) -> String {
+        switch choice {
+        case .oneVoice: "No speaker names were found, so one voice reads every paragraph."
+        case .alternating: "No speaker names were found, so paragraphs alternate between two speakers."
+        }
+    }
+    static var unnamedNotes: Set<String> { Set(UnnamedSpeakers.allCases.map(unnamedNote)) }
 
     public enum Failure: LocalizedError {
         case unsupportedType(String)
@@ -34,7 +75,9 @@ public enum ConversationImporter {
         }
     }
 
-    public static func importFile(at url: URL) throws -> Result {
+    /// - Parameter unnamed: who reads a script without speaker names. The app imports with the default, checks
+    ///   `asksAboutSpeakers`, and applies the user's answer with `withUnnamedSpeakers(_:)`.
+    public static func importFile(at url: URL, unnamed: UnnamedSpeakers = .alternating) throws -> Result {
         let ext = url.pathExtension.lowercased()
         let text: String
         switch ext {
@@ -45,7 +88,7 @@ public enum ConversationImporter {
         default:
             throw Failure.unsupportedType(ext)
         }
-        var result = parse(text)
+        var result = parse(text, unnamed: unnamed)
         if result.script.lines.isEmpty { throw Failure.empty }
         if result.script.title.isEmpty { result.script.title = url.deletingPathExtension().lastPathComponent }
         return result
@@ -64,7 +107,7 @@ public enum ConversationImporter {
 
     // MARK: Parsing
 
-    public static func parse(_ raw: String) -> Result {
+    public static func parse(_ raw: String, unnamed: UnnamedSpeakers = .alternating) -> Result {
         let lines = normalize(raw)
         var builder = Builder()
 
@@ -91,6 +134,7 @@ public enum ConversationImporter {
         } else {
             parseParagraphs(lines, into: &builder)
             builder.layout = .paragraphs
+            return builder.finish().withUnnamedSpeakers(unnamed)
         }
         return builder.finish()
     }
@@ -243,7 +287,7 @@ public enum ConversationImporter {
             if t.isEmpty { flush() } else { paragraph.append(t) }
         }
         flush()
-        if turn > 1 { b.notes.append("No speaker names were found, so paragraphs alternate between two speakers.") }
+        // Speakers and the note about them are settled by `Result.withUnnamedSpeakers(_:)`.
     }
 
     // MARK: Labels

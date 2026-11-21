@@ -10,7 +10,8 @@ extension EncoreService {
             try Self.checkReadable(source)
             let context = try self.loadContext(manifest, variantID: request.variantID)
             let needs: EngineFeatures = request.timestamps == .word ? [.transcription, .wordTimestamps] : .transcription
-            let candidates = try await self.capableBackends(for: manifest, needs: needs)
+            let candidates = try await self.capableBackends(for: manifest, needs: needs,
+                                                            prefers: Self.transcriptionPreference(request.timestamps))
 
             let record = try await self.runtime.run(.transcription, title: source.lastPathComponent, model: manifest) { job in
                 let report = Reporter(job: job, continuation: continuation, stageEvent: { .stage($0) },
@@ -43,6 +44,13 @@ extension EncoreService {
             continuation.yield(.progress(1))
             continuation.yield(.finished(record))
         }
+    }
+
+    /// What a transcription prefers in a runtime on top of what it needs. For segment timings, a runtime that can
+    /// also time words goes first: it cuts segments at sentences, where the native Whisper port returns one
+    /// segment per 30-second window. With no such runtime ready, the job runs wherever the model does.
+    public static func transcriptionPreference(_ timestamps: TimestampGranularity) -> EngineFeatures {
+        timestamps == .segment ? .wordTimestamps : []
     }
 
     /// Transcribes a voice-cloning reference clip (optionally just `range` of it) so the user doesn't have to type

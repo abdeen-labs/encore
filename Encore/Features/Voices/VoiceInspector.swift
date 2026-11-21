@@ -121,24 +121,23 @@ struct VoiceInspector: View {
         VStack(alignment: .leading, spacing: 2) {
             PerforatedDivider().padding(.bottom, Theme.Space.s)
             KeyValueRow("Length", value: String(format: "%.1f s", voice.duration))
-            KeyValueRow("Added", value: voice.createdAt.formatted(date: .abbreviated, time: .shortened))
+            KeyValueRow("Added") {
+                Text(VoiceDates.compact(voice.createdAt)).textRole(.mono).textSelection(.enabled)
+                    .help(voice.createdAt.formatted(date: .complete, time: .shortened))
+            }
             if let id = voice.sourceModelID {
                 KeyValueRow("Made with", value: deps.catalog.model(id)?.name ?? id)
             }
             KeyValueRow("Consent") {
                 Text(consentText).textRole(.mono, color: voice.consentConfirmedAt != nil ? .mint : .textTertiary)
-                    .lineLimit(1)
+                    .help(voice.consentConfirmedAt.map { "Confirmed " + $0.formatted(date: .complete, time: .shortened) } ?? "")
             }
         }
     }
 
     private var consentText: String {
-        if let at = voice.consentConfirmedAt { return "Confirmed " + at.formatted(date: .abbreviated, time: .shortened) }
-        switch voice.origin {
-        case .designed: return "Not needed"
-        case .imported: return "Not recorded"
-        case .cloned: return "Not recorded"
-        }
+        if let at = voice.consentConfirmedAt { return "Confirmed " + VoiceDates.day(at) }
+        return voice.needsSpeakerConsent ? "Not recorded" : "Not needed"
     }
 
     private var saveBar: some View {
@@ -171,5 +170,22 @@ struct VoiceInspector: View {
         } catch {
             toasts.show("Couldn't save “\(voice.name)”: \(error.localizedDescription)", tone: .danger)
         }
+    }
+}
+
+/// Short dates for the inspector's facts, in the user's locale and 12/24-hour setting.
+enum VoiceDates {
+    /// "Nov 20, 10:40 PM" this year, "Nov 20, 2025" before (the full date and time are in the tooltip).
+    static func compact(_ date: Date, now: Date = Date()) -> String {
+        let calendar = Calendar.current
+        if calendar.isDate(date, equalTo: now, toGranularity: .year) {
+            return date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+        }
+        return day(date)
+    }
+
+    /// "Nov 20, 2026".
+    static func day(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day().year())
     }
 }

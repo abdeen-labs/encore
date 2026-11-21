@@ -2,6 +2,7 @@
   "id": "orpheus",
   "name": "Orpheus",
   "family": "Orpheus",
+  "author": "Canopy Labs",
   "summary": "Canopy Labs' 3B English model: eight lifelike voices with laughs, sighs and other sounds written inline.",
   "tasks": [
     "tts"
@@ -16,8 +17,7 @@
         "mlx-community/snac_24khz"
       ],
       "downloadBytes": 1964775495,
-      "memoryBytes": 2800000000,
-      "recommended": true
+      "memoryBytes": 2800000000
     },
     {
       "id": "8bit",

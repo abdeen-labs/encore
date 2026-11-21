@@ -17,6 +17,19 @@ final class VoicesModel {
         var refused: [Refusal]
     }
 
+    /// Files that were read and hold at least one cloned voice, waiting for the importer's consent (one tick covers
+    /// the whole batch). Files that couldn't be read wait here too, so the report lists them afterwards.
+    struct PendingImport: Equatable {
+        struct File: Equatable { var url: URL; var voices: [Voice] }
+        var files: [File]
+        var refused: [ImportReport.Refusal]
+        var consent = false
+
+        var voices: [Voice] { files.flatMap(\.voices) }
+        /// The voices that need the speaker's permission.
+        var clones: [Voice] { voices.filter(\.needsSpeakerConsent) }
+    }
+
     let library: VoiceLibrary
 
     var query = ""
@@ -27,7 +40,11 @@ final class VoicesModel {
     var selection: Set<UUID> = []
     /// The voice open in the inspector.
     var focused: UUID?
+    /// A card's check circle was used: cards show their checks and the batch bar stays up even for one voice.
+    private(set) var isPicking = false
     var importReport: ImportReport?
+    /// Set while the import consent sheet is up.
+    var pendingImport: PendingImport?
     var exportNote: String?
     private(set) var busy: String?
     var showImporter = false
@@ -82,6 +99,20 @@ final class VoicesModel {
         focused = id
         selection = id.map { [$0] } ?? []
         anchor = id
+        isPicking = false
+    }
+
+    /// Cards show their check circles and the batch bar is up: picking has started, or several voices are selected.
+    var showsChecks: Bool { isPicking || selection.count > 1 }
+
+    /// The voice's card is drawn checked.
+    func isChecked(_ id: UUID) -> Bool { showsChecks && selection.contains(id) }
+
+    /// The batch bar's Done: clears the selection and closes the inspector.
+    func endPicking() {
+        selection = []
+        focused = nil
+        isPicking = false
     }
 
     /// Click on a card: plain selects one and opens it; ⌘ toggles; ⇧ extends from the last click.
@@ -90,19 +121,30 @@ final class VoicesModel {
             if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
             focused = selection.count == 1 ? selection.first : (selection.contains(id) ? id : focused.flatMap { selection.contains($0) ? $0 : nil })
             anchor = id
+            settlePicking()
         } else if modifiers.contains(.shift), let a = anchor, let i = list.firstIndex(where: { $0.id == a }),
                   let j = list.firstIndex(where: { $0.id == id }) {
             selection.formUnion(list[min(i, j)...max(i, j)].map(\.id))
             focused = id
+            settlePicking()
         } else {
             focus(id)
         }
     }
 
+    /// A card's check circle: adds the voice to the selection (like ⌘-click) and shows the checks; once they show,
+    /// it toggles. A voice that was merely open in the inspector becomes checked on the first click, not cleared.
     func toggle(_ id: UUID) {
-        if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
-        if selection.count != 1 { focused = selection.contains(focused ?? UUID()) ? focused : nil }
+        if showsChecks, selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+        isPicking = true
+        focused = selection.count == 1 ? selection.first : focused.flatMap { selection.contains($0) ? $0 : nil }
         anchor = id
+        settlePicking()
+    }
+
+    /// Picking mode lasts while anything is selected and starts whenever several voices are.
+    private func settlePicking() {
+        if selection.isEmpty { isPicking = false } else if selection.count > 1 { isPicking = true }
     }
 
     /// Drops selected/focused ids that no longer exist.
@@ -110,21 +152,62 @@ final class VoicesModel {
         let ids = Set(library.voices.map(\.id))
         selection.formIntersection(ids)
         if let f = focused, !ids.contains(f) { focused = nil }
+        settlePicking()
     }
 
     // MARK: Import
 
+    /// Reads the files first. If any holds a cloned voice, the consent sheet comes up (`pendingImport`) and nothing is
+    /// imported until `confirmImport()`; files of designed voices only are imported straight away.
     func importFiles(_ urls: [URL]) async {
         let files = urls.filter { $0.pathExtension.lowercased() == VoiceLibrary.fileExtension }
-        guard !files.isEmpty else { return }
-        busy = files.count == 1 ? "Importing \(files[0].lastPathComponent)…" : "Importing \(files.count) files…"
-        defer { busy = nil }
-        var report = ImportReport(imported: [], refused: [])
+        guard !files.isEmpty, pendingImport == nil else { return }
+        busy = files.count == 1 ? "Reading \(files[0].lastPathComponent)…" : "Reading \(files.count) files…"
+        var readable: [PendingImport.File] = []
+        var refused: [ImportReport.Refusal] = []
         for url in files {
             do {
-                report.imported += try await library.importVoices(from: url)
+                readable.append(.init(url: url, voices: try await library.inspectArchive(url)))
             } catch {
-                report.refused.append(.init(file: url.lastPathComponent, reason: Self.describe(error)))
+                refused.append(.init(file: url.lastPathComponent, reason: Self.describe(error)))
+            }
+        }
+        busy = nil
+        let pending = PendingImport(files: readable, refused: refused)
+        if pending.clones.isEmpty {
+            await finishImport(pending, consentConfirmedAt: nil)
+        } else {
+            withStageAnimation { pendingImport = pending }
+        }
+    }
+
+    /// The consent sheet's Import: brings the files in with the importer's consent, dated now.
+    func confirmImport() async {
+        guard let pending = pendingImport, pending.consent else { return }
+        pendingImport = nil
+        await finishImport(pending, consentConfirmedAt: Date())
+    }
+
+    /// The consent sheet was closed: nothing is imported; files that couldn't be read are still reported.
+    func cancelImport() {
+        guard let pending = pendingImport else { return }
+        pendingImport = nil
+        if !pending.refused.isEmpty { withStageAnimation { importReport = ImportReport(imported: [], refused: pending.refused) } }
+    }
+
+    private func finishImport(_ pending: PendingImport, consentConfirmedAt: Date?) async {
+        guard !pending.files.isEmpty else {
+            withStageAnimation { importReport = ImportReport(imported: [], refused: pending.refused) }
+            return
+        }
+        busy = pending.files.count == 1 ? "Importing \(pending.files[0].url.lastPathComponent)…" : "Importing \(pending.files.count) files…"
+        defer { busy = nil }
+        var report = ImportReport(imported: [], refused: pending.refused)
+        for file in pending.files {
+            do {
+                report.imported += try await library.importVoices(from: file.url, consentConfirmedAt: consentConfirmedAt)
+            } catch {
+                report.refused.append(.init(file: file.url.lastPathComponent, reason: Self.describe(error)))
             }
         }
         withStageAnimation { importReport = report }

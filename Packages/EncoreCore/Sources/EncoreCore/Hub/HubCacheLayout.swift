@@ -48,6 +48,12 @@ public struct HubCacheLayout: Sendable, Hashable {
         root.appendingPathComponent(".locks", isDirectory: true).appendingPathComponent(Self.folderName(repo: repo), isDirectory: true)
     }
     public func lockFile(_ repo: String, etag: String) -> URL { locksDirectory(repo).appendingPathComponent(etag + ".lock") }
+    /// The flat working copy mlx-audio-swift keeps of a repo (`<hub>/mlx-audio/<org>_<name>/`); Encore stages it from
+    /// the snapshot with hard links before an MLX load (EncoreMLX's `MLXRepoStaging`).
+    public func mlxAudioDirectory(_ repo: String) -> URL {
+        root.appendingPathComponent("mlx-audio", isDirectory: true)
+            .appendingPathComponent(repo.replacingOccurrences(of: "/", with: "_"), isDirectory: true)
+    }
 
     /// The relative symlink target from `snapshots/<sha>/<path>` to `blobs/<etag>`.
     public static func symlinkTarget(path: String, etag: String) -> String {

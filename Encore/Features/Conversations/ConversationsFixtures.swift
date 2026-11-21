@@ -6,7 +6,7 @@ import SwiftUI
 ///
 ///     Encore --snapshot <dir> --snapshot-only Conversations --conversations-fixture imported [--snapshot-size 940x600]
 ///
-/// States: empty, imported, editing, rendering, result, notes, cloning, firstRun.
+/// States: empty, imported, editing, rendering, result, notes, unnamed, cloning, firstRun.
 @MainActor
 enum ConversationsFixtures {
     static var state: String? { ProduceFixtureSeed.arg("--conversations-fixture") }
@@ -75,14 +75,14 @@ enum ConversationsFixtures {
     static func prepare(_ deps: AppDependencies) async {
         guard let state else { return }
         if state != "firstRun" {
-            await ProduceFixtureSeed.markDownloaded(deps, ["kokoro", "chatterbox-turbo", "qwen3-tts-base"],
-                                                    runtimes: ["kokoro": .mlxSwift, "chatterbox-turbo": .mlxSwift, "qwen3-tts-base": .mlxSwift])
+            await ProduceFixtureSeed.markDownloaded(deps, ["zonos3-mini", "chatterbox-turbo", "qwen3-tts-base"],
+                                                    runtimes: ["zonos3-mini": .mlxSwift, "chatterbox-turbo": .mlxSwift, "qwen3-tts-base": .mlxSwift])
         }
         let cast = state == "cloning" || state == "result" ? await ProduceFixtureSeed.addVoices(deps) : nil
         let model = deps.screenModel("Conversations") { ConversationsModel(deps: deps) }
         await model.prepare()
-        let kokoro = ModelChoice(modelID: "kokoro", variantID: "bf16")
-        model.debugSet(choice: kokoro, pause: 0.45)
+        let zonos = ModelChoice(modelID: "zonos3-mini", variantID: "bf16")
+        model.debugSet(choice: zonos, pause: 0.45)
 
         func importScreenplay() {
             model.apply(ConversationImporter.parse(screenplay), fileName: "The Lighthouse Keeper.pdf")
@@ -106,7 +106,7 @@ enum ConversationsFixtures {
             model.dismissImportReport()
             let ids = model.lines.map(\.id)
             model.debugMarkRendered(Array(ids.prefix(3)))
-            model.runner.debugShow(.running, identity: .init(kind: .conversation, modelID: "kokoro", modelName: "Kokoro"),
+            model.runner.debugShow(.running, identity: .init(kind: .conversation, modelID: "zonos3-mini", modelName: "Zonos3 Mini"),
                                    stage: "Line 5 of \(ids.count) (Tom)", progress: 0.9 * 4 / Double(ids.count),
                                    startedAt: Date().addingTimeInterval(-6))
         case "result":
@@ -115,13 +115,15 @@ enum ConversationsFixtures {
             if model.lines.count > 4 { model.setText("Then why didn't you come home? [pause 0.3s] Not once.", for: model.lines[2].id) }
             model.debugMarkRendered(model.lines.map(\.id))
             let r = await ProduceFixtureSeed.insertGeneration(deps, kind: .conversation, title: "The Lighthouse Keeper",
-                                                              text: ConversationImporter.text(for: model.script), modelID: "kokoro",
+                                                              text: ConversationImporter.text(for: model.script), modelID: "zonos3-mini",
                                                               voiceName: "Mira, Tom, Juniper", seconds: 41, seed: 12, pitch: 170, ago: 30)
             model.debugShowResult(r, reused: model.lines.count - 1, lines: model.lines.count)
             model.result?.track.seek(to: 12.6)
             model.runner.debugShow(.idle, identity: nil, lastOutcome: .finished(elapsed: 2.4))
         case "notes":
             model.apply(ConversationImporter.parse(paragraphs), fileName: "Ferry, draft 2.txt")
+        case "unnamed":
+            model.pendingUnnamedImport = .init(result: ConversationImporter.parse(paragraphs), fileName: "Ferry, draft 2.txt")
         case "cloning":
             importScreenplay()
             model.dismissImportReport()

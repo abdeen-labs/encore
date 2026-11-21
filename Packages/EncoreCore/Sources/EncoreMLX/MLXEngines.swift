@@ -24,7 +24,6 @@ enum MLXEngines {
     /// What this backend has been verified to do, per engine key (`ModelManifest.engine`).
     /// Only list an engine here once real generations through `encore-cli mlx` came back intelligible.
     static let features: [String: EngineFeatures] = [
-        "kokoro": [.synthesis],
         "qwen3_tts": [.synthesis, .cloning, .voiceDesign],
         // Not "chatterbox" (Multilingual v3): the Swift port has no language tokens or v3 text handling, has no
         // built-in voice for it, and cloned English came back ~66% word errors. It belongs to the Python backend.
@@ -42,12 +41,6 @@ enum MLXEngines {
     static func loadSpeech(_ context: ModelLoadContext, directory: RepoDirectory) async throws -> MLXSpeechEngine {
         let repo = context.variant.repo
         switch context.manifest.engine {
-        case "kokoro":
-            // English G2P (beshkenadze/kitten-tts-g2p) is resolved during load, other languages on first use;
-            // every companion is staged before this call, so all of it resolves offline.
-            let processor = KokoroMultilingualProcessor(cache: .default)
-            let model = try await KokoroModel.fromModelDirectory(try directory(repo), textProcessor: processor)
-            return KokoroEngine(model)
         case "qwen3_tts":
             let dir = try directory(repo)
             let kind = (try? JSONSerialization.jsonObject(with: Data(contentsOf: dir.appendingPathComponent("config.json")))
@@ -93,25 +86,6 @@ enum MLXEngines {
 }
 
 // MARK: - Text to speech
-
-final class KokoroEngine: MLXSpeechEngine {
-    let model: KokoroModel
-    init(_ model: KokoroModel) { self.model = model }
-    var sampleRate: Int { model.sampleRate }
-
-    /// Python `lang_code` letters (the manifest's language codes) → the Swift processor's codes.
-    static let languages: [String: String] = [
-        "a": "en-us", "b": "en-gb", "e": "es", "f": "fr", "h": "hi", "i": "it", "j": "ja", "p": "pt", "z": "cmn",
-    ]
-
-    func synthesize(_ job: SynthesisJob, reference: MaterializedArray?, parameters: ResolvedParameters) async throws -> MLXArray {
-        model.speed = parameters.float("speed") ?? 1.0
-        let voice = job.voice?.preset ?? "af_heart"
-        let language = job.language.flatMap { Self.languages[$0] ?? $0 }
-        return try await model.generate(text: job.text, voice: voice, refAudio: nil, refText: nil,
-                                        language: language, generationParameters: model.defaultGenerationParameters)
-    }
-}
 
 final class Qwen3Engine: MLXSpeechEngine {
     let model: Qwen3TTSModel

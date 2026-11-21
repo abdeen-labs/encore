@@ -16,8 +16,10 @@ enum AudioSource {
 
 /// Exports and drag-out for an `AudioSource`.
 @MainActor enum AudioExportActions {
-    /// Shows a save panel, then writes the audio in `format`. Reports the result through `toasts` when given.
-    static func export(_ source: AudioSource, format: AudioFileFormat, suggestedName: String, toasts: ToastCenter?) {
+    /// Shows a save panel, then writes the audio in `format`. While it encodes, `exports` shows a progress card
+    /// (only if it takes long enough to notice); the result is reported through `toasts` when given.
+    static func export(_ source: AudioSource, format: AudioFileFormat, suggestedName: String, toasts: ToastCenter?,
+                       exports: ExportProgressCenter? = nil) {
         let panel = NSSavePanel()
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
@@ -27,20 +29,35 @@ enum AudioSource {
         let handler: (NSApplication.ModalResponse) -> Void = { response in
             guard response == .OK, let destination = panel.url else { return }
             Task { @MainActor in
-                toasts?.show("Exporting \(destination.lastPathComponent)…", symbol: "square.and.arrow.up", duration: 30)
                 do {
-                    switch source {
-                    case .file(let url): try await AudioExporter.convert(url, to: destination, format: format)
-                    case .buffer(let buffer): try await AudioExporter.export(buffer, to: destination, format: format)
-                    case .preview: throw AudioError.invalidArgument("Nothing to export.")
+                    try await AudioExportActions.trackingProgress(exports, title: destination.lastPathComponent) { progress in
+                        try await AudioExportActions.write(source, to: destination, format: format, progress: progress)
                     }
                     toasts?.show("Saved “\(destination.lastPathComponent)”", tone: .success)
+                } catch is CancellationError {
+                    toasts?.show("Export canceled", symbol: "xmark")
                 } catch {
                     toasts?.show(error.localizedDescription, tone: .danger, duration: 6)
                 }
             }
         }
         if let window = NSApp.keyWindow { panel.beginSheetModal(for: window, completionHandler: handler) } else { panel.begin(completionHandler: handler) }
+    }
+
+    /// Encodes `source` into `destination` (the shared path behind every audio export menu).
+    static func write(_ source: AudioSource, to destination: URL, format: AudioFileFormat, progress: ExportProgress?) async throws {
+        switch source {
+        case .file(let url): try await AudioExporter.convert(url, to: destination, format: format, progress: progress)
+        case .buffer(let buffer): try await AudioExporter.export(buffer, to: destination, format: format, progress: progress)
+        case .preview: throw AudioError.invalidArgument("Nothing to export.")
+        }
+    }
+
+    /// Runs `operation` under `exports` when there is one (progress card), or plainly when there isn't.
+    static func trackingProgress<T: Sendable>(_ exports: ExportProgressCenter?, title: String,
+                                              _ operation: @escaping @MainActor (_ progress: ExportProgress?) async throws -> T) async throws -> T {
+        guard let exports else { return try await operation(nil) }
+        return try await exports.track(title) { progress in try await operation(progress) }
     }
 
     static func revealInFinder(_ url: URL) {
@@ -89,6 +106,7 @@ struct AudioExportMenu: View {
     var symbol: String = "square.and.arrow.up"
 
     @Environment(ToastCenter.self) private var toasts: ToastCenter?
+    @Environment(ExportProgressCenter.self) private var exports: ExportProgressCenter?
     @Environment(\.controlSize) private var controlSize
     @State private var ffmpegAvailable = true
     @State private var isHovered = false
@@ -133,6 +151,6 @@ struct AudioExportMenu: View {
     }
 
     private func export(_ format: AudioFileFormat) {
-        AudioExportActions.export(source, format: format, suggestedName: suggestedName, toasts: toasts)
+        AudioExportActions.export(source, format: format, suggestedName: suggestedName, toasts: toasts, exports: exports)
     }
 }

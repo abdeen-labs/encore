@@ -16,6 +16,7 @@ struct RootView: View {
                         .transition(.opacity)
                 }
                 .toastOverlay(toasts)
+                .exportProgressOverlay()
                 PlayerDock()
             }
             .padding(.top, Theme.Space.s)

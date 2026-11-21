@@ -49,6 +49,14 @@ public final class PresetStore {
 
     public func delete(_ id: UUID) throws { try commit(presets.filter { $0.id != id }) }
 
+    /// Removes every preset and the file itself (as on first launch).
+    public func deleteAll() throws {
+        if FileManager.default.fileExists(atPath: fileURL.path) { try FileManager.default.removeItem(at: fileURL) }
+        presets = []
+        snapshot.withLock { $0 = [] }
+        loadError = nil
+    }
+
     private func commit(_ all: [Preset]) throws {
         try StoreFiles.write(all, to: fileURL)
         presets = all

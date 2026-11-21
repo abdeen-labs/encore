@@ -281,6 +281,10 @@ struct ModelPickerPanel: View {
                     HStack(spacing: 4) {
                         Circle().fill(on ? Color.mint : Color.textTertiary.opacity(0.5)).frame(width: 5, height: 5)
                         Text(v.label).font(.ui(11, weight: selected ? .semibold : .medium))
+                        if m.isRecommended(v) {
+                            Image(systemName: "star.fill").font(.system(size: 7, weight: .bold)).foregroundStyle(Color.tungsten)
+                                .accessibilityLabel("Recommended")
+                        }
                         Text(MemoryGauge.bytes(v.downloadBytes)).font(.mono(9.5)).foregroundStyle(.textTertiary)
                     }
                     .foregroundStyle(selected ? Color.tungsten : .textSecondary)
@@ -291,7 +295,8 @@ struct ModelPickerPanel: View {
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .help(on ? "\(v.label): on this Mac" : "\(v.label): not downloaded")
+                .help((on ? "\(v.label): on this Mac" : "\(v.label): not downloaded")
+                      + (m.isRecommended(v) ? ". " + ModelManifest.recommendationHelp : ""))
             }
         }
     }

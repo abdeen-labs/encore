@@ -4,7 +4,7 @@ import HuggingFace
 
 /// Presents Encore's standard Hugging Face snapshots to mlx-audio-swift without any network access.
 ///
-/// mlx-audio-swift resolves auxiliary repos (Chatterbox's S3 tokenizer, Kokoro's G2P data, all of
+/// mlx-audio-swift resolves auxiliary repos (Chatterbox's S3 tokenizer, Orpheus's SNAC codec, all of
 /// OmniVoice) through its own downloader, which looks for a flat copy at
 /// `<hub cache>/mlx-audio/<org>_<name>/` and otherwise goes to the network. Some loaders also write
 /// generated files (a fast `tokenizer.json`) next to the weights. So before a load we build that flat

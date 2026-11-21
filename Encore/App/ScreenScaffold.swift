@@ -4,9 +4,11 @@ extension EnvironmentValues {
     /// When false, `ScreenScaffold` lays its content out at full height without a scroll view.
     /// The snapshot renderer uses this for `-full` captures.
     @Entry var scaffoldScrolls: Bool = true
+    /// Where a scrolling `ScreenScaffold` starts (fixtures use `.bottom` to show a screen's last section).
+    @Entry var scaffoldScrollAnchor: UnitPoint? = nil
 }
 
-/// The standard screen frame: a playbill header (optional eyebrow, display-serif title,
+/// The standard screen frame: a playbill header (display-serif title,
 /// subtitle, trailing actions) above scrolling content.
 ///
 ///     ScreenScaffold("Studio", subtitle: "Text to speech") {
@@ -20,18 +22,17 @@ extension EnvironmentValues {
 struct ScreenScaffold<Content: View, Actions: View>: View {
     let title: String
     var subtitle: String?
-    var eyebrow: String?
     var scrolls: Bool = true
     @ViewBuilder var content: Content
     @ViewBuilder var actions: Actions
 
     @Environment(\.scaffoldScrolls) private var environmentScrolls
+    @Environment(\.scaffoldScrollAnchor) private var scrollAnchor
 
-    init(_ title: String, subtitle: String? = nil, eyebrow: String? = nil, scrolls: Bool = true,
+    init(_ title: String, subtitle: String? = nil, scrolls: Bool = true,
          @ViewBuilder content: () -> Content, @ViewBuilder actions: () -> Actions) {
         self.title = title
         self.subtitle = subtitle
-        self.eyebrow = eyebrow
         self.scrolls = scrolls
         self.content = content()
         self.actions = actions()
@@ -47,6 +48,7 @@ struct ScreenScaffold<Content: View, Actions: View>: View {
             }
             .scrollIndicators(.automatic)
             .scrollContentBackground(.hidden)
+            .defaultScrollAnchor(scrollAnchor)
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 header
@@ -59,9 +61,6 @@ struct ScreenScaffold<Content: View, Actions: View>: View {
     private var header: some View {
         HStack(alignment: .bottom, spacing: Theme.Space.l) {
             VStack(alignment: .leading, spacing: 6) {
-                if let eyebrow {
-                    Text(eyebrow).textRole(.eyebrow, color: Color.tungsten.opacity(0.75))
-                }
                 Text(title)
                     .textRole(.marquee)
                     .lineLimit(1)
@@ -88,17 +87,17 @@ struct ScreenScaffold<Content: View, Actions: View>: View {
 }
 
 extension ScreenScaffold where Actions == EmptyView {
-    init(_ title: String, subtitle: String? = nil, eyebrow: String? = nil, scrolls: Bool = true,
+    init(_ title: String, subtitle: String? = nil, scrolls: Bool = true,
          @ViewBuilder content: () -> Content) {
-        self.init(title, subtitle: subtitle, eyebrow: eyebrow, scrolls: scrolls, content: content) { EmptyView() }
+        self.init(title, subtitle: subtitle, scrolls: scrolls, content: content) { EmptyView() }
     }
 }
 
 extension ScreenScaffold {
-    /// Convenience: title, subtitle and eyebrow from an `AppSection`.
+    /// Convenience: title and subtitle from an `AppSection`.
     init(_ section: AppSection, scrolls: Bool = true,
          @ViewBuilder content: () -> Content, @ViewBuilder actions: () -> Actions) {
-        self.init(section.title, subtitle: section.subtitle, eyebrow: section.eyebrow, scrolls: scrolls,
+        self.init(section.title, subtitle: section.subtitle, scrolls: scrolls,
                   content: content, actions: actions)
     }
 }

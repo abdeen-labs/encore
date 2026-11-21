@@ -8,14 +8,15 @@ import Foundation
 ///
 ///     HF_HUB_OFFLINE=1 Encore.app/Contents/MacOS/Encore --voices-headless [clone|design|library|all] [--keep]
 ///
-/// clone:   Kokoro speaks a few sentences; they're stitched into a 4+ minute "interview" with one target sentence in
+/// clone:   the smallest speech model says a few sentences; they're stitched into a 4+ minute "interview" with one target sentence in
 ///          the middle. CloneModel loads it, the selection moves to a filler stretch and then to the target (each settle
 ///          auto-transcribes), the voice is saved with consent, and VoiceTryout speaks a new line with it on a cloning
 ///          model; that take is transcribed back and compared with what was asked for.
 /// design:  DesignModel auditions two voices for a description, keeps one, discards the other, and the kept voice
 ///          speaks a line on a cloning model (transcribed back and compared).
-/// library: VoicesModel exports a voice to .encorevoice, deletes it, imports it back, and refuses a junk file and an
-///          archive holding a symbolic link.
+/// library: VoicesModel exports a cloned voice to .encorevoice, deletes it, imports it back (only after the consent
+///          tick, dated at import), refuses a junk file and an archive holding a symbolic link, and imports a designed
+///          voice without asking.
 /// Stores live in a temporary folder (deleted at the end unless --keep); the Hugging Face cache is only read.
 @MainActor
 enum VoiceHeadless {
@@ -65,6 +66,9 @@ enum VoiceHeadless {
         await shelf.waitForScan()
         let env = Env(root: root, service: service, voices: voices, settings: settings, shelf: shelf, history: history)
         log("shelf: \(shelf.downloaded.count) downloaded variants")
+        // Every screen model here starts on the smallest model that can do its job (see ProofModels).
+        let missing = ProofModels.seed(settings, catalog: catalog, shelf: shelf, features: [.speech, .cloning, .voiceDesign, .transcription])
+        guard missing.isEmpty else { log("FAIL not downloaded: \(missing.joined(separator: ", "))"); return 1 }
 
         var ok = true
         if which == "clone" || which == "all" { ok = await cloneProof(env) && ok }
@@ -88,13 +92,13 @@ enum VoiceHeadless {
             "We recorded most of the album in a converted barn, with the doors open and the rain coming in sideways.",
             "People always ask about the early days, but honestly I remember the van more than the shows.",
         ]
-        guard let t = await kokoro(target, voice: "am_michael", env), !t.samples.isEmpty else { log("FAIL Kokoro target"); return false }
+        guard let t = await plainSpeech(target, env), !t.samples.isEmpty else { log("FAIL target speech"); return false }
         var parts: [AudioBuffer] = []
         let rate = t.sampleRate
         let gap = AudioBuffer(samples: [Float](repeating: 0, count: Int(1.2 * rate)), sampleRate: rate)
         var fillerBuffers: [AudioBuffer] = []
         for f in fillers {
-            guard let b = await kokoro(f, voice: "am_michael", env) else { log("FAIL Kokoro filler"); return false }
+            guard let b = await plainSpeech(f, env) else { log("FAIL filler speech"); return false }
             fillerBuffers.append(b)
         }
         // ~2 minutes of fillers, the target, then fillers until past 4 minutes.
@@ -135,7 +139,7 @@ enum VoiceHeadless {
         log(String(format: "selection moved to %.2f–%.2f (%.1f s, verdict %@)", sel.lowerBound, sel.upperBound, model.length, "\(model.lengthVerdict)"))
         guard let text = await waitForTranscript(model, different: first) else { return false }
         let wer1 = wordErrorRate(reference: target, hypothesis: text)
-        log(String(format: "auto-transcribed target: “%@” · WER %.2f vs the Kokoro script", text, wer1))
+        log(String(format: "auto-transcribed target: “%@” · WER %.2f vs the spoken script", text, wer1))
 
         model.name = "Lighthouse Keeper"
         model.tags = ["narration", "test"]
@@ -166,7 +170,7 @@ enum VoiceHeadless {
         log("── Design ──")
         let model = DesignModel(service: env.service, settings: env.settings, shelf: env.shelf)
         await model.prepare()
-        model.description = DesignModel.examples[1].text
+        model.description = model.examples[1].text
         model.count = 2
         model.parameters = ["seed": .int(7)]
         log("designer: \(model.manifest?.name ?? "none") · “\(model.description)” · sample “\(model.sampleText)”")
@@ -203,6 +207,10 @@ enum VoiceHeadless {
         let discarded = !FileManager.default.fileExists(atPath: other.candidate.audioPath)
         log("discarded the other audition: file gone \(discarded); auditions left \(model.auditions.count); library has \(env.voices.voices.count) voices")
         guard discarded, voice.origin == .designed, voice.transcript == model.sampleText.trimmingCharacters(in: .whitespacesAndNewlines) else { log("FAIL keep/discard"); return false }
+        // The kept audition still goes to History with its own copy of the clip (the try-out below doesn't).
+        let kept = (try? await env.history.count(HistoryQuery(kinds: [.voiceDesign]))) ?? 0
+        log("kept audition in History: \(kept) record(s)")
+        guard kept == 1 else { log("FAIL kept audition not in History"); return false }
         model.tryout.line = "Good evening, and welcome back to the night desk. The city is quiet, and the coffee is hot."
         log("try it with \(model.tryout.manifest?.name ?? "no model") — the design-then-clone flow")
         return await speakAndCheck(model.tryout, env)
@@ -213,9 +221,10 @@ enum VoiceHeadless {
     private static func libraryProof(_ env: Env) async -> Bool {
         log("── Voices ──")
         let model = VoicesModel(library: env.voices)
-        var voice = env.voices.voices.first
+        // A cloned voice, so the import has to ask for consent.
+        var voice = env.voices.voices.first(where: \.needsSpeakerConsent)
         if voice == nil {
-            guard let b = await kokoro("This is a short reference clip for the library test.", voice: "af_heart", env) else { return false }
+            guard let b = await plainSpeech("This is a short reference clip for the library test.", env) else { return false }
             let url = env.root.appendingPathComponent("lib.wav")
             try? AudioExporter.writeWAV(b, to: url)
             voice = try? await env.voices.add(Voice(name: "Library Test", tags: ["test"], origin: .cloned,
@@ -238,14 +247,37 @@ enum VoiceHeadless {
         try? Data("hello".utf8).write(to: junk)
         let evil = await makeSymlinkArchive(env.root)
         await model.importFiles([archive, junk] + (evil.map { [$0] } ?? []))
+        // A cloned voice: nothing comes in until the importer confirms consent themselves.
+        guard let pending = model.pendingImport, model.importReport == nil, env.voices.voices.count == before - 1 else {
+            log("FAIL import didn't wait for consent"); return false
+        }
+        log("consent asked first: \(pending.clones.count) cloned voice(s) waiting, nothing imported; Import with no tick does nothing")
+        await model.confirmImport()
+        guard model.pendingImport != nil, env.voices.voices.count == before - 1 else { log("FAIL imported without the tick"); return false }
+        model.pendingImport?.consent = true
+        let ticked = Date()
+        await model.confirmImport()
         guard let report = model.importReport else { log("FAIL no report"); return false }
         for r in report.refused { log("refused \(r.file): \(r.reason)") }
         guard let back = report.imported.first, let backRef = env.voices.referenceAudioURL(for: back.id) else { log("FAIL import"); return false }
         let same = (try? Data(contentsOf: backRef)) == refBytes
-        log("imported “\(back.name)” as \(back.origin.rawValue): transcript equal \(back.transcript == v.transcript), tags \(back.tags), reference bytes identical \(same), consent kept \(back.consentConfirmedAt != nil)")
-        let ok = report.imported.count == 1 && report.refused.count == (evil == nil ? 1 : 2) && same && back.transcript == v.transcript
+        let consentIsNew = back.consentConfirmedAt.map { $0 >= ticked } ?? false
+        log("imported “\(back.name)” as \(back.origin.rawValue): transcript equal \(back.transcript == v.transcript), tags \(back.tags), reference bytes identical \(same), consent dated at import \(consentIsNew) (exporter's \(v.consentConfirmedAt.map { "\($0)" } ?? "nil"), now \(back.consentConfirmedAt.map { "\($0)" } ?? "nil"))")
+        let ok = report.imported.count == 1 && report.refused.count == (evil == nil ? 1 : 2) && same && back.transcript == v.transcript && consentIsNew
         log(ok ? "library round trip OK" : "FAIL library round trip")
-        return ok
+
+        // A designed voice needs no consent: it comes straight in, with no consent date.
+        var designedOK = true
+        if let d = env.voices.voices.first(where: { !$0.needsSpeakerConsent }) {
+            let file = env.root.appendingPathComponent("designed.encorevoice")
+            await model.export([d.id], to: file)
+            model.importReport = nil
+            await model.importFiles([file])
+            let back = model.importReport?.imported.first
+            designedOK = model.pendingImport == nil && back != nil && back?.consentConfirmedAt == nil
+            log("designed “\(d.name)”: imported without asking \(designedOK)")
+        }
+        return ok && designedOK
     }
 
     /// A `.encorevoice` whose reference is a symbolic link to a system file: the importer must refuse it.
@@ -271,15 +303,17 @@ enum VoiceHeadless {
 
     // MARK: Helpers
 
-    /// Speaks `text` with Kokoro through the service (as Studio would) and returns the audio.
-    private static func kokoro(_ text: String, voice: String, _ env: Env) async -> AudioBuffer? {
-        var r = SpeechRequest(modelID: "kokoro", text: text)
-        r.voice = .preset(voice)
+    /// Speaks `text` on the smallest speech model through the service (as Studio would) and returns the audio.
+    private static func plainSpeech(_ text: String, _ env: Env) async -> AudioBuffer? {
+        guard let m = ProofModels.speech(env.service.catalog) else { log("no speech model in the catalog"); return nil }
+        var r = SpeechRequest(modelID: m.id, text: text)
+        r.variantID = ProofModels.choice(m, shelf: env.shelf).variantID
+        r.voice = ProofModels.voice(0, of: m)
         do {
             for try await e in env.service.speak(r) {
                 if case .finished(let rec) = e { return try await AudioReader.read(rec.audioURL) }
             }
-        } catch { log("Kokoro failed: \(error)") }
+        } catch { log("speech failed: \(error)") }
         return nil
     }
 
@@ -303,12 +337,18 @@ enum VoiceHeadless {
 
     private static func speakAndCheck(_ tryout: VoiceTryout, _ env: Env) async -> Bool {
         if let r = tryout.blockedReason { log("FAIL tryout blocked: \(r)"); return false }
+        let historyBefore = (try? await env.history.count()) ?? -1
         tryout.speak()
         await watch(tryout.runner) {}
         guard let rec = tryout.result else {
             log("FAIL tryout: \(tryout.runner.error.map { "\($0)" } ?? "no result")"); return false
         }
         log(String(format: "spoke with “%@” on %@: %.2f s in %.2f s → %@", rec.voiceName ?? "-", rec.modelName, rec.duration, rec.elapsed, rec.audioURL.lastPathComponent))
+        // Try-outs stay out of History: no new record, and the take is a scratch file.
+        let historyAfter = (try? await env.history.count()) ?? -2
+        let scratch = rec.audioURL.deletingLastPathComponent().standardizedFileURL == env.service.unsavedDirectory.standardizedFileURL
+        log("history records \(historyBefore) → \(historyAfter); take is a scratch file \(scratch)")
+        guard historyBefore == historyAfter, scratch else { log("FAIL tryout was saved to History"); return false }
         do {
             let heard = try await env.service.transcribeReference(rec.audioURL)
             let wer = wordErrorRate(reference: tryout.line, hypothesis: heard.text)

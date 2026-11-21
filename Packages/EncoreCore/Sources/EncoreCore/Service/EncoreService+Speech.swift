@@ -163,11 +163,17 @@ struct Assembler {
 
     func finish(defaultRate: Double) throws -> AudioBuffer {
         let rate = rate ?? defaultRate
+        // Each piece was generated on its own, so bring their speech to one level before joining them.
+        var pieces: [[Float]] = []
+        for case .audio(let a) in parts {
+            pieces.append(abs(a.sampleRate - rate) > 0.01 ? try AudioEdit.resample(a, to: rate).samples : a.samples)
+        }
+        var leveled = ChunkLeveler.level(pieces, sampleRate: rate).makeIterator()
         var samples: [Float] = []
         for part in parts {
             switch part {
-            case .audio(let a):
-                samples += abs(a.sampleRate - rate) > 0.01 ? try AudioEdit.resample(a, to: rate).samples : a.samples
+            case .audio:
+                samples += leveled.next() ?? []
             case .silence(let s):
                 samples += repeatElement(0, count: max(0, Int((s * rate).rounded())))
             }

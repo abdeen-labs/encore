@@ -28,7 +28,7 @@ struct ComponentGallery: View {
     @State private var advancedOpen = true
 
     var body: some View {
-        ScreenScaffold("Gallery", subtitle: "Every component, every state.", eyebrow: "Debug · Design system") {
+        ScreenScaffold("Gallery", subtitle: "Every component, every state.") {
             group("Type") { typeSamples }
             group("Color") { swatches }
             group("Buttons") { buttons }
@@ -55,6 +55,8 @@ struct ComponentGallery: View {
                     SegmentedControl(selection: $mode, options: ["Fast", "Balanced", "Quality"]) { $0 }
                     SegmentedControl(selection: $format, options: ["WAV", "MP3", "FLAC", "M4A"]) { $0 }
                         .controlSize(.small)
+                    SegmentedControl(selection: $mode, options: ["Fast", "Balanced", "Quality"], count: { [12, 3, 0][["Fast", "Balanced", "Quality"].firstIndex(of: $0)!] }) { $0 }
+                        .controlSize(.small)
                     MenuPicker("Language", selection: $language, options: ["English", "French", "Japanese", "Spanish"]) { $0 }
                     MenuPicker(selection: $language, options: ["English", "French", "Japanese", "Spanish"]) { $0 }
                 }
@@ -79,6 +81,12 @@ struct ComponentGallery: View {
                         Chip("Cloned", symbol: "mic", tone: .accent)
                         Chip("Ready", tone: .success)
                         Chip("Large", tone: .warning)
+                    }
+                    HStack(spacing: 6) {
+                        CountBadge(7)
+                        CountBadge(42, isEmphasized: true)
+                        KeycapBadge("1")
+                        KeycapBadge("⇧G")
                     }
                     HStack(spacing: 6) {
                         Chip("Warm", isSelected: $warm)
@@ -107,7 +115,7 @@ struct ComponentGallery: View {
             }
             group("Banners") {
                 Banner(.neutral, title: "Models run on this Mac", message: "Nothing you type or record leaves the device.")
-                Banner(.warning, title: "Model not downloaded", message: "Kokoro 82M is needed to perform in Studio.") {
+                Banner(.warning, title: "Model not downloaded", message: "Soprano is needed to perform in Studio.") {
                     Button("Download") {}.buttonStyle(.secondary).controlSize(.small)
                 }
                 Banner(.danger, title: "Generation failed", message: "The model ran out of memory. Try a shorter script.", onDismiss: {})

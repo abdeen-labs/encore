@@ -110,7 +110,7 @@ struct CloneStage: View {
 
     private func trimmer(_ source: CloneModel.Source) -> some View {
         WaveformTrimmer(url: source.url, selection: model.trimmerSelection, target: model.target, title: source.name,
-                        suggestsSelection: !model.hasChosenSelection)
+                        suggestsSelection: !model.hasChosenSelection, wholeFileRange: model.wholeFileRange)
     }
 }
 
@@ -439,9 +439,7 @@ private struct ConsentAndSave: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
             CueLabel(number: 5, title: "Consent")
-            ConsentCheck(isOn: $model.consent,
-                         statement: "I have the speaker's permission to clone this voice.",
-                         detail: "If it's your own voice, that's you. Encore keeps the date you confirmed with the voice.")
+            ConsentCheck(isOn: $model.consent, statement: ConsentCheck.cloneStatement(), detail: ConsentCheck.cloneDetail)
             PerforatedDivider(bleed: Theme.Space.l)
             HStack(spacing: Theme.Space.m) {
                 Button(model.isSaving ? "Saving…" : "Save voice", systemImage: "person.crop.circle.badge.plus") {

@@ -84,7 +84,7 @@ struct VoiceCard: View {
             shape.strokeBorder(isFocused || isSelected ? Color.tungsten.opacity(isFocused ? 0.85 : 0.55)
                                : (isHovered ? Color.hairlineStrong : Color.hairline), lineWidth: isFocused ? 1.5 : 1)
         }
-        .overlay(alignment: .topTrailing) { check.padding(Theme.Space.m) }
+        .overlay(alignment: .topTrailing) { check.padding(Theme.Space.m - 5) }
         .glow(.tungsten, radius: 14, intensity: isFocused ? 0.18 : 0)
         .contentShape(shape)
         .onTapGesture(perform: onClick)
@@ -114,7 +114,8 @@ struct VoiceCard: View {
         }
     }
 
-    /// A round tick for multi-select: shown on hover, and always once more than one voice is selected.
+    /// A round tick for multi-select: shown on hover, and always while voices are being picked. Clicking it
+    /// checks this card (starting a multi-selection) or unchecks it.
     private var check: some View {
         Button(action: onToggle) {
             ZStack {
@@ -125,11 +126,13 @@ struct VoiceCard: View {
                 }
             }
             .frame(width: 18, height: 18)
+            // A generous target around the small circle, so a near miss doesn't fall through to the card.
+            .frame(width: 28, height: 28)
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .opacity(isSelected || showsCheck || isHovered ? 1 : 0)
-        .help(isSelected ? "Deselect" : "Select (⌘-click a card to add it)")
+        .help(isSelected ? "Deselect" : "Select for export or delete (or ⌘-click the card)")
         .accessibilityLabel(isSelected ? "Deselect \(voice.name)" : "Select \(voice.name)")
     }
 }

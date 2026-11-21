@@ -168,7 +168,11 @@ private struct ScriptColumn: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
             titleRow
-            if let report = model.importReport { ScriptImportBanner(model: model, report: report) }
+            if let pending = model.pendingUnnamedImport {
+                UnnamedSpeakersQuestion(model: model, pending: pending)
+            } else if let report = model.importReport {
+                ScriptImportBanner(model: model, report: report)
+            }
             if compact, !model.speakers.isEmpty { CastStrip(model: model, open: openCast) }
             if model.lines.isEmpty {
                 EmptyScript(model: model, chooseFile: chooseFile)
@@ -229,6 +233,11 @@ private struct ScriptColumn: View {
             ServiceErrorBanner(error: error, onDismiss: { withStageAnimation { model.runner.error = nil } }, onRetry: model.render)
         } else if let error = model.auditionRunner.error {
             ServiceErrorBanner(error: error, onDismiss: { withStageAnimation { model.auditionRunner.error = nil } })
+        } else if model.draftModelRetired {
+            Banner(.neutral, title: "The model this script was cast for is no longer in Encore",
+                   message: model.manifest.map { "Your lines are kept. Speakers who had that model's voices are recast with \($0.name)'s." }
+                    ?? "Your lines are kept. Choose a model to recast its speakers.",
+                   onDismiss: { withStageAnimation { model.draftModelRetired = false } })
         } else if let m = model.manifest, model.shelf.hasScanned, !model.isDownloaded {
             Banner(.warning, title: "\(m.name) isn't downloaded yet",
                    message: "Get it in Models, or choose a model that's on this Mac.") {
@@ -248,6 +257,26 @@ private struct ScriptColumn: View {
     }
 }
 
+/// A script without speaker names, waiting to be applied: one voice for everything, or two speakers taking turns.
+/// The working script stays as it is until the user answers; dismissing drops the import.
+private struct UnnamedSpeakersQuestion: View {
+    let model: ConversationsModel
+    let pending: ConversationsModel.PendingUnnamedImport
+
+    var body: some View {
+        Banner(.accent, title: "Who reads “\(pending.fileName)”?",
+               message: "It has no speaker names. Read all \(pending.paragraphs) paragraphs in one voice, or alternate them between two speakers?",
+               onDismiss: { withStageAnimation { model.cancelUnnamedImport() } }) {
+            Button("Alternate", systemImage: "person.2") { withStageAnimation { model.finishUnnamedImport(.alternating) } }
+                .buttonStyle(.secondary).controlSize(.small)
+                .help("Paragraphs alternate between Speaker 1 and Speaker 2")
+            Button("One voice", systemImage: "person") { withStageAnimation { model.finishUnnamedImport(.oneVoice) } }
+                .buttonStyle(.primary).controlSize(.small)
+                .help("One speaker reads every paragraph")
+        }
+    }
+}
+
 /// What an import found: the layout it recognized, the cast, and anything worth checking.
 private struct ScriptImportBanner: View {
     let model: ConversationsModel
@@ -262,7 +291,7 @@ private struct ScriptImportBanner: View {
         var message = "Read as \(layout): \(report.speakers) speaker\(report.speakers == 1 ? "" : "s"), \(report.lines) lines."
         if !report.castFromLibrary.isEmpty { message += " Cast from your library: \(report.castFromLibrary.joined(separator: ", "))." }
         if !report.notes.isEmpty { message += " " + report.notes.joined(separator: " ") }
-        return Banner(report.layout == .paragraphs ? .warning : .neutral, title: "Imported “\(report.fileName)”", message: message,
+        return Banner(.neutral, title: "Imported “\(report.fileName)”", message: message,
                       onDismiss: { withStageAnimation { model.dismissImportReport() } }) {
             if model.canUndoImport {
                 Button("Undo import") { withStageAnimation { model.undoImport() } }.buttonStyle(.ghost).controlSize(.small)
@@ -855,7 +884,7 @@ private struct ConversationsFirstRun: View {
 
     var body: some View {
         EmptyState(symbol: "bubble.left.and.bubble.right", title: "No one to cast yet",
-                   message: "Conversations are performed by the same models as the Studio. Download one first: Kokoro has dozens of voices to cast from; Qwen3-TTS and Chatterbox can speak in your own.") {
+                   message: "Conversations are performed by the same models as the Studio. Download one first: Zonos3 Mini has dozens of voices to cast from; Qwen3-TTS and Chatterbox can speak in your own.") {
             Button("Open Models", systemImage: "arrow.down.circle") { router.go(.models) }
                 .buttonStyle(.primary).controlSize(.large)
         }

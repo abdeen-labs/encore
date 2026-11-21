@@ -92,10 +92,11 @@ public struct HubService: Sendable {
 
     /// The license text to show for a repo, best source first: the file the card links to, a
     /// LICENSE-like file in the repo, the card's "License" section, the standard text of a
-    /// well-known license (from spdx.org), the gate prompt. Never throws;
-    /// a gated repo whose files can't be read falls through to the next source.
+    /// well-known license (bundled with Encore; nothing is fetched for it), the gate prompt. Never throws;
+    /// a gated repo whose files can't be read falls through to the next source. With none of these, the
+    /// result has no text and points at the model's page.
     public func licenseText(for info: HubRepoInfo) async -> HubLicenseText {
-        let fallbackURL = info.licenseLink ?? HubLicenseCatalog.url(for: info.licenseID)
+        let fallbackURL = info.licenseLink ?? info.pageURL
         for path in Self.licenseFileCandidates(info) {
             if let text = try? await fetchText(repo: info.id, path: path, revision: info.commit ?? "main"), !text.isEmpty {
                 let fileURL = URL(string: info.pageURL.absoluteString + "/blob/main/" + Self.escapePath(path))
@@ -107,16 +108,13 @@ public struct HubService: Sendable {
            let section = Self.licenseSection(ofModelCard: readme) {
             return HubLicenseText(source: .modelCard, text: section, url: fallbackURL)
         }
-        if let spdxID = HubLicenseCatalog.spdxID(for: info.licenseID),
-           let url = URL(string: "https://spdx.org/licenses/\(spdxID).txt"),
-           let (data, response) = try? await send(URLRequest(url: url)), response.statusCode == 200,
-           let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+        if let spdxID = HubLicenseCatalog.spdxID(for: info.licenseID), let text = HubLicenseCatalog.bundledText(for: spdxID) {
             return HubLicenseText(source: .standard(spdxID), text: text, url: fallbackURL)
         }
         if let prompt = info.gatePrompt {
             return HubLicenseText(source: .gatePrompt, text: prompt, url: fallbackURL)
         }
-        return HubLicenseText(source: .none, text: nil, url: fallbackURL)
+        return HubLicenseText(source: .none, text: nil, url: info.pageURL)
     }
 
     /// Repo files worth trying as the license text, most specific first.
@@ -339,8 +337,9 @@ public struct HubService: Sendable {
     }
 }
 
-/// License ids as Hugging Face cards spell them → canonical reference pages.
-enum HubLicenseCatalog {
+/// License ids as Hugging Face cards spell them → SPDX ids, and the standard texts bundled with Encore
+/// (`Resources/Licenses/<SPDX id>.txt`, verbatim from spdx/license-list-data). Nothing here touches the network.
+public enum HubLicenseCatalog {
     static let spdx: [String: String] = [
         "apache-2.0": "Apache-2.0", "mit": "MIT", "bsd-2-clause": "BSD-2-Clause", "bsd-3-clause": "BSD-3-Clause",
         "cc0-1.0": "CC0-1.0", "cc-by-4.0": "CC-BY-4.0", "cc-by-sa-4.0": "CC-BY-SA-4.0", "cc-by-nc-4.0": "CC-BY-NC-4.0",
@@ -349,10 +348,22 @@ enum HubLicenseCatalog {
         "lgpl-3.0": "LGPL-3.0-only", "agpl-3.0": "AGPL-3.0-only", "mpl-2.0": "MPL-2.0", "unlicense": "Unlicense",
         "openrail": "OpenRAIL", "bigscience-openrail-m": "BigScience-OpenRAIL-M", "creativeml-openrail-m": "CreativeML-OpenRAIL-M",
     ]
-    static func spdxID(for id: String?) -> String? { id.flatMap { spdx[$0.lowercased()] } }
-    static func url(for id: String?) -> URL? {
-        guard let spdxID = spdxID(for: id) else { return nil }
-        return URL(string: "https://spdx.org/licenses/\(spdxID).html")
+    /// The SPDX id for a license id as a Hugging Face card or a manifest spells it (case doesn't matter).
+    public static func spdxID(for id: String?) -> String? { id.flatMap { spdx[$0.lowercased()] } }
+
+    /// SPDX ids whose full text ships with Encore.
+    public static var bundledIDs: Set<String> {
+        let urls = Bundle.module.urls(forResourcesWithExtension: "txt", subdirectory: "Licenses") ?? []
+        return Set(urls.map { $0.deletingPathExtension().lastPathComponent })
+    }
+
+    /// The bundled standard text for a license id (SPDX or Hugging Face spelling); nil when it isn't bundled.
+    public static func bundledText(for id: String?) -> String? {
+        guard let spdxID = spdxID(for: id),
+              let url = Bundle.module.url(forResource: spdxID, withExtension: "txt", subdirectory: "Licenses"),
+              let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 

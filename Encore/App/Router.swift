@@ -73,12 +73,6 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable, Sendable {
         if let n = shortcutNumber { return KeyboardShortcut(KeyEquivalent(Character(String(n))), modifiers: .command) }
         return KeyboardShortcut(",", modifiers: .command)
     }
-
-    /// Playbill-style eyebrow, e.g. "No. 03 · Perform".
-    var eyebrow: String {
-        let n = (Self.allCases.firstIndex(of: self) ?? 0) + 1
-        return String(format: "No. %02d · %@", n, group.rawValue)
-    }
 }
 
 /// App-wide navigation state.

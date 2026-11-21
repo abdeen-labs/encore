@@ -2,6 +2,7 @@
   "id": "omnivoice",
   "name": "OmniVoice",
   "family": "OmniVoice",
+  "author": "k2-fsa",
   "summary": "k2-fsa's fast diffusion TTS for 600+ languages. Clones a voice, or builds one from attributes like gender, age, pitch and accent.",
   "tasks": [
     "tts"
@@ -13,8 +14,7 @@
       "label": "8-bit",
       "repo": "mlx-community/OmniVoice-8bit",
       "downloadBytes": 1449000000,
-      "memoryBytes": 4600000000,
-      "recommended": true
+      "memoryBytes": 4600000000
     },
     {
       "id": "bf16",

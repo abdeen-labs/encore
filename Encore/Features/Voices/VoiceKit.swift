@@ -157,6 +157,12 @@ struct ConsentCheck: View {
     var statement: String
     var detail: String?
 
+    /// The words Clone uses, shared with the import sheet so both ask the same thing.
+    static func cloneStatement(voices: Int = 1) -> String {
+        voices > 1 ? "I have the speakers' permission to clone these voices." : "I have the speaker's permission to clone this voice."
+    }
+    static let cloneDetail = "If it's your own voice, that's you. Encore keeps the date you confirmed with the voice."
+
     @State private var isHovered = false
 
     var body: some View {
@@ -222,7 +228,8 @@ extension AppDependencies {
 // MARK: - Hear it
 
 /// "Hear the new voice": a short line spoken with a downloaded cloning model. Used after a voice is saved in Clone
-/// or Design. The line goes through `EncoreService.speak`, so the take also lands in History.
+/// or Design. The line goes through `EncoreService.speak` without a History record (`SpeechRequest.voiceTryout`);
+/// the take's scratch file is deleted when the next line is spoken or the panel is reset.
 @MainActor @Observable
 final class VoiceTryout {
     let service: EncoreService
@@ -260,7 +267,7 @@ final class VoiceTryout {
     /// Readies the panel for a newly saved voice: picks a model and writes a line.
     func prepare(for voice: Voice, preferredModel: ModelChoice? = nil) {
         self.voice = voice
-        result = nil
+        discardResult()
         runner.error = nil
         let models = cloningModels(for: voice)
         if let p = preferredModel, models.contains(where: { $0.id == p.modelID }) {
@@ -276,7 +283,7 @@ final class VoiceTryout {
     func reset() {
         runner.cancel()
         voice = nil
-        result = nil
+        discardResult()
         runner.error = nil
     }
 
@@ -292,19 +299,24 @@ final class VoiceTryout {
 
     func speak() {
         guard blockedReason == nil, let voice, let m = manifest else { return }
-        var r = SpeechRequest(modelID: m.id, text: line)
-        r.variantID = shelf.preferredVariant(m, requested: choice?.variantID).id
-        r.voice = .library(voice.id)
-        r.language = VoiceLanguages.modelCode(for: voice.language, in: m)
-        r.title = "\(voice.name) — first words"
-        let request = r
+        let request = SpeechRequest.voiceTryout(voice, modelID: m.id, variantID: shelf.preferredVariant(m, requested: choice?.variantID).id,
+                                                text: line, language: VoiceLanguages.modelCode(for: voice.language, in: m))
         let service = self.service
-        result = nil
-        runner.start(.speech, model: m, variantID: r.variantID) {
+        discardResult()
+        runner.start(.speech, model: m, variantID: request.variantID) {
             service.speak(request)
         } onEvent: { [weak self] event in
             if case .finished(let record) = event { withStageAnimation { self?.result = record } }
         }
+    }
+
+    /// Hides the take and deletes its file: try-outs aren't in History, so their scratch files are ours to remove.
+    private func discardResult() {
+        if let url = result?.audioURL,
+           url.deletingLastPathComponent().standardizedFileURL == service.unsavedDirectory.standardizedFileURL {
+            try? FileManager.default.removeItem(at: url)
+        }
+        result = nil
     }
 
     #if DEBUG
@@ -351,7 +363,7 @@ struct VoiceTryoutPanel: View {
             }
             if let record = tryout.result {
                 WaveformPlayer(url: record.audioURL, title: record.title,
-                               subtitle: "\(record.modelName) · made in \(RunSurface.seconds(record.elapsed)) · saved in History")
+                               subtitle: "\(record.modelName) · made in \(RunSurface.seconds(record.elapsed)) · not saved")
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
             PerforatedDivider().padding(.vertical, Theme.Space.xxs)

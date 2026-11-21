@@ -7,12 +7,20 @@ import Testing
     let db: HistoryDatabase
     let base = Date(timeIntervalSince1970: 1_750_000_000)
 
+    /// Stands in for the user's Trash, so deletes in these tests never reach the real one.
+    var trash: URL { dir.url.appendingPathComponent("Trash") }
+
     init() throws {
         dir = try TempDir()
-        db = try HistoryDatabase(directory: dir.url)
+        db = try HistoryDatabase(directory: dir.url.appendingPathComponent("History"),
+                                 trash: .folder(dir.url.appendingPathComponent("Trash")))
     }
 
-    func generation(_ title: String, text: String = "", kind: GenerationRecord.Kind = .speech, model: String = "kokoro",
+    func trashed() -> Set<String> {
+        Set((try? FileManager.default.contentsOfDirectory(atPath: trash.path)) ?? [])
+    }
+
+    func generation(_ title: String, text: String = "", kind: GenerationRecord.Kind = .speech, model: String = "orpheus",
                     voice: String? = nil, voiceID: UUID? = nil, minutes: Double = 0, favorite: Bool = false) throws -> GenerationRecord {
         let id = UUID()
         let url = db.newAudioURL(id: id)
@@ -45,7 +53,7 @@ import Testing
         #expect(try await db.count() == 2)
 
         // Survives reopening (migrations already applied).
-        let reopened = try HistoryDatabase(directory: dir.url)
+        let reopened = try HistoryDatabase(directory: db.directory, trash: .folder(trash))
         #expect(try await reopened.fetch().map(\.id) == [t.id, g.id])
     }
 
@@ -62,7 +70,7 @@ import Testing
 
     @Test func filters() async throws {
         let ava = UUID()
-        try await db.insert(try generation("A", kind: .speech, model: "kokoro", minutes: 0))
+        try await db.insert(try generation("A", kind: .speech, model: "orpheus", minutes: 0))
         try await db.insert(try generation("B", kind: .conversation, model: "qwen3", voice: "Ava", voiceID: ava, minutes: 10, favorite: true))
         try await db.insert(try generation("C", kind: .voiceChange, model: "chatterbox", voiceID: ava, minutes: 20))
         try await db.insert(transcription("D", text: "words", minutes: 30))
@@ -76,23 +84,23 @@ import Testing
 
     @Test func facetsAndPresetVoiceFilter() async throws {
         let ava = UUID()
-        try await db.insert(try generation("A", model: "kokoro", voice: "Heart"))
-        try await db.insert(try generation("B", model: "kokoro", voice: "Heart", minutes: 1))
+        try await db.insert(try generation("A", model: "orpheus", voice: "Tara"))
+        try await db.insert(try generation("B", model: "orpheus", voice: "Tara", minutes: 1))
         try await db.insert(try generation("C", model: "qwen3", voice: "Ava", voiceID: ava, minutes: 2))
         try await db.insert(try generation("D", kind: .conversation, model: "qwen3", voice: "Ava, Bram", minutes: 3))
         try await db.insert(transcription("E", text: "words", minutes: 4))
         let f = try await db.facets()
-        #expect(f.models.map(\.id) == ["kokoro", "qwen3", "whisper"])
+        #expect(f.models.map(\.id) == ["orpheus", "qwen3", "whisper"])
         #expect(f.models.map(\.count) == [2, 2, 1])
-        #expect(f.voices.map(\.name) == ["Heart", "Ava"])
+        #expect(f.voices.map(\.name) == ["Tara", "Ava"])
         #expect(f.voices.first { $0.name == "Ava" }?.voiceID == ava)
         #expect(f.kinds == [.speech: 3, .conversation: 1, .transcription: 1] && f.total == 5)
-        #expect(try await titles(.init(voiceName: "Heart")) == ["B", "A"])
-        #expect(HistoryQuery(voiceName: "Heart").hasFilters && !HistoryQuery(search: "x").hasFilters)
+        #expect(try await titles(.init(voiceName: "Tara")) == ["B", "A"])
+        #expect(HistoryQuery(voiceName: "Tara").hasFilters && !HistoryQuery(search: "x").hasFilters)
     }
 
     @Test func fullTextSearch() async throws {
-        try await db.insert(try generation("Morning news", text: "General Kenobi arrived at the café.", model: "kokoro", voice: "Zoë"))
+        try await db.insert(try generation("Morning news", text: "General Kenobi arrived at the café.", model: "orpheus", voice: "Zoë"))
         try await db.insert(try generation("Bedtime", text: "Rock'n'roll lullaby, sung softly.", model: "qwen3", voice: "Bram"))
         try await db.insert(transcription("interview.mov", text: "The quarterly numbers were excellent."))
         #expect(try await titles(.init(search: "gen")) == ["Morning news"])            // prefix as you type
@@ -159,7 +167,72 @@ import Testing
         #expect(try await db.count() == 0)
         #expect(!FileManager.default.fileExists(atPath: owned.audioPath))
         #expect(FileManager.default.fileExists(atPath: externalURL.path))
+        #expect(trashed() == ["\(owned.id.uuidString).wav"])  // only Encore's own audio goes to the Trash
         #expect(try await db.fetch(.init(search: "owned")).isEmpty) // FTS index follows deletes
+    }
+
+    @Test func deleteMovesAudioAndSidecarsToTheTrash() async throws {
+        let fm = FileManager.default
+        let a = try generation("A"), b = try generation("B"), c = try generation("Kept")
+        for g in [a, b, c] { try await db.insert(g) }
+        // Files that belong to `a`: a sidecar named after it and a leftover hidden partial write.
+        let sidecar = db.audioDirectory.appendingPathComponent("\(a.id.uuidString).peaks")
+        let partial = db.audioDirectory.appendingPathComponent(".\(a.id.uuidString).partial.wav")
+        try Data("peaks".utf8).write(to: sidecar)
+        try Data("partial".utf8).write(to: partial)
+        let original = try Data(contentsOf: URL(fileURLWithPath: a.audioPath))
+
+        try await db.delete([a.id, b.id])
+
+        #expect(try await db.count() == 1)
+        #expect(try await db.item(a.id) == nil)
+        #expect(try await db.item(b.id) == nil)
+        for path in [a.audioPath, b.audioPath, sidecar.path, partial.path] { #expect(!fm.fileExists(atPath: path)) }
+        #expect(trashed() == ["\(a.id.uuidString).wav", "\(b.id.uuidString).wav", "\(a.id.uuidString).peaks",
+                              ".\(a.id.uuidString).partial.wav"])
+        // Recoverable: the bytes are intact in the Trash.
+        #expect(try Data(contentsOf: trash.appendingPathComponent("\(a.id.uuidString).wav")) == original)
+        // The other item and its audio are untouched.
+        #expect(fm.fileExists(atPath: c.audioPath))
+        #expect(try await db.fetch().map(\.id) == [c.id])
+    }
+
+    @Test func folderTrashKeepsBothOnANameClash() throws {
+        let fm = FileManager.default
+        let bin = FileTrash.folder(trash)
+        for text in ["one", "two"] {
+            let f = dir.url.appendingPathComponent("take.wav")
+            try Data(text.utf8).write(to: f)
+            try bin.discard(f)
+            #expect(!fm.fileExists(atPath: f.path))
+        }
+        #expect(trashed() == ["take.wav", "take 2.wav"])
+        #expect(try String(contentsOf: trash.appendingPathComponent("take 2.wav"), encoding: .utf8) == "two")
+    }
+
+    @Test func aTrashThatFailsFallsBackToRemoving() async throws {
+        struct NoTrash: Error {}
+        let db = try HistoryDatabase(directory: dir.url.appendingPathComponent("Other"), trash: FileTrash { _ in throw NoTrash() })
+        let id = UUID()
+        let url = db.newAudioURL(id: id)
+        try Data("wav".utf8).write(to: url)
+        try await db.insert(GenerationRecord(id: id, kind: .speech, title: "x", text: "x", modelID: "m", modelName: "M",
+                                             voiceName: nil, voiceID: nil, parameters: [:], audioPath: url.path, duration: 1,
+                                             sampleRate: 24000))
+        try await db.delete([id])
+        #expect(try await db.count() == 0)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test func deleteAllIsPermanentAndSkipsTheTrash() async throws {
+        let fm = FileManager.default
+        let gens = try (0..<3).map { try generation("G\($0)") }
+        for g in gens { try await db.insert(g) }
+        try Data("sidecar".utf8).write(to: db.audioDirectory.appendingPathComponent("\(gens[0].id.uuidString).peaks"))
+        let result = try await db.deleteAll()
+        #expect(result.items == 3 && result.failures.isEmpty)
+        #expect(try fm.contentsOfDirectory(atPath: db.audioDirectory.path).isEmpty)
+        #expect(!fm.fileExists(atPath: trash.path))  // nothing was sent to the Trash
     }
 
     @Test func newAudioURLIsInsideHistory() {

@@ -163,26 +163,144 @@ public final class ModelDownloadCenter {
         tasks[ModelVariantKey(manifest, variant)]?.cancel()
     }
 
-    /// Deletes the variant's repos from the cache, except repos another variant that is on disk
-    /// still uses (shared companions, or the same repo with different patterns). Returns bytes freed.
+    /// What deleting a variant removes.
+    public struct DeletionPlan: Sendable, Equatable {
+        /// Repos that will be removed from the cache.
+        public var repos: [String]
+        /// Bytes those repos occupy now.
+        public var bytes: Int64
+        /// Other models that live in the same repo and so go with it.
+        public var alsoRemoves: [ModelManifest]
+    }
+
+    /// Works out what `delete` would remove. The variant's own repo always goes, along with any other model
+    /// stored in that same repo. A companion repo stays while a model that is still on disk needs it.
+    public func deletionPlan(_ manifest: ModelManifest, _ variant: ModelVariant) -> DeletionPlan {
+        let key = ModelVariantKey(manifest, variant)
+        var keep: Set<String> = []
+        var alsoRemoves: [ModelManifest] = []
+        for m in catalog.models {
+            for v in m.variants {
+                let k = ModelVariantKey(m, v)
+                guard k != key, isOnDisk(m, v) else { continue }
+                if v.repo == variant.repo {
+                    if m.id != manifest.id, !alsoRemoves.contains(where: { $0.id == m.id }) { alsoRemoves.append(m) }
+                } else {
+                    keep.formUnion(v.allRepos)
+                }
+            }
+        }
+        let repos = variant.allRepos.filter { !keep.contains($0) }
+        return DeletionPlan(repos: repos, bytes: store.diskUsage(repos: repos), alsoRemoves: alsoRemoves)
+    }
+
+    /// Downloading, or with files of its own in the cache.
+    private func isOnDisk(_ manifest: ModelManifest, _ variant: ModelVariant) -> Bool {
+        let key = ModelVariantKey(manifest, variant)
+        if tasks[key] != nil { return true }
+        return (statuses[key] ?? store.status(of: variant)).state != .notDownloaded
+    }
+
+    /// Deletes the variant from the cache as `deletionPlan` describes. Returns bytes freed.
     @discardableResult
     public func delete(_ manifest: ModelManifest, _ variant: ModelVariant) async throws -> Int64 {
         let key = ModelVariantKey(manifest, variant)
-        if let task = tasks[key] { task.cancel(); _ = await task.value }
-        let inUse = Set(catalog.models.flatMap { m in
-            m.variants.filter { v in
-                ModelVariantKey(m, v) != key && (tasks[ModelVariantKey(m, v)] != nil || (statuses[ModelVariantKey(m, v)]?.presentBytes ?? 0) > 0)
-            }.flatMap(\.allRepos)
-        })
-        let repos = variant.allRepos.filter { !inUse.contains($0) }
+        // Stop this download, and any download into the same repo.
+        for m in catalog.models {
+            for v in m.variants where v.repo == variant.repo {
+                if let task = tasks[ModelVariantKey(m, v)] { task.cancel(); _ = await task.value }
+            }
+        }
+        let repos = deletionPlan(manifest, variant).repos
         let store = self.store
         let freed = try await Task.detached(priority: .userInitiated) { try store.delete(repos: repos) }.value
         states[key] = nil
-        await refresh(manifest, variant)
-        for m in catalog.models { for v in m.variants where !Set(v.allRepos).isDisjoint(with: repos) {
+        let touched = Set(variant.allRepos)
+        for m in catalog.models { for v in m.variants where !Set(v.allRepos).isDisjoint(with: touched) {
             await refresh(m, v)
         } }
         return freed
+    }
+
+    // MARK: Removing every catalog model
+
+    /// What "delete all downloaded models" removes: every repo the catalog references (each variant's own repo and
+    /// its companions) that has anything on disk, partial downloads included, plus their mlx-audio working copies.
+    /// Repos in the cache that the catalog doesn't reference are never part of it.
+    public struct CatalogRemovalPlan: Sendable, Equatable {
+        public struct Model: Sendable, Equatable, Identifiable {
+            public struct Variant: Sendable, Equatable {
+                public var label: String
+                /// False for a partial download.
+                public var complete: Bool
+                public init(label: String, complete: Bool) { self.label = label; self.complete = complete }
+            }
+            public var id: String
+            public var name: String
+            /// The variants with files on disk.
+            public var variants: [Variant]
+            public init(id: String, name: String, variants: [Variant]) { self.id = id; self.name = name; self.variants = variants }
+        }
+        /// Catalog models with a variant on disk, by name.
+        public var models: [Model]
+        /// Companion repos on disk that are no variant's own repo (tokenizers, codecs shared between models).
+        public var sharedComponents: [String]
+        /// Model repos in the cache that aren't in the catalog: left alone.
+        public var otherRepos: [String]
+        public var hub: HubRemovalPlan
+        public var bytes: Int64 { hub.bytes }
+        public var isEmpty: Bool { hub.isEmpty }
+
+        public init(models: [Model], sharedComponents: [String], otherRepos: [String], hub: HubRemovalPlan) {
+            self.models = models; self.sharedComponents = sharedComponents; self.otherRepos = otherRepos; self.hub = hub
+        }
+    }
+
+    /// Measures what `removeAllCatalogModels()` would remove, from disk (no network).
+    public func catalogRemovalPlan() async -> CatalogRemovalPlan {
+        let catalog = self.catalog, store = self.store
+        return await Task.detached(priority: .userInitiated) { Self.catalogRemovalPlan(catalog: catalog, store: store) }.value
+    }
+
+    nonisolated static func catalogRemovalPlan(catalog: ModelCatalog, store: HubLocalStore) -> CatalogRemovalPlan {
+        let fm = FileManager.default
+        let layout = store.layout
+        let allRepos = Set(catalog.models.flatMap { $0.variants.flatMap(\.allRepos) })
+        let hub = store.removalPlan(repos: allRepos)
+        let touched = Set(hub.repos).union(allRepos.filter { fm.fileExists(atPath: layout.mlxAudioDirectory($0).path) })
+        var models: [CatalogRemovalPlan.Model] = []
+        for m in catalog.models {
+            let variants = m.variants.filter { touched.contains($0.repo) }
+                .map { CatalogRemovalPlan.Model.Variant(label: $0.label, complete: store.status(of: $0).state == .downloaded) }
+            if !variants.isEmpty { models.append(.init(id: m.id, name: m.name, variants: variants)) }
+        }
+        models.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let primaries = Set(catalog.models.flatMap { $0.variants.map(\.repo) })
+        let shared = touched.subtracting(primaries).sorted()
+        let names = (try? fm.contentsOfDirectory(atPath: layout.root.path)) ?? []
+        let others = names.compactMap(HubCacheLayout.repo(fromFolderName:)).filter { !allRepos.contains($0) }.sorted()
+        return CatalogRemovalPlan(models: models, sharedComponents: shared, otherRepos: others, hub: hub)
+    }
+
+    /// Stops every download in progress (partial files stay until deleted) and waits for each to wind down.
+    public func cancelAllDownloads() async {
+        let running = tasks
+        for task in running.values { task.cancel() }
+        for task in running.values { _ = await task.value }
+    }
+
+    /// Removes every catalog model from the Hugging Face cache, as `catalogRemovalPlan()` measures it, after stopping
+    /// all downloads. Unload models first: an engine may still have the files open. States refresh afterwards, so
+    /// every variant reads as not downloaded.
+    public func removeAllCatalogModels() async -> HubRemovalResult {
+        await cancelAllDownloads()
+        let catalog = self.catalog, store = self.store
+        let result = await Task.detached(priority: .userInitiated) { () -> HubRemovalResult in
+            store.remove(Self.catalogRemovalPlan(catalog: catalog, store: store).hub)
+        }.value
+        states = [:]
+        await refresh(verifyOnline: false)
+        return result
     }
 
     /// Everything an engine needs to load the variant, or nil if it isn't fully downloaded.
@@ -215,10 +333,12 @@ public final class HubAccountModel {
     @ObservationIgnored public private(set) var isShowingFixture = false
 
     /// Shows a made-up sign-in state (snapshots and previews) without reading any token.
-    public func showFixture(_ status: Status, source: HubTokenSource? = nil) {
+    public func showFixture(_ status: Status, source: HubTokenSource? = nil, signedOutOfEncoreOnly: Bool = false) {
         isShowingFixture = true
         self.status = status
         tokenSource = source
+        isSignedOutOfEncoreOnly = signedOutOfEncoreOnly
+        sharedTokenFileExists = signedOutOfEncoreOnly
     }
 
     public init(tokenStore: HubTokenStore = .standard, endpoint: URL = HubService.defaultEndpoint) {
@@ -228,12 +348,21 @@ public final class HubAccountModel {
 
     public var account: HubAccount? { if case .signedIn(let a) = status { return a } else { return nil } }
 
-    /// Loads the stored token (adopting an existing HF token file) and validates it.
+    /// True while the user is signed out of Encore only: the shared token file is ignored until they sign in again here.
+    public private(set) var isSignedOutOfEncoreOnly = false
+    /// Whether the shared token file exists (its contents aren't read for this). Meaningful while signed out of Encore only.
+    public private(set) var sharedTokenFileExists = false
+
+    /// Loads the token (the shared token file wins over the Keychain copy) and validates it.
     public func refresh() async {
         guard !isShowingFixture else { return }
         let store = tokenStore
-        let current = await Task.detached { store.current() }.value
+        let (current, encoreOnly, fileExists) = await Task.detached {
+            (store.current(), store.isSignedOutOfEncoreOnly, FileManager.default.fileExists(atPath: store.tokenFile.path))
+        }.value
         tokenSource = current?.source
+        isSignedOutOfEncoreOnly = encoreOnly
+        sharedTokenFileExists = fileExists
         guard let token = current?.token else { status = .signedOut; return }
         await validate(token)
     }
@@ -247,6 +376,7 @@ public final class HubAccountModel {
         do {
             try tokenStore.save(token)
             tokenSource = .keychain
+            isSignedOutOfEncoreOnly = false
             return true
         } catch {
             status = .unreachable(error.localizedDescription)
@@ -254,11 +384,33 @@ public final class HubAccountModel {
         }
     }
 
-    /// Removes the token from the Keychain and the HF token file.
+    /// Signs out everywhere: removes the token from the Keychain and deletes the shared HF token file,
+    /// which also signs out the `hf` tool and anything else that reads it.
     public func signOut() {
         try? tokenStore.clear()
         tokenSource = nil
+        isSignedOutOfEncoreOnly = false
+        sharedTokenFileExists = false
         status = .signedOut
+    }
+
+    /// Signs out of Encore only: removes Encore's Keychain copy and ignores the shared token file (which stays,
+    /// so the `hf` tool stays signed in) until the user signs in again in Encore. Survives relaunches.
+    /// Returns false if the Keychain refused; the status is then left as it was.
+    @discardableResult
+    public func signOutOfEncoreOnly() -> Bool {
+        do { try tokenStore.signOutOfEncoreOnly() } catch { return false }
+        tokenSource = nil
+        isSignedOutOfEncoreOnly = true
+        sharedTokenFileExists = FileManager.default.fileExists(atPath: tokenStore.tokenFile.path)
+        status = .signedOut
+        return true
+    }
+
+    /// Ends an Encore-only sign-out and signs in with the shared token file again.
+    public func useSharedToken() async {
+        try? tokenStore.clearEncoreOnlySignOut()
+        await refresh()
     }
 
     private func validate(_ token: String) async {

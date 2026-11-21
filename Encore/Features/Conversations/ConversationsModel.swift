@@ -26,7 +26,9 @@ final class ConversationsModel {
     /// Color slot per speaker (index into `CastPalette`), kept stable as speakers come and go.
     private(set) var tints: [UUID: Int] = [:]
     var pauseSeconds: Double = 0.4 { didSet { saveDraft() } }
-    var choice: ModelChoice? { didSet { if choice?.modelID != oldValue?.modelID, !restoring { modelChanged() }; saveDraft() } }
+    var choice: ModelChoice? {
+        didSet { if choice?.modelID != oldValue?.modelID, !restoring { draftModelRetired = false; modelChanged() }; saveDraft() }
+    }
     var language: String? { didSet { saveDraft() } }
     var parameters: ParamValues = [:] { didSet { saveDraft() } }
     var post: PostProcessingOptions { didSet { saveDraft() } }
@@ -44,6 +46,8 @@ final class ConversationsModel {
     @ObservationIgnored let auditionPlayer = AudioPlayer(title: "Audition")
     private(set) var auditionedLineID: UUID?
     private(set) var isPrepared = false
+    /// The restored draft named a model that is no longer in the catalog; the screen says so until dismissed.
+    var draftModelRetired = false
 
     struct ImportReport: Equatable {
         var fileName: String
@@ -81,9 +85,8 @@ final class ConversationsModel {
     }
 
     convenience init(deps: AppDependencies) {
-        let live = SnapshotConfig(arguments: CommandLine.arguments) == nil
         self.init(service: deps.service, settings: deps.settings, voices: deps.voices, pronunciations: deps.pronunciations,
-                  shelf: deps.modelShelf, drafts: live ? .standard : nil)
+                  shelf: deps.modelShelf, drafts: deps.drafts)
     }
 
     isolated deinit {
@@ -92,13 +95,19 @@ final class ConversationsModel {
 
     func prepare() async {
         await shelf.waitForScan()
-        if let c = choice, service.catalog.model(c.modelID)?.tasks.contains(.tts) != true { setChoiceQuietly(nil) }
+        let retired = choice.map { service.catalog.model($0.modelID)?.tasks.contains(.tts) != true } ?? false
+        if retired { setChoiceQuietly(nil) }
         if choice == nil {
             let requires: ModelRequirement = usesLibraryVoices ? .cloning : []
             if let initial = shelf.initialChoice(for: .tts, requiring: requires, feature: .conversation, settings: settings)
                 ?? shelf.initialChoice(for: .tts, feature: .conversation, settings: settings) {
                 setChoiceQuietly(initial)
             }
+        }
+        if retired {
+            // The draft's model left the catalog: recast its model voices and drop its settings, as a model switch does.
+            draftModelRetired = true
+            modelChanged()
         }
         if let id = pendingResultID {
             pendingResultID = nil
@@ -288,7 +297,7 @@ final class ConversationsModel {
         var presets = m.presetVoices
         if let language { presets = presets.filter { $0.language == language } + presets.filter { $0.language != language } }
         else if let first = presets.first?.language { presets = presets.filter { $0.language == first } + presets.filter { $0.language != first } }
-        // Alternate voices so neighbors differ (Kokoro lists all women, then all men, per language).
+        // Alternate voices so neighbors differ (a manifest may list all women, then all men, per language).
         let byGender = Dictionary(grouping: presets, by: { $0.gender ?? "" })
         var interleaved: [PresetVoice] = []
         let groups = byGender.keys.sorted().map { byGender[$0]! }
@@ -414,6 +423,7 @@ final class ConversationsModel {
     func newScript() {
         editingLineID = nil
         importReport = nil
+        pendingUnnamedImport = nil
         script = ConversationScript()
         tints = [:]
         renderedKeys = [:]
@@ -433,10 +443,37 @@ final class ConversationsModel {
     static let scriptTypes: [UTType] = [.plainText, .pdf, UTType(filenameExtension: "md") ?? .plainText,
                                         UTType(filenameExtension: "fountain") ?? .plainText]
 
+    /// Imports a script. One without speaker names waits in `pendingUnnamedImport` until the user says who reads it
+    /// (`finishUnnamedImport(_:)`); a script with names is applied straight away.
     func importScript(from url: URL) throws {
         let imported = try ConversationImporter.importFile(at: url)
-        apply(imported, fileName: url.lastPathComponent)
+        if imported.asksAboutSpeakers {
+            dismissImportReport()  // an earlier import's report would otherwise sit beside the question
+            pendingUnnamedImport = PendingUnnamedImport(result: imported, fileName: url.lastPathComponent)
+        } else {
+            pendingUnnamedImport = nil
+            apply(imported, fileName: url.lastPathComponent)
+        }
     }
+
+    /// A script without speaker names, imported but not applied until the user chooses one voice or alternating
+    /// speakers. The working script is untouched meanwhile.
+    struct PendingUnnamedImport {
+        var result: ConversationImporter.Result
+        var fileName: String
+        var paragraphs: Int { result.script.lines.count }
+    }
+    var pendingUnnamedImport: PendingUnnamedImport?
+
+    /// Applies the waiting import with the user's answer.
+    func finishUnnamedImport(_ choice: ConversationImporter.UnnamedSpeakers) {
+        guard let pending = pendingUnnamedImport else { return }
+        pendingUnnamedImport = nil
+        apply(pending.result.withUnnamedSpeakers(choice), fileName: pending.fileName)
+    }
+
+    /// Drops the waiting import; the working script stays as it was.
+    func cancelUnnamedImport() { pendingUnnamedImport = nil }
 
     /// Replaces the working script with an imported one; speakers named like a library voice get that voice (when
     /// the model clones), the rest get distinct voices of the model's own.

@@ -11,6 +11,7 @@ enum Main {
         if VoiceHeadless.isRequested { VoiceHeadless.run() }  // Clone/Design/Voices proofs: Features/Voices/VoiceHeadless.swift
         if ProduceHeadless.isRequested { ProduceHeadless.run() }  // Changer, Conversations, Transcribe: Features/Changer/ProduceHeadless.swift
         if HistoryHeadless.isRequested { HistoryHeadless.run() }  // Features/History/HistoryHeadless.swift
+        if ResetHeadless.isRequested { ResetHeadless.run() }  // Settings → Reset, temp roots only: Features/Settings/ResetHeadless.swift
         #endif
         if let config = SnapshotConfig(arguments: CommandLine.arguments) {
             SnapshotRunner.run(config)

@@ -109,11 +109,14 @@ final class ModelShelf {
         manifest.variants.contains { downloaded.contains(ModelVariantKey(manifest, $0)) }
     }
 
-    /// The best variant to use: the one asked for, else a downloaded one (recommended first), else the recommended one.
+    /// The best variant to use: the one asked for, else a downloaded one (the recommended one first, then the
+    /// next smaller ones, then larger ones), else the recommended one.
     func preferredVariant(_ manifest: ModelManifest, requested: String? = nil) -> ModelVariant {
         if let requested, let v = manifest.variants.first(where: { $0.id == requested }) { return v }
-        if isDownloaded(manifest, variantID: manifest.defaultVariant.id) { return manifest.defaultVariant }
-        return manifest.variants.first { downloaded.contains(ModelVariantKey(manifest, $0)) } ?? manifest.defaultVariant
+        let recommended = manifest.defaultVariant
+        let ranked = VariantRecommendation.rank(manifest.variants)
+        let split = ranked.firstIndex(of: recommended) ?? 0
+        return (ranked[split...] + ranked[..<split]).first { downloaded.contains(ModelVariantKey(manifest, $0)) } ?? recommended
     }
 
     func hasDownloadedModel(for task: ModelTask, requiring: ModelRequirement = []) -> Bool {
@@ -235,6 +238,17 @@ extension AppDependencies {
 
     /// The app's model availability cache, shared by every picker.
     var modelShelf: ModelShelf {
-        screenModel("Shared.ModelShelf") { ModelShelf(service: service, downloads: downloads) }
+        screenModel(Self.modelShelfKey) { ModelShelf(service: service, downloads: downloads) }
+    }
+}
+
+extension ModelManifest {
+    /// Whether `variant` is the one recommended for this Mac's RAM (`defaultVariant`).
+    func isRecommended(_ variant: ModelVariant) -> Bool { variants.count > 1 && variant.id == defaultVariant.id }
+
+    /// Tooltip for the Recommended badge.
+    static var recommendationHelp: String {
+        let ram = MemoryGauge.bytes(Int64(clamping: VariantRecommendation.installedMemory))
+        return "Recommended for this Mac (\(ram) of memory): the most precise variant that leaves at least 4 GB free."
     }
 }

@@ -2,6 +2,7 @@
   "id": "whisper-large-v3",
   "name": "Whisper large-v3",
   "family": "Whisper",
+  "author": "OpenAI",
   "summary": "OpenAI's most accurate Whisper: 99 languages, slower than turbo.",
   "tasks": [
     "stt"
@@ -13,8 +14,7 @@
       "label": "8-bit",
       "repo": "mlx-community/whisper-large-v3-asr-8bit",
       "downloadBytes": 1266000000,
-      "memoryBytes": 2300000000,
-      "recommended": true
+      "memoryBytes": 2300000000
     },
     {
       "id": "fp16",

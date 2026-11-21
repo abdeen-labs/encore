@@ -95,16 +95,21 @@ public struct HistoryFacets: Sendable, Equatable {
 // MARK: - Database
 
 /// Generation and transcription history in SQLite (GRDB), with FTS5 search. Audio masters live in
-/// `<directory>/Audio/`; deleting a generation deletes its master when it lives there.
+/// `<directory>/Audio/`; deleting a generation moves its master (and any other file there named after the item) to
+/// the Trash. `deleteAll()` is the exception: it removes everything for good.
 ///
 /// Sendable; every method can be called from any isolation (async methods run on GRDB's queues).
 public final class HistoryDatabase: Sendable {
     public let directory: URL
     public let audioDirectory: URL
     let pool: DatabasePool
+    /// Where `delete(_:)` sends audio files.
+    let trash: FileTrash
 
-    public init(directory: URL = EncorePaths.history) throws {
+    /// - Parameter trash: where deleted items' audio goes; tests and headless runs pass `.folder(_:)` in a temp folder.
+    public init(directory: URL = EncorePaths.history, trash: FileTrash = .system) throws {
         self.directory = directory
+        self.trash = trash
         audioDirectory = directory.appendingPathComponent("Audio", isDirectory: true)
         try FileManager.default.createDirectory(at: audioDirectory, withIntermediateDirectories: true)
         var config = Configuration()
@@ -201,21 +206,64 @@ public final class HistoryDatabase: Sendable {
         }
     }
 
-    /// Deletes items and the audio masters they own. Missing ids are ignored.
+    /// Deletes items and moves the audio files they own to the Trash: the master, plus any other file in
+    /// `audioDirectory` whose name starts with the item's id (sidecars, a leftover partial write). Audio a record
+    /// points at outside `audioDirectory` is never touched. Missing ids are ignored. The rows go first; a file that
+    /// can't be moved or removed afterwards is skipped rather than failing the delete.
     public func delete(_ ids: [UUID]) async throws {
-        let paths: [String] = try await pool.write { db in
-            var paths: [String] = []
+        let (deleted, paths): ([String], [String]) = try await pool.write { db in
+            var deleted: [String] = [], paths: [String] = []
             for id in ids {
                 guard let row = try ItemRow.fetchOne(db, key: id.uuidString) else { continue }
+                deleted.append(row.id)
                 if let p = row.audioPath { paths.append(p) }
                 try row.delete(db)
             }
-            return paths
+            return (deleted, paths)
         }
-        for p in paths where ownsAudio(p) { try? FileManager.default.removeItem(atPath: p) }
+        guard !deleted.isEmpty else { return }
+        var files = paths.filter { ownsAudio($0) }.map { URL(fileURLWithPath: $0) }
+        let names = Set(files.map(\.lastPathComponent))
+        for file in (try? FileManager.default.contentsOfDirectory(at: audioDirectory, includingPropertiesForKeys: nil)) ?? []
+        where !names.contains(file.lastPathComponent) && Self.isSidecar(file.lastPathComponent, ofAny: deleted) {
+            files.append(file)
+        }
+        for file in files { try? trash.discard(file) }
+    }
+
+    /// `<id>…` or `.<id>…` (a hidden partial write), ignoring case.
+    static func isSidecar(_ name: String, ofAny ids: [String]) -> Bool {
+        let lower = name.lowercased()
+        return ids.contains { id in
+            let id = id.lowercased()
+            return lower.hasPrefix(id) || lower.hasPrefix("." + id)
+        }
     }
 
     public func delete(_ id: UUID) async throws { try await delete([id]) }
+
+    /// Deletes every item and everything in `audioDirectory` permanently (never to the Trash: this is the full wipe
+    /// behind Settings' reset), then compacts the database file. Audio a record points
+    /// at outside `audioDirectory` (never Encore's) is left alone. Returns the number of items deleted and the files
+    /// that couldn't be removed (a failure there doesn't stop the rest).
+    public func deleteAll() async throws -> (items: Int, failures: [String]) {
+        let count = try await pool.write { db -> Int in
+            let n = try ItemRow.fetchCount(db)
+            try ItemRow.deleteAll(db)
+            return n
+        }
+        // Give the space back: rebuild the file and truncate the write-ahead log. Best effort (readers can hold it).
+        try? await pool.writeWithoutTransaction { db in
+            try db.execute(sql: "VACUUM")
+            try db.checkpoint(.truncate)
+        }
+        var failures: [String] = []
+        let fm = FileManager.default
+        for file in (try? fm.contentsOfDirectory(at: audioDirectory, includingPropertiesForKeys: nil)) ?? [] {
+            do { try fm.removeItem(at: file) } catch { failures.append("\(file.path): \(error.localizedDescription)") }
+        }
+        return (count, failures)
+    }
 
     // MARK: Reading
 

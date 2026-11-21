@@ -96,7 +96,7 @@ func testManifest(_ id: String, engine: String? = nil, tasks: [String] = ["tts"]
                   reference: [String: Any]? = nil, parameters: [[String: Any]] = []) -> ModelManifest {
     var json: [String: Any] = [
         "id": id, "name": id.capitalized, "family": "Test", "summary": "", "tasks": tasks, "engine": engine ?? id,
-        "variants": [["id": "v1", "label": "V1", "repo": "test/\(id)", "downloadBytes": 1, "memoryBytes": memory, "recommended": true]],
+        "variants": [["id": "v1", "label": "V1", "repo": "test/\(id)", "downloadBytes": 1, "memoryBytes": memory]],
         "license": ["name": "MIT"], "capabilities": capabilities, "languages": [],
         "presetVoices": presets.map { ["id": $0, "name": $0.capitalized] }, "expressiveTags": [],
         "parameters": parameters, "maxChunkCharacters": maxChunk, "sampleRate": sampleRate,

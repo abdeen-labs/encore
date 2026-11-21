@@ -3,7 +3,8 @@ import EncoreCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Preferences, in sections: Hugging Face, memory, output, pronunciations, ffmpeg, the Python helper, storage, about.
+/// Preferences, in sections: Hugging Face, memory, output, pronunciations, ffmpeg, the Python helper, storage, about,
+/// and the two reset actions at the very bottom.
 struct SettingsScreen: View {
     @Environment(AppSettings.self) private var settings
     @Environment(HubAccountModel.self) private var account
@@ -26,6 +27,7 @@ struct SettingsScreen: View {
             PythonSection(model: model)
             StorageSection(model: model)
             AboutSection()
+            ResetSection(onReset: refreshStorage)
         }
         .task {
             await account.refresh()  // fixture-safe; snapshots use an isolated token store
@@ -33,20 +35,30 @@ struct SettingsScreen: View {
             model.refreshFFmpeg(configuredPath: settings.ffmpegPath)
             await model.refreshPython(service: service)
             await downloads.refresh(verifyOnline: false)
-            await model.refreshStorage(modelsBytes: downloads.totalBytesOnDisk, hubCache: downloads.downloader.store.layout.root)
+            await refreshStorage()
         }
         .onChange(of: settings.ffmpegPath) { model.refreshFFmpeg(configuredPath: settings.ffmpegPath) }
+    }
+
+    private func refreshStorage() async {
+        guard !model.isFixture, !isSnapshotting else { return }
+        await model.refreshStorage(modelsBytes: downloads.totalBytesOnDisk, hubCache: downloads.downloader.store.layout.root)
     }
 }
 
 // MARK: - Section chrome
 
 /// A settings section: title and one-line purpose on the left rail of the card, controls on the right.
-private struct SettingsSection<Content: View>: View {
+struct SettingsSection<Content: View>: View {
     let title: String
     let subtitle: String
     let symbol: String
+    var accent: Color = .tungsten
     @ViewBuilder var content: Content
+
+    init(title: String, subtitle: String, symbol: String, accent: Color = .tungsten, @ViewBuilder content: () -> Content) {
+        self.title = title; self.subtitle = subtitle; self.symbol = symbol; self.accent = accent; self.content = content()
+    }
 
     var body: some View {
         Card {
@@ -54,9 +66,9 @@ private struct SettingsSection<Content: View>: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Image(systemName: symbol)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.tungsten)
+                        .foregroundStyle(accent)
                         .frame(width: 28, height: 28)
-                        .background(Circle().fill(Color.tungsten.opacity(0.1)))
+                        .background(Circle().fill(accent.opacity(0.1)))
                     Text(title).textRole(.heading)
                     Text(subtitle).textRole(.caption).fixedSize(horizontal: false, vertical: true)
                 }
@@ -72,6 +84,8 @@ private struct SettingsSection<Content: View>: View {
 
 private struct HuggingFaceSection: View {
     @Environment(HubAccountModel.self) private var account
+    @Environment(EncoreService.self) private var service
+    @Environment(ToastCenter.self) private var toasts
     @State private var token = ""
     @State private var replacing = false
     @State private var confirmingSignOut = false
@@ -100,6 +114,7 @@ private struct HuggingFaceSection: View {
                 }
                 signOutRow
             case .signedOut, .unknown:
+                if account.isSignedOutOfEncoreOnly { encoreOnlyNotice }
                 Text("Paste an access token from your Hugging Face account. A read token is enough.")
                     .textRole(.body).fixedSize(horizontal: false, vertical: true)
                 tokenEntry(prompt: "hf_…")
@@ -111,6 +126,26 @@ private struct HuggingFaceSection: View {
             Text("Stored in your Keychain and in \(Self.tokenPath), where the hf command-line tool and Encore's Python helper read it.")
                 .textRole(.caption, color: .textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+        .stageSheet(isPresented: $confirmingSignOut) {
+            SignOutSheet(tokenPath: Self.tokenPath, everywhere: signOutEverywhere, encoreOnly: signOutOfEncoreOnly)
+        }
+    }
+
+    /// Shown while signed out of Encore only, when the shared token file may still hold a token.
+    private var encoreOnlyNotice: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
+            Text(account.sharedTokenFileExists
+                 ? "Signed out of Encore only. The token in \(Self.tokenPath) is still there for the hf tool; Encore ignores it until you sign in here."
+                 : "Signed out of Encore only. Encore won't use \(Self.tokenPath) until you sign in here.")
+                .textRole(.caption, color: .textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: Theme.Space.s)
+            if account.sharedTokenFileExists {
+                Button("Use that token") { Task { await account.useSharedToken() } }
+                    .buttonStyle(.secondary).controlSize(.small)
+                    .fixedSize()
+            }
         }
     }
 
@@ -134,7 +169,7 @@ private struct HuggingFaceSection: View {
             }
             if replacing {
                 tokenEntry(prompt: "Paste the new token")
-            } else if !confirmingSignOut {
+            } else {
                 HStack(spacing: Theme.Space.s) {
                     Button("Replace token") { replacing = true }.buttonStyle(.secondary).controlSize(.small)
                     signOutButton
@@ -142,7 +177,6 @@ private struct HuggingFaceSection: View {
                     LinkButton(title: "Manage tokens", url: Self.tokensURL)
                 }
             }
-            if confirmingSignOut { signOutConfirmation }
         }
     }
 
@@ -196,21 +230,68 @@ private struct HuggingFaceSection: View {
         Button("Sign out…") { confirmingSignOut = true }.buttonStyle(.ghost).controlSize(.small)
     }
 
-    @ViewBuilder private var signOutRow: some View {
-        if confirmingSignOut { signOutConfirmation } else { HStack { signOutButton; Spacer() } }
+    private var signOutRow: some View {
+        HStack { signOutButton; Spacer() }
     }
 
-    private var signOutConfirmation: some View {
-        Banner(.warning, title: "Sign out of Hugging Face?",
-               message: "This removes the token from your Keychain and deletes \(Self.tokenPath) — which also signs out the hf command-line tool and anything else that reads that file.") {
-            Button("Keep") { confirmingSignOut = false }.buttonStyle(.ghost).controlSize(.small)
-            Button("Sign out") {
-                account.signOut()
-                confirmingSignOut = false
-                replacing = false
-            }
-            .buttonStyle(.destructive).controlSize(.small)
+    private func signOutEverywhere() {
+        account.signOut()
+        replacing = false
+        token = ""
+    }
+
+    private func signOutOfEncoreOnly() {
+        guard account.signOutOfEncoreOnly() else {
+            toasts.show("Encore couldn't update its Keychain item, so you're still signed in.", tone: .danger, duration: 6)
+            return
         }
+        replacing = false
+        token = ""
+        // A running helper was started with the shared token file visible; restart it (when idle) without it.
+        Task { for case let python as PythonBackend in service.backends { await python.shutdownIfIdle() } }
+    }
+}
+
+/// Asks how far to sign out: everywhere on this Mac (the default; deletes the shared token file), or Encore only.
+struct SignOutSheet: View {
+    let tokenPath: String
+    let everywhere: () -> Void
+    let encoreOnly: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        SheetContainer(title: "Sign out of Hugging Face?", width: 520) {
+            option(title: "Sign out everywhere", symbol: "rectangle.portrait.and.arrow.right",
+                   detail: "Removes the token from your Keychain and deletes \(tokenPath). Everything on this Mac that uses that shared file is signed out too, including the hf command-line tool.")
+            option(title: "Sign out of Encore only", symbol: "key.slash",
+                   detail: "Removes Encore's copy from your Keychain and leaves \(tokenPath) alone, so the hf tool stays signed in. Encore stays signed out, even after you quit it, until you sign in here again.")
+        } actions: {
+            Button("Cancel") { dismiss() }
+                .buttonStyle(.ghost)
+                .keyboardShortcut(.cancelAction)
+            Button("Sign out of Encore only") { encoreOnly(); dismiss() }
+                .buttonStyle(.secondary)
+            Button("Sign out everywhere") { everywhere(); dismiss() }
+                .buttonStyle(.destructive)
+                .keyboardShortcut(.defaultAction)
+        }
+    }
+
+    private func option(title: String, symbol: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: Theme.Space.m) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.textSecondary)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).textRole(.headline)
+                Text(detail).textRole(.caption, color: .textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(Theme.Space.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .surface(.sunken, radius: Theme.Radius.m)
     }
 }
 
@@ -506,6 +587,8 @@ private struct StorageSection: View {
 // MARK: - About
 
 private struct AboutSection: View {
+    @Environment(EncoreService.self) private var service
+
     private static let components: [(String, String, String)] = [
         ("MLX Swift", "Apple", "MIT"),
         ("mlx-audio-swift", "mlx-audio contributors", "MIT"),
@@ -519,9 +602,9 @@ private struct AboutSection: View {
     ]
 
     var body: some View {
-        SettingsSection(title: "About", subtitle: "Free and open source. Everything runs on this Mac.", symbol: "theatermasks") {
+        SettingsSection(title: "About", subtitle: "Free and open source under the MIT license. Everything runs on this Mac.", symbol: "theatermasks") {
             HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
-                Text("Encore").font(.display(24, italic: true)).foregroundStyle(.textPrimary)
+                Text("Encore").textRole(.headline)
                 Text(version).textRole(.mono, color: .textTertiary)
             }
             Text("Each model has its own license, shown in its details on the Models screen.")
@@ -529,16 +612,32 @@ private struct AboutSection: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Built with").textRole(.eyebrow).padding(.bottom, Theme.Space.xs)
                 ForEach(Self.components, id: \.0) { name, author, license in
-                    HStack(spacing: Theme.Space.s) {
-                        Text(name).font(.ui(12.5, weight: .medium)).foregroundStyle(.textPrimary)
-                        Text(author).textRole(.caption, color: .textTertiary).lineLimit(1)
-                        Spacer(minLength: Theme.Space.s)
-                        Text(license).textRole(.monoSmall, color: .textSecondary)
-                    }
-                    .padding(.vertical, 5)
+                    creditRow(name, author, license)
+                }
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Models by").textRole(.eyebrow).padding(.bottom, Theme.Space.xs)
+                ForEach(service.catalog.credits) { c in
+                    creditRow(c.family, ListFormatter.localizedString(byJoining: c.authors), c.licenses.joined(separator: ", "))
+                }
+                let publishers = service.catalog.weightPublishers
+                if !publishers.isEmpty {
+                    Text("Weights downloaded from \(ListFormatter.localizedString(byJoining: publishers)) on Hugging Face.")
+                        .textRole(.caption, color: .textTertiary)
+                        .padding(.top, Theme.Space.xs)
                 }
             }
         }
+    }
+
+    private func creditRow(_ name: String, _ author: String, _ license: String) -> some View {
+        HStack(spacing: Theme.Space.s) {
+            Text(name).font(.ui(12.5, weight: .medium)).foregroundStyle(.textPrimary)
+            Text(author).textRole(.caption, color: .textTertiary).lineLimit(1)
+            Spacer(minLength: Theme.Space.s)
+            Text(license).textRole(.monoSmall, color: .textSecondary)
+        }
+        .padding(.vertical, 5)
     }
 
     private var version: String {

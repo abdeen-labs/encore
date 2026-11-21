@@ -2,6 +2,7 @@
   "id": "parakeet-tdt-v3",
   "name": "Parakeet TDT v3",
   "family": "Parakeet",
+  "author": "NVIDIA",
   "summary": "NVIDIA's very fast, accurate recognizer for 25 European languages, with punctuation and sentence timestamps.",
   "tasks": [
     "stt"
@@ -13,8 +14,7 @@
       "label": "0.6B · bf16",
       "repo": "mlx-community/parakeet-tdt-0.6b-v3",
       "downloadBytes": 2509000000,
-      "memoryBytes": 3800000000,
-      "recommended": true
+      "memoryBytes": 3800000000
     }
   ],
   "license": {

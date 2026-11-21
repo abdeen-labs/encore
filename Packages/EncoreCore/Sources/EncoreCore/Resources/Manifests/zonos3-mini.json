@@ -2,6 +2,7 @@
   "id": "zonos3-mini",
   "name": "Zonos3 Mini",
   "family": "Zonos",
+  "author": "Zyphra",
   "summary": "Zyphra's light multilingual 44.1 kHz model with 27 built-in voices; clones from a short clip without a transcript.",
   "tasks": [
     "tts"
@@ -13,8 +14,7 @@
       "label": "bf16",
       "repo": "mlx-community/ZONOS3-Mini",
       "downloadBytes": 1408913747,
-      "memoryBytes": 1800000000,
-      "recommended": true
+      "memoryBytes": 1800000000
     }
   ],
   "license": {

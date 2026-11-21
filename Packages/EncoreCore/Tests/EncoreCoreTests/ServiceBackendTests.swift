@@ -48,7 +48,7 @@ import Testing
     @Test func fallsThroughOnUnsupportedAtRunTime() async throws {
         let native = FakeBackend(.mlxSwift, features: ["whisper": .transcription])
         native.unsupportedWithoutLanguage = true
-        let python = FakeBackend(.python, features: ["whisper": [.transcription, .wordTimestamps]])
+        let python = FakeBackend(.python, features: ["whisper": .transcription])
         let w = try ServiceWorld(models: [Self.whisper], backends: [native, python])
         let media = try w.wav("talk.wav", Signal.speechLike(seconds: 3, rate: 44_100), rate: 44_100)
         let events = try await collect(w.service.transcribe(TranscriptionRequest(modelID: "whisper-tiny", mediaPath: media.path)))
@@ -60,6 +60,40 @@ import Testing
         r.language = "en"
         _ = try await collect(w.service.transcribe(r))
         #expect(native.transcribeCalls.count == 2 && python.transcribeCalls.count == 1)
+    }
+
+    @Test func segmentTimingsPreferARuntimeThatAlsoTimesWords() async throws {
+        let native = FakeBackend(.mlxSwift, features: ["whisper": .transcription])
+        let python = FakeBackend(.python, features: ["whisper": [.transcription, .wordTimestamps]])
+        let w = try ServiceWorld(models: [Self.whisper], backends: [native, python])
+        let media = try w.wav("talk.wav", Signal.speechLike(seconds: 2, rate: 16_000), rate: 16_000)
+        let prefers = EncoreService.transcriptionPreference(.segment)
+        #expect(EncoreService.transcriptionPreference(.none).isEmpty && EncoreService.transcriptionPreference(.word).isEmpty)
+
+        // Segment timings (the default) go to the runtime that cuts finer segments.
+        let segments = TranscriptionRequest(modelID: "whisper-tiny", mediaPath: media.path)
+        _ = try await collect(w.service.transcribe(segments))
+        #expect(native.transcribeCalls.isEmpty && python.transcribeCalls.count == 1)
+        #expect(await w.service.plannedRuntime(modelID: "whisper-tiny", needs: .transcription, prefers: prefers) == .success(.python))
+        #expect(await w.service.plannedRuntime(modelID: "whisper-tiny") == .success(.mlxSwift))
+
+        // Plain text has no timings to refine, so it stays native.
+        var plain = segments
+        plain.timestamps = .none
+        _ = try await collect(w.service.transcribe(plain))
+        #expect(native.transcribeCalls.count == 1 && python.transcribeCalls.count == 1)
+
+        // A runtime chosen in Settings wins over the preference.
+        w.settings.setRuntimePreference(.mlxSwift, for: "whisper-tiny")
+        _ = try await collect(w.service.transcribe(segments))
+        #expect(native.transcribeCalls.count == 2 && python.transcribeCalls.count == 1)
+        w.settings.setRuntimePreference(.automatic, for: "whisper-tiny")
+
+        // With the helper not set up, segments run natively instead of failing.
+        python.setAvailability(.needsSetup("Not set up."))
+        _ = try await collect(w.service.transcribe(segments))
+        #expect(native.transcribeCalls.count == 3 && python.transcribeCalls.count == 1)
+        #expect(await w.service.plannedRuntime(modelID: "whisper-tiny", needs: .transcription, prefers: prefers) == .success(.mlxSwift))
     }
 
     @Test func unsupportedWithNoFallbackIsATypedError() async throws {

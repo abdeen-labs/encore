@@ -145,6 +145,9 @@ struct HistoryDetail: View {
         }
         DetailSection("Made with") {
             info("Model", g.modelName)
+            if manifest == nil {
+                notInCatalog(g.kind == .speech ? "The take still plays and exports; it can't be reused in the Studio." : nil)
+            }
             if let v = variantLabel(g.variantID) { info("Variant", v) }
             if let r = g.runtime { info("Runtime", r == .mlxSwift ? "Native (MLX Swift)" : "Python helper (mlx-audio)") }
             if let v = g.voiceName, !v.isEmpty { info(g.kind == .conversation ? "Voices" : "Voice", v) }
@@ -229,6 +232,7 @@ struct HistoryDetail: View {
         }
         DetailSection("Made with") {
             info("Model", t.modelName)
+            if manifest == nil { notInCatalog(nil) }
             if let v = variantLabel(t.variantID) { info("Variant", v) }
             if let r = t.runtime { info("Runtime", r == .mlxSwift ? "Native (MLX Swift)" : "Python helper (mlx-audio)") }
             info("Language", t.language.map(languageName) ?? (t.transcript.language.map { "\(languageName($0)) (detected)" } ?? "Automatic"))
@@ -245,6 +249,18 @@ struct HistoryDetail: View {
             }
             info("Segments", "\(t.transcript.segments.count)", mono: true)
         }
+    }
+
+    /// The record names a model this version of Encore no longer ships (one dropped from the catalog).
+    private func notInCatalog(_ detail: String?) -> some View {
+        Label {
+            Text(["This model is no longer in Encore's catalog.", detail].compactMap { $0 }.joined(separator: " "))
+                .textRole(.caption, color: .textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "archivebox").font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.footlight)
+        }
+        .padding(.vertical, 3)
     }
 
     // MARK: Formatting

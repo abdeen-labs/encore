@@ -107,11 +107,11 @@ private struct HistoryFilterBar: View {
     }
 
     private var kinds: some View {
-        SegmentedControl(selection: $model.kind, options: model.kindTabs) { k in
+        SegmentedControl(selection: $model.kind, options: model.kindTabs, count: { k in
             // Counts are of the whole history, so they'd mislead while searching or filtering.
             let n = model.isFiltered ? 0 : model.count(k)
-            return k == .all ? "All" : (n > 0 ? "\(k.title) \(n)" : k.title)
-        }
+            return k != .all && n > 0 ? n : nil
+        }) { k in k == .all ? "All" : k.title }
         .controlSize(.small)
     }
 
@@ -562,6 +562,7 @@ struct HistoryExportMenu: View {
     let model: HistoryModel
     let items: [HistoryItem]
     @Environment(ToastCenter.self) private var toasts
+    @Environment(ExportProgressCenter.self) private var exports: ExportProgressCenter?
     @State private var ffmpeg = true
 
     var body: some View {
@@ -601,9 +602,14 @@ struct HistoryExportMenu: View {
         let handler: (NSApplication.ModalResponse) -> Void = { response in
             guard response == .OK, let folder = panel.url else { return }
             Task { @MainActor in
-                toasts.show("Exporting \(chosen.count == 1 ? "1 item" : "\(chosen.count) items")…", symbol: "square.and.arrow.up", duration: 60)
-                let result = await model.export(chosen, format: format, to: folder)
-                if result.failures.isEmpty {
+                let title = chosen.count == 1 ? chosen[0].title : "\(chosen.count) items"
+                let result = (try? await AudioExportActions.trackingProgress(exports, title: title) { progress in
+                    await model.export(chosen, format: format, to: folder, progress: progress)
+                }) ?? HistoryModel.ExportResult(written: [], failures: [], canceled: true)
+                if result.canceled {
+                    toasts.show(result.written.isEmpty ? "Export canceled"
+                                : "Export canceled after \(result.written.count == 1 ? "1 file" : "\(result.written.count) files")", symbol: "xmark")
+                } else if result.failures.isEmpty {
                     toasts.show("Saved \(result.written.count == 1 ? "1 file" : "\(result.written.count) files") to “\(folder.lastPathComponent)”", tone: .success)
                 } else {
                     toasts.show("\(result.failures.count) couldn't be exported: \(result.failures[0])", tone: .danger, duration: 8)
@@ -616,7 +622,7 @@ struct HistoryExportMenu: View {
 
 // MARK: - Delete
 
-/// The confirmation: history deletes are permanent (audio files included), and the sheet says so.
+/// The confirmation: items leave history and their audio files go to the Trash, and the sheet says so.
 struct HistoryDeleteSheet: View {
     let model: HistoryModel
     @Environment(ToastCenter.self) private var toasts
@@ -631,7 +637,7 @@ struct HistoryDeleteSheet: View {
         let n = model.pendingDelete.count
         let audio = items.filter { $0.generation != nil }.count
         SheetContainer(title: n == 1 ? "Delete “\(items.first?.title ?? "this item")”?" : "Delete \(n) items?",
-                       subtitle: "This can't be undone.") {
+                       subtitle: subtitle(n: n, audio: audio)) {
             Text(message(n: n, audio: audio))
                 .textRole(.body, color: .textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -653,11 +659,12 @@ struct HistoryDeleteSheet: View {
             Button("Cancel") { model.pendingDelete = []; dismiss() }
                 .buttonStyle(.ghost)
                 .keyboardShortcut(.cancelAction)
-            Button(n == 1 ? "Delete permanently" : "Delete \(n) permanently", systemImage: "trash") {
+            Button(n == 1 ? "Delete" : "Delete \(n) items", systemImage: "trash") {
                 Task {
                     do {
                         let count = try await model.confirmDelete()
-                        toasts.show(count == 1 ? "Deleted" : "Deleted \(count) items", symbol: "trash")
+                        let deleted = count == 1 ? "Deleted" : "Deleted \(count) items"
+                        toasts.show(audio > 0 ? "\(deleted), audio moved to the Trash" : deleted, symbol: "trash")
                     } catch {
                         toasts.show(error.localizedDescription, tone: .danger, duration: 6)
                     }
@@ -668,15 +675,24 @@ struct HistoryDeleteSheet: View {
         }
     }
 
+    /// Audio goes to the Trash; a transcript has no file, so deleting only transcripts is final.
+    private func subtitle(n: Int, audio: Int) -> String {
+        switch audio {
+        case 0: "This can't be undone."
+        case 1 where n == 1: "Its audio file goes to the Trash."
+        default: "Audio files go to the Trash."
+        }
+    }
+
     private func message(n: Int, audio: Int) -> String {
         let what = n == 1 ? "It's removed from history" : "They're removed from history"
         let files: String
         switch audio {
         case 0: files = ""
-        case 1 where n == 1: files = ", and its audio file is deleted from this Mac"
-        default: files = ", and \(audio == 1 ? "1 audio file is" : "\(audio) audio files are") deleted from this Mac"
+        case 1 where n == 1: files = ", and its audio file is moved to the Trash, so you can still get it back from there"
+        default: files = ", and \(audio == 1 ? "1 audio file is" : "\(audio) audio files are") moved to the Trash, so you can still get them back from there"
         }
-        return "\(what)\(files). Nothing goes to the Trash. Voices in your library and files you exported stay as they are."
+        return "\(what)\(files). Voices in your library and files you exported stay as they are."
     }
 }
 

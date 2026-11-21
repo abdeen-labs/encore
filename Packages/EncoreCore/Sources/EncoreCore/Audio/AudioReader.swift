@@ -35,15 +35,20 @@ public enum AudioReader {
 
     /// Reads a file (or the part of it inside `range`, in seconds) as mono, at `sampleRate` if given,
     /// otherwise at the file's native rate.
+    /// - Parameter progress: fraction read so far (0…1), called from the reading thread after each chunk when the
+    ///   length is known up front.
     public static func read(_ url: URL, range: ClosedRange<TimeInterval>? = nil,
-                            sampleRate: Double? = nil) async throws -> AudioBuffer {
+                            sampleRate: Double? = nil, progress: (@Sendable (Double) -> Void)? = nil) async throws -> AudioBuffer {
         let reader = try await AudioFileReader(url: url, range: range, sampleRate: sampleRate)
         var samples: [Float] = []
         if let expected = reader.expectedFrameCount { samples.reserveCapacity(expected + 4096) }
+        let total = reader.expectedFrameCount.map { Double(max(1, $0)) }
         while let chunk = try reader.next() {
             try Task.checkCancellation()
             samples += chunk
+            if let progress, let total { progress(min(1, Double(samples.count) / total)) }
         }
+        progress?(1)
         return AudioBuffer(samples: samples, sampleRate: reader.outputSampleRate)
     }
 }

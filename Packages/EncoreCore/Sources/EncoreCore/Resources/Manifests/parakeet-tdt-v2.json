@@ -2,6 +2,7 @@
   "id": "parakeet-tdt-v2",
   "name": "Parakeet TDT v2",
   "family": "Parakeet",
+  "author": "NVIDIA",
   "summary": "NVIDIA's English-only Parakeet: very fast and accurate, with punctuation and sentence timestamps.",
   "tasks": [
     "stt"
@@ -13,8 +14,7 @@
       "label": "0.6B · bf16",
       "repo": "mlx-community/parakeet-tdt-0.6b-v2",
       "downloadBytes": 2472000000,
-      "memoryBytes": 3800000000,
-      "recommended": true
+      "memoryBytes": 3800000000
     }
   ],
   "license": {

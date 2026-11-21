@@ -161,7 +161,7 @@ struct ModelDetailView: View {
                 }
             }
             LicenseTextBox(state: library.licenses[manifest.id], repo: ModelsLibrary.licenseRepo(manifest, variant),
-                           fallbackURL: manifest.license.url.flatMap(URL.init(string:))) {
+                           licenseName: manifest.license.name, fallbackURL: manifest.license.url.flatMap(URL.init(string:))) {
                 library.licenses[manifest.id] = nil
                 Task { await library.loadDetails(manifest, variant, hub: downloads.service) }
             }
@@ -172,7 +172,7 @@ struct ModelDetailView: View {
 
     @ViewBuilder private var actions: some View {
         if confirmingDelete {
-            Text("Remove \(Bytes.file(onDisk)) from this Mac?").textRole(.label, color: .textSecondary)
+            Text(deleteQuestion).textRole(.label, color: .textSecondary)
             Button("Keep") { confirmingDelete = false }.buttonStyle(.ghost)
             Button("Delete", systemImage: "trash") { delete() }
                 .buttonStyle(.destructive)
@@ -199,6 +199,15 @@ struct ModelDetailView: View {
         }
     }
 
+    /// Says how much goes, and names any other model stored in the same files.
+    private var deleteQuestion: String {
+        let plan = downloads.deletionPlan(manifest, variant)
+        let question = "Remove \(Bytes.file(plan.bytes)) from this Mac?"
+        guard !plan.alsoRemoves.isEmpty else { return question }
+        let names = plan.alsoRemoves.map(\.name).formatted(.list(type: .and))
+        return "\(question) \(names) \(plan.alsoRemoves.count == 1 ? "uses" : "use") the same files and will be removed too."
+    }
+
     private var onDisk: Int64 {
         switch state {
         case .partial(let b), .downloaded(let b), .failed(_, let b): b
@@ -218,7 +227,8 @@ struct ModelDetailView: View {
             do {
                 let freed = try await downloads.delete(manifest, variant)
                 toasts.show(freed > 0 ? "Deleted \(manifest.name) · freed \(Bytes.file(freed))"
-                                      : "\(manifest.name) removed; its files are shared with another model", tone: .success, symbol: "trash")
+                                      : "\(manifest.name) removed; the files it shares with another model were kept",
+                            tone: .success, symbol: "trash")
             } catch {
                 toasts.show(error.localizedDescription, tone: .danger)
             }
@@ -266,7 +276,7 @@ private struct VariantRow: View {
             }
             HStack(spacing: 6) {
                 Text(variant.label).font(.ui(13, weight: .semibold)).foregroundStyle(.textPrimary)
-                if variant.recommended == true { Chip("Recommended", tone: .accent) }
+                if manifest.isRecommended(variant) { Chip("Recommended", tone: .accent).fixedSize().help(ModelManifest.recommendationHelp) }
             }
             Spacer(minLength: Theme.Space.s)
             Text(Bytes.file(variant.downloadBytes)).textRole(.mono, color: .textSecondary)
@@ -278,7 +288,7 @@ private struct VariantRow: View {
                 case .downloaded: StatusBadge("On Mac", tone: .success)
                 case .downloading(let p): Text("\(Int(p.fractionCompleted * 100))%").textRole(.monoSmall, color: .tungsten)
                 case .partial: StatusBadge("Partial", tone: .warning)
-                default: EmptyView()
+                default: Color.clear.frame(height: 1) // keeps the column, so sizes line up across rows
                 }
             }
             .frame(width: 70, alignment: .trailing)
@@ -303,6 +313,8 @@ private struct VariantRow: View {
 struct LicenseTextBox: View {
     let state: ModelsLibrary.LicenseState?
     let repo: String
+    /// Shown when there's no text to show (no license file and no bundled standard text).
+    let licenseName: String
     let fallbackURL: URL?
     var retry: () -> Void
 
@@ -337,8 +349,12 @@ struct LicenseTextBox: View {
                         .frame(maxHeight: 190)
                         .fixedSize(horizontal: false, vertical: true)
                     } else {
-                        Text("The repository has no license text. Read it at the source.").textRole(.caption)
-                            .frame(maxWidth: .infinity, minHeight: 64)
+                        VStack(spacing: 4) {
+                            Text(licenseName).textRole(.headline)
+                            Text("Encore doesn't have this license's text. Read it on the model's page.").textRole(.caption)
+                        }
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, minHeight: 64)
                     }
                 }
             }
@@ -349,18 +365,19 @@ struct LicenseTextBox: View {
                     Text(source(license.source)).textRole(.caption, color: .textTertiary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                if let url = loadedURL ?? fallbackURL { LinkButton(title: "Read the license", url: url) }
+                if let url = loadedURL ?? fallbackURL { LinkButton(title: hasNoText ? "Open the model's page" : "Read the license", url: url) }
             }
         }
     }
 
     private var loadedURL: URL? { if case .loaded(let l)? = state { return l.url } else { return nil } }
+    private var hasNoText: Bool { if case .loaded(let l)? = state { return l.text == nil } else { return false } }
 
     private func source(_ s: HubLicenseText.Source) -> String {
         switch s {
         case .repoFile(let path): "From \(path) in \(repo)"
         case .modelCard: "From the model card of \(repo)"
-        case .standard(let id): "Standard text of \(id), from spdx.org"
+        case .standard(let id): "Standard text of \(id), bundled with Encore"
         case .gatePrompt: "From the terms shown on \(repo)'s gate"
         case .none: "No license text published"
         }

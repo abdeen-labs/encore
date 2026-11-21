@@ -247,7 +247,7 @@ private struct AuditionsColumn: View {
     private var header: some View {
         HStack(spacing: Theme.Space.s) {
             Text("Auditions").textRole(.heading)
-            Text("\(model.auditions.count)").textRole(.mono, color: .textTertiary)
+            CountBadge(model.auditions.count)
             Spacer(minLength: Theme.Space.s)
             if !model.unsaved.isEmpty {
                 Button("Discard unkept", systemImage: "trash") { model.discardUnsaved() }

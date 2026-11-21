@@ -31,15 +31,16 @@ struct TranscribeStage: View {
         }
         .task { await model.prepare() }
         .task(id: runtimeKey) {
-            // Only word timings need asking (it can start the Python helper); segments run wherever the model does.
+            // Word timings may need the Python helper; segment timings prefer it when it gives finer rows.
             if model.timestamps == .word, let m = model.manifest { await model.shelf.refreshRuntimes(for: [m], requiring: model.requirement) }
+            await model.refreshSegmentRuntime()
         }
         #if DEBUG
         .environment(\.inlinePickerPanels, TranscribeFixtures.isRequested)
         #endif
     }
 
-    /// Re-asks which runtime will run the job when the model or the timings change (words may need the helper).
+    /// Re-asks which runtime will run the job when the model or the timings change.
     private var runtimeKey: String { "\(model.choice?.modelID ?? "-")|\(model.timestamps.rawValue)|\(model.isDownloaded)" }
 
     @ViewBuilder private var headerActions: some View {
@@ -179,27 +180,39 @@ private struct SetupView: View {
         }
     }
 
-    /// Word timings may route to the Python helper; say so before the run, not after.
+    /// Timings may route to the Python helper; say so before the run, not after.
     @ViewBuilder private var runtimeNote: some View {
-        if model.timestamps == .word, let m = model.manifest {
+        if let text = runtimeNoteText {
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "clock.badge.checkmark").font(.system(size: 11)).foregroundStyle(Color.tungsten.opacity(0.8))
-                Group {
-                    switch model.plannedRuntime {
-                    case .runs(.python)?:
-                        Text("Word timings come from \(m.name) in Encore's Python helper; segment timings run natively. The first run starts the helper, which takes a few seconds.")
-                    case .runs?:
-                        Text("\(m.name) times each word natively.")
-                    case .blocked(let e)?:
-                        Text("Word timings need \(m.name) in the Python helper: \(ErrorPresentation(e)?.message ?? e.localizedDescription)")
-                    case nil:
-                        Text("Checking where \(m.name) can time each word…")
-                    }
-                }
-                .textRole(.caption, color: .textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+                Text(text)
+                    .textRole(.caption, color: .textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, Theme.Space.xs)
+        }
+    }
+
+    private var runtimeNoteText: String? {
+        guard let m = model.manifest else { return nil }
+        switch model.timestamps {
+        case .word:
+            switch model.plannedRuntime {
+            case .runs(.python)?:
+                return "Word timings come from \(m.name) in Encore's Python helper. The first run starts the helper, which takes a few seconds."
+            case .runs?:
+                return "\(m.name) times each word natively."
+            case .blocked(let e)?:
+                return "Word timings need \(m.name) in the Python helper: \(ErrorPresentation(e)?.message ?? e.localizedDescription)"
+            case nil:
+                return "Checking where \(m.name) can time each word…"
+            }
+        case .segment:
+            // Only worth a line when the job leaves the app's own process.
+            guard case .runs(.python)? = model.segmentRuntime else { return nil }
+            return "Sentence-length segments come from \(m.name) in Encore's Python helper. The first run starts the helper, which takes a few seconds."
+        case .none:
+            return nil
         }
     }
 

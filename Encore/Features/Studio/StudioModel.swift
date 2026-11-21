@@ -47,6 +47,8 @@ final class StudioModel {
     private(set) var sessionTakeIDs: Set<UUID> = []
     /// True once the shelf has been scanned and a starting model picked.
     private(set) var isPrepared = false
+    /// The restored draft named a model that is no longer in the catalog; the screen says so until dismissed.
+    var draftModelRetired = false
 
     @ObservationIgnored private var perModel: [String: PerModel] = [:]
     @ObservationIgnored private var restoring = false
@@ -72,9 +74,8 @@ final class StudioModel {
     }
 
     convenience init(deps: AppDependencies) {
-        let live = SnapshotConfig(arguments: CommandLine.arguments) == nil
         self.init(service: deps.service, settings: deps.settings, voices: deps.voices, pronunciations: deps.pronunciations,
-                  shelf: deps.modelShelf, drafts: live ? .standard : nil)
+                  shelf: deps.modelShelf, drafts: deps.drafts)
     }
 
     isolated deinit { takesTask?.cancel() }
@@ -82,9 +83,19 @@ final class StudioModel {
     /// Picks a starting model once the cache has been scanned (keeps a restored draft's choice if it still exists).
     func prepare() async {
         await shelf.waitForScan()
-        if let c = choice, service.catalog.model(c.modelID)?.tasks.contains(.tts) != true { setChoiceQuietly(nil) }
+        let retired = choice.map { service.catalog.model($0.modelID)?.tasks.contains(.tts) != true } ?? false
+        if retired { setChoiceQuietly(nil) }
         if choice == nil, let initial = shelf.initialChoice(for: .tts, feature: .speech, settings: settings) {
             setChoiceQuietly(initial)
+        }
+        if retired {
+            // The draft's voice, language and parameters belonged to the model that left; keep only what carries over.
+            draftModelRetired = true
+            let m = manifest
+            if case .library = voice, m?.capabilities.cloning == true {} else { voice = .automatic }
+            if let l = language, m?.languages.contains(where: { $0.code == l }) != true { language = nil }
+            parameters = [:]
+            if directionKind == nil { instruct = "" }
         }
         if !takes.isEmpty, script.isEmpty { wingsTab = .takes }
         isPrepared = true
@@ -226,6 +237,7 @@ final class StudioModel {
     /// (or its defaults): a library voice carries over to another cloning model, nothing else does.
     private func modelChanged(from old: ModelChoice?) {
         guard !restoring else { return }
+        draftModelRetired = false
         if let old {
             perModel[old.modelID] = PerModel(voice: voice, language: language, parameters: parameters, instruct: instruct)
         }

@@ -61,6 +61,16 @@ struct FeatureFixture {
                 deps.hubAccount.showFixture(.signedOut)
                 return Overrides(settingsModel: settingsModel(ffmpeg: false, python: .needsSetup(pythonSetupMessage)))
             }),
+            FeatureFixture(name: "Settings-SignedOut-EncoreOnly", section: .settings, prepare: { deps in
+                deps.hubAccount.showFixture(.signedOut, signedOutOfEncoreOnly: true)
+                return Overrides(settingsModel: settingsModel(ffmpeg: true, python: pythonFound))
+            }),
+            FeatureFixture(name: "Settings-SignOutSheet", section: .settings, size: CGSize(width: 520, height: 420),
+                           prepare: { deps in
+                               deps.hubAccount.showFixture(.signedIn(account), source: .keychain)
+                               return Overrides(settingsModel: settingsModel(ffmpeg: true, python: pythonFound))
+                           },
+                           sheet: { _, _ in AnyView(SignOutSheet(tokenPath: "~/.cache/huggingface/token", everywhere: {}, encoreOnly: {})) }),
             FeatureFixture(name: "Settings-SignedIn", section: .settings, prepare: { deps in
                 deps.hubAccount.showFixture(.signedIn(account), source: .keychain)
                 loadedModels(deps)
@@ -79,7 +89,12 @@ struct FeatureFixture {
                 deps.hubAccount.showFixture(.invalidToken, source: .keychain)
                 return Overrides(settingsModel: settingsModel(ffmpeg: false, python: .needsSetup(pythonSetupMessage)))
             }),
-        ] + HistoryFixtures.all  // Features/History/HistoryFixtures.swift
+            // The rail as it looks while Command is held.
+            FeatureFixture(name: "Rail-ShortcutHints", section: .voices, prepare: { _ in Overrides() },
+                           sheet: { _, _ in AnyView(RootView().environment(\.forcesShortcutHints, true)) }),
+            FeatureFixture(name: "Rail-ShortcutHints-Min", section: .studio, size: minimum, prepare: { _ in Overrides() },
+                           sheet: { _, _ in AnyView(RootView().environment(\.forcesShortcutHints, true)) }),
+        ] + HistoryFixtures.all + VoiceFixtures.inspectorFixtures + ResetFixtures.all  // Features/History/HistoryFixtures.swift, Features/Voices/VoiceFixtures.swift, Features/Settings/ResetFixtures.swift
     }
 
     // MARK: Data
@@ -100,7 +115,7 @@ struct FeatureFixture {
         let GB: Int64 = 1_000_000_000
         var states: [ModelVariantKey: ModelDownloadState] = [:]
         for m in c.models { for v in m.variants { states[ModelVariantKey(m, v)] = .notDownloaded } }
-        states[key("kokoro")] = .downloaded(bytesOnDisk: 480_000_000)
+        states[key("soprano")] = .downloaded(bytesOnDisk: 284_000_000)
         states[key("whisper-large-v3-turbo")] = .downloaded(bytesOnDisk: 1_620_000_000)
         states[key("chatterbox-turbo")] = .downloaded(bytesOnDisk: 1_200_000_000)
         let total = Int64(3.1 * Double(GB))
@@ -127,12 +142,12 @@ struct FeatureFixture {
                 library.fits[ModelVariantKey(m, v)] = ModelsLibrary.Fit(verdict: verdict, summary: fitSummary(verdict, v.memoryBytes))
             }
         }
-        library.fits[key("kokoro")]?.alreadyLoaded = true
+        library.fits[key("soprano")]?.alreadyLoaded = true
         library.licenses["omnivoice"] = .loaded(HubLicenseText(source: .modelCard, text: omniVoiceLicense,
                                                                 url: URL(string: "https://huggingface.co/k2-fsa/OmniVoice")))
         library.licenses["qwen3-tts-base"] = .loading
         library.licenses["orpheus"] = .loaded(HubLicenseText(source: .standard("Apache-2.0"), text: apacheExcerpt,
-                                                              url: URL(string: "https://spdx.org/licenses/Apache-2.0.html")))
+                                                              url: URL(string: "https://huggingface.co/canopylabs/orpheus-3b-0.1-ft")))
         let orpheus = "canopylabs/orpheus-3b-0.1-ft"
         library.repoInfo["mlx-community/orpheus-3b-0.1-ft-4bit"] = HubRepoInfo(id: "mlx-community/orpheus-3b-0.1-ft-4bit", gate: .auto,
             licenseID: "apache-2.0", gatePrompt: orpheusPrompt, pageURL: URL(string: "https://huggingface.co/mlx-community/orpheus-3b-0.1-ft-4bit")!)
@@ -159,7 +174,7 @@ struct FeatureFixture {
             "jobs": [], "recentUnloads": [],
             "memory": ["physicalBytes": 51_539_607_552, "availableBytes": 33_700_000_000, "pressure": "normal"],
             "loaded": [
-                ["modelID": "kokoro", "modelName": "Kokoro", "variantID": "bf16", "variantLabel": "bf16", "runtime": "mlxSwift",
+                ["modelID": "soprano", "modelName": "Soprano", "variantID": "bf16", "variantLabel": "bf16", "runtime": "mlxSwift",
                  "memoryBytes": 3_100_000_000, "loadedAt": now - 900, "lastUsed": now - 120, "isBusy": false, "unloadsAt": now + 480],
                 ["modelID": "whisper-large-v3-turbo", "modelName": "Whisper Large v3 Turbo", "variantID": "fp16", "variantLabel": "fp16",
                  "runtime": "python", "memoryBytes": 2_400_000_000, "loadedAt": now - 60, "lastUsed": now, "isBusy": true],

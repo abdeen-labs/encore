@@ -14,7 +14,7 @@ enum ChangerFixtures {
     static func prepare(_ deps: AppDependencies) async {
         guard let state else { return }
         if state != "firstRun" {
-            await ProduceFixtureSeed.markDownloaded(deps, ["chatterbox-vc", "kokoro"], runtimes: ["chatterbox-vc": .python, "kokoro": .mlxSwift])
+            await ProduceFixtureSeed.markDownloaded(deps, ["chatterbox-vc", "zonos3-mini"], runtimes: ["chatterbox-vc": .python, "zonos3-mini": .mlxSwift])
         }
         let cast: ProduceFixtureSeed.Cast? = state == "noVoices" || state == "firstRun" ? nil : await ProduceFixtureSeed.addVoices(deps)
         let model = deps.screenModel("Changer") { ChangerModel(deps: deps) }

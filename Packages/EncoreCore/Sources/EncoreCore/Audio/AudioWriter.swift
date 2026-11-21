@@ -56,12 +56,17 @@ public struct AudioExportOptions: Codable, Sendable, Hashable {
     }
 }
 
+/// Export progress: the fraction done (0…1), called from whatever thread is encoding. Real encoder progress:
+/// frames handed to the WAV writer or the AAC encoder, and the position ffmpeg reports for MP3.
+public typealias ExportProgress = @Sendable (Double) -> Void
+
 /// The one entry point the UI calls to save audio.
 public enum AudioExporter {
     /// Writes `buffer` to `url` in `format`. The file is written to a temporary name and moved into place,
     /// so a failed or canceled export never leaves a half-written file behind.
     public static func export(_ buffer: AudioBuffer, to url: URL, format: AudioFileFormat,
-                              options: AudioExportOptions = AudioExportOptions()) async throws {
+                              options: AudioExportOptions = AudioExportOptions(),
+                              progress: ExportProgress? = nil) async throws {
         var buffer = buffer
         if let rate = options.sampleRate, abs(rate - buffer.sampleRate) > 0.01 {
             buffer = try AudioEdit.resample(buffer, to: rate)
@@ -70,12 +75,14 @@ public enum AudioExporter {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let temp = dir.appendingPathComponent(".\(UUID().uuidString).\(format.fileExtension)")
         defer { try? FileManager.default.removeItem(at: temp) }
+        progress?(0)
         switch format {
-        case .wav: try writeWAV(buffer, to: temp, encoding: options.wavEncoding)
-        case .m4a: try writeM4A(buffer, to: temp, bitrate: options.aacBitrate)
-        case .mp3: try await writeMP3(buffer, to: temp, bitrate: options.mp3Bitrate)
+        case .wav: try writeWAV(buffer, to: temp, encoding: options.wavEncoding, progress: progress)
+        case .m4a: try writeM4A(buffer, to: temp, bitrate: options.aacBitrate, progress: progress)
+        case .mp3: try await writeMP3(buffer, to: temp, bitrate: options.mp3Bitrate, progress: progress)
         }
         try Task.checkCancellation()
+        progress?(1)
         do {
             if FileManager.default.fileExists(atPath: url.path) {
                 _ = try FileManager.default.replaceItemAt(url, withItemAt: temp)
@@ -87,24 +94,52 @@ public enum AudioExporter {
         }
     }
 
-    /// Re-encodes any readable media file (audio or video) into `format`.
+    /// Re-encodes any readable media file (audio or video) into `format`. Progress covers reading (the first
+    /// `readShare`) and encoding (the rest).
     public static func convert(_ source: URL, to url: URL, format: AudioFileFormat,
-                               options: AudioExportOptions = AudioExportOptions()) async throws {
-        let buffer = try await AudioReader.read(source, sampleRate: options.sampleRate)
+                               options: AudioExportOptions = AudioExportOptions(),
+                               progress: ExportProgress? = nil) async throws {
+        let buffer = try await AudioReader.read(source, sampleRate: options.sampleRate, progress: scaled(progress, 0, readShare))
         var options = options
         options.sampleRate = nil
-        try await export(buffer, to: url, format: format, options: options)
+        try await export(buffer, to: url, format: format, options: options, progress: scaled(progress, readShare, 1))
+    }
+
+    /// The part of a conversion's progress bar given to decoding the source; encoding is the slow part.
+    static let readShare = 0.15
+
+    /// Maps a step's 0…1 onto `lower…upper` of the whole.
+    static func scaled(_ progress: ExportProgress?, _ lower: Double, _ upper: Double) -> ExportProgress? {
+        guard let progress else { return nil }
+        return { @Sendable fraction in progress(lower + (upper - lower) * min(max(fraction, 0), 1)) }
     }
 
     // MARK: Encoders
 
-    public static func writeWAV(_ buffer: AudioBuffer, to url: URL, encoding: WAVEncoding = .pcm16) throws {
+    /// Frames per progress step for encoders that write in one go otherwise.
+    static let progressChunk = 1 << 17
+
+    public static func writeWAV(_ buffer: AudioBuffer, to url: URL, encoding: WAVEncoding = .pcm16,
+                                progress: ExportProgress? = nil) throws {
         let writer = try WAVWriter(url: url, sampleRate: buffer.sampleRate, encoding: encoding)
-        try writer.append(buffer.samples)
+        if let progress {
+            let samples = buffer.samples
+            var offset = 0
+            while offset < samples.count {
+                try Task.checkCancellation()
+                let end = min(samples.count, offset + progressChunk)
+                try writer.append(Array(samples[offset..<end]))
+                offset = end
+                progress(Double(offset) / Double(samples.count))
+            }
+        } else {
+            try writer.append(buffer.samples)
+        }
         try writer.finish()
     }
 
-    public static func writeM4A(_ buffer: AudioBuffer, to url: URL, bitrate kbps: Int = 128) throws {
+    public static func writeM4A(_ buffer: AudioBuffer, to url: URL, bitrate kbps: Int = 128,
+                                progress: ExportProgress? = nil) throws {
         var buffer = buffer
         // AAC-LC tops out at 48 kHz; anything above is resampled down.
         if buffer.sampleRate > 48_000 { buffer = try AudioEdit.resample(buffer, to: 48_000) }
@@ -119,28 +154,44 @@ public enum AudioExporter {
         ]
         do {
             let file = try AVAudioFile(forWriting: url, settings: settings, commonFormat: .pcmFormatFloat32, interleaved: false)
-            try writeChunks(buffer, to: file)
+            try writeChunks(buffer, to: file, progress: progress)
         } catch let error as AudioError {
+            throw error
+        } catch let error as CancellationError {
             throw error
         } catch {
             throw AudioError.writeFailed(path: url.path, reason: error.localizedDescription)
         }
     }
 
-    public static func writeMP3(_ buffer: AudioBuffer, to url: URL, bitrate kbps: Int = 192) async throws {
+    /// Encodes through the user's ffmpeg (located at runtime; `AudioError.ffmpegMissing` when there is none).
+    /// Progress: writing the intermediate WAV takes the first `mp3StagingShare`, then the position ffmpeg reports.
+    public static func writeMP3(_ buffer: AudioBuffer, to url: URL, bitrate kbps: Int = 192,
+                                progress: ExportProgress? = nil) async throws {
         let ffmpeg = try FFmpeg.require(for: "MP3 export")
         let wav = EncorePaths.scratch.appendingPathComponent("\(UUID().uuidString).wav")
         defer { try? FileManager.default.removeItem(at: wav) }
-        try writeWAV(buffer, to: wav, encoding: .float32)
+        try writeWAV(buffer, to: wav, encoding: .float32, progress: scaled(progress, 0, mp3StagingShare))
         // MP3 supports 8–48 kHz; let LAME pick the nearest legal rate otherwise.
         var args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", wav.path,
                     "-codec:a", "libmp3lame", "-b:a", "\(kbps)k"]
         if buffer.sampleRate > 48_000 { args += ["-ar", "48000"] }
-        args += ["-f", "mp3", url.path]
-        try await FFmpeg.run(ffmpeg, args)
+        guard let encoding = scaled(progress, mp3StagingShare, 1), buffer.duration > 0 else {
+            args += ["-f", "mp3", url.path]
+            try await FFmpeg.run(ffmpeg, args)
+            return
+        }
+        // `-progress pipe:1` prints key=value blocks on stdout as it encodes; `out_time_us` is the position.
+        args += ["-nostats", "-progress", "pipe:1", "-f", "mp3", url.path]
+        let duration = buffer.duration
+        try await FFmpeg.run(ffmpeg, args, onStdoutLine: { line in
+            if let seconds = FFmpeg.progressSeconds(line) { encoding(seconds / duration) }
+        })
     }
 
-    static func writeChunks(_ buffer: AudioBuffer, to file: AVAudioFile) throws {
+    static let mp3StagingShare = 0.05
+
+    static func writeChunks(_ buffer: AudioBuffer, to file: AVAudioFile, progress: ExportProgress? = nil) throws {
         let chunk = 32_768
         guard let pcm = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(chunk)) else {
             throw AudioError.writeFailed(path: file.url.path, reason: "Unsupported format.")
@@ -148,11 +199,13 @@ public enum AudioExporter {
         var offset = 0
         try buffer.samples.withUnsafeBufferPointer { src in
             while offset < src.count {
+                if progress != nil { try Task.checkCancellation() }
                 let n = min(chunk, src.count - offset)
                 pcm.floatChannelData![0].update(from: src.baseAddress! + offset, count: n)
                 pcm.frameLength = AVAudioFrameCount(n)
                 try file.write(from: pcm)
                 offset += n
+                progress?(Double(offset) / Double(src.count))
             }
         }
     }

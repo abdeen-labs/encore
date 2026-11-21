@@ -59,10 +59,21 @@ public enum FFmpeg {
             && FileManager.default.isExecutableFile(atPath: url.path)
     }
 
+    /// The encoding position in seconds from one line of ffmpeg's `-progress` output (`out_time_us=…`, or the
+    /// older, misnamed `out_time_ms=…`, both microseconds). Nil for any other line or an `N/A` value.
+    static func progressSeconds(_ line: String) -> Double? {
+        let parts = line.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1)
+        guard parts.count == 2, parts[0] == "out_time_us" || parts[0] == "out_time_ms",
+              let micros = Double(parts[1].trimmingCharacters(in: .whitespaces)), micros >= 0 else { return nil }
+        return micros / 1_000_000
+    }
+
     /// Runs a tool to completion, returning stdout. Stderr is collected for error messages.
     /// Canceling the calling task terminates the process.
+    /// - Parameter onStdoutLine: called with each complete stdout line as it arrives (on a background thread).
     @discardableResult
-    static func run(_ executable: URL, _ arguments: [String]) async throws -> Data {
+    static func run(_ executable: URL, _ arguments: [String],
+                    onStdoutLine: (@Sendable (String) -> Void)? = nil) async throws -> Data {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
@@ -71,7 +82,7 @@ public enum FFmpeg {
         process.standardError = err
         process.standardInput = FileHandle.nullDevice
 
-        let collector = OutputCollector()
+        let collector = OutputCollector(onLine: onStdoutLine)
         out.fileHandleForReading.readabilityHandler = { h in collector.appendOut(h.availableData) }
         err.fileHandleForReading.readabilityHandler = { h in collector.appendErr(h.availableData) }
 
@@ -100,7 +111,25 @@ public enum FFmpeg {
     final class OutputCollector: @unchecked Sendable {
         private let lock = NSLock()
         private var _out = Data(), _err = Data()
-        func appendOut(_ d: Data) { lock.withLock { _out.append(d) } }
+        private let onLine: (@Sendable (String) -> Void)?
+        /// Bytes of stdout after the last newline handed to `onLine`.
+        private var pending = Data()
+
+        init(onLine: (@Sendable (String) -> Void)? = nil) { self.onLine = onLine }
+
+        func appendOut(_ d: Data) {
+            guard !d.isEmpty else { return }
+            let lines: [String] = lock.withLock {
+                _out.append(d)
+                guard onLine != nil else { return [] }
+                pending.append(d)
+                guard let last = pending.lastIndex(of: UInt8(ascii: "\n")) else { return [] }
+                let complete = pending[pending.startIndex...last]
+                pending = Data(pending[pending.index(after: last)...])
+                return String(decoding: complete, as: UTF8.self).split(whereSeparator: \.isNewline).map(String.init)
+            }
+            if let onLine { lines.forEach(onLine) }
+        }
         func appendErr(_ d: Data) { lock.withLock { _err.append(d) } }
         var out: Data { lock.withLock { _out } }
         /// Last few meaningful stderr lines.

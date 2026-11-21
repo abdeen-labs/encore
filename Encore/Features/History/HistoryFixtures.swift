@@ -54,6 +54,18 @@ enum HistoryFixtures {
                                       await m.waitForResults()
                                       m.requestDelete([s.detailTake])
                                   }))
+        // An MP3 export part-way through: the progress card over the screen.
+        for (name, size) in [("History-Exporting", nil), ("History-Exporting-Min", min)] as [(String, CGSize?)] {
+            out.append(FeatureFixture(name: name, section: .history, size: size, prepare: { deps in
+                deps.exports.debugShow("Harbor at dusk, take 3.mp3", fraction: 0.42)
+                return .init()
+            }, seed: { deps in
+                let s = await seed(deps)
+                let m = deps.screenModel("History") { HistoryModel(deps: deps) }
+                m.focusedID = s.detailTake
+                await m.waitForResults()
+            }))
+        }
         // The rail's activity lamp, over a populated History.
         for (name, size) in [("Rail-Idle", nil), ("Rail-Running", nil), ("Rail-Queued", nil), ("Rail-Running-Min", min), ("Rail-Queued-Min", min)] as [(String, CGSize?)] {
             out.append(FeatureFixture(name: name, section: .history, size: size, prepare: { deps in
@@ -109,7 +121,7 @@ enum HistoryFixtures {
                  language: "english", instruct: "Grand and theatrical, savoring every word", post: post,
                  seconds: 9.4, elapsed: 6.2, at: today(12), favorite: true, pitch: 112),
             Take(kind: .speech, title: "The house lights dim", text: "The house lights dim. A single spot finds the center of the stage.",
-                 model: "kokoro", variant: "bf16", voice: "Heart", params: ["speed": .double(1.1)], language: "a",
+                 model: "zonos3-mini", variant: "bf16", voice: "Imogen", params: ["speed": .double(1.1)], language: "en",
                  seconds: 4.2, elapsed: 0.9, at: today(40), pitch: 190),
             Take(kind: .conversation, title: "Act two, scene one",
                  text: "Captain Reyes: Who goes there?\nMira: Only the understudy, Captain.\nCaptain Reyes: Then step into the light.",
@@ -131,7 +143,7 @@ enum HistoryFixtures {
                  model: "chatterbox-turbo", variant: "8bit", voice: "Captain Reyes", voiceID: captain, seconds: 5.0, elapsed: 2.4,
                  at: ago(60 * 24 * 3 + 30), favorite: true, pitch: 100),
             Take(kind: .speech, title: "Welcome to the Encore stage", text: "Welcome to the Encore stage. Tonight's program runs for ninety minutes, with one interval.",
-                 model: "kokoro", variant: "bf16", voice: "Heart", language: "a", seconds: 5.6, elapsed: 1.1, at: ago(60 * 24 * 5), pitch: 185),
+                 model: "zonos3-mini", variant: "bf16", voice: "Imogen", language: "en", seconds: 5.6, elapsed: 1.1, at: ago(60 * 24 * 5), pitch: 185),
             Take(kind: .speech, title: "Good evening and welcome", text: "(A warm, unhurried narrator) Good evening, and welcome back to the archive.",
                  model: "voxcpm2", variant: "8bit", voice: nil, instruct: "A warm, unhurried narrator", seconds: 4.8, elapsed: 4.3,
                  at: ago(60 * 24 * 34), pitch: 120),

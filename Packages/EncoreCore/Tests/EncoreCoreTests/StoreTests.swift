@@ -127,33 +127,80 @@ func observes<T>(_ read: () -> T, after change: () throws -> Void) rethrows -> B
 
         // Into a fresh library: same ids and metadata, origin marked imported.
         let other = library("Other")
-        let imported = try await other.importVoices(from: file)
+        let imported = try await other.importVoices(from: file, consentConfirmedAt: Date())
         #expect(Set(imported.map(\.id)) == [a.id, b.id])
         let ia = try #require(other.voice(a.id))
         #expect(ia.name == "Ava" && ia.transcript == "one" && ia.tags == ["x"] && ia.origin == .imported)
-        #expect(ia.consentConfirmedAt == a.consentConfirmedAt)
         #expect(try Data(contentsOf: other.referenceAudioURL(for: b.id)!) == Data(contentsOf: clip))
 
         // Into the same library: new ids, originals untouched.
         try lib.rename(a.id, to: "Ava (edited)")
-        let again = try await lib.importVoices(from: file)
+        let again = try await lib.importVoices(from: file, consentConfirmedAt: Date())
         #expect(again.allSatisfy { $0.id != a.id && $0.id != b.id })
         #expect(lib.voice(a.id)?.name == "Ava (edited)")
         #expect(lib.voices.count == 4)
+    }
+
+    @Test func importingACloneNeedsTheImportersConsent() async throws {
+        let lib = library()
+        let exporterDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let a = try await lib.add(Voice(name: "Ava", origin: .cloned, transcript: "one", duration: 2,
+                                        consentConfirmedAt: exporterDate), referenceAudio: clip)
+        let b = try await lib.add(Voice(name: "Bram", origin: .designed, transcript: "two", designPrompt: "deep", duration: 3),
+                                  referenceAudio: clip)
+        let file = dir.url.appendingPathComponent("Both.\(VoiceLibrary.fileExtension)")
+        try await lib.export([a.id, b.id], to: file)
+
+        // Looking inside adds nothing and shows which voices need consent.
+        let other = library("Other")
+        let peek = try await other.inspectArchive(file)
+        #expect(Set(peek.map(\.id)) == [a.id, b.id])
+        #expect(peek.filter(\.needsSpeakerConsent).map(\.id) == [a.id])
+        #expect(other.voices.isEmpty)
+
+        // Without the importer's consent the whole file is refused and nothing is added.
+        do {
+            try await other.importVoices(from: file)
+            Issue.record("A cloned voice was imported without consent")
+        } catch let error as StoreError {
+            guard case .consentRequired = error else { Issue.record("Wrong error: \(error)"); return }
+        }
+        #expect(other.voices.isEmpty)
+
+        // With it, the clone carries the importer's date (now), never the exporter's; the designed voice carries none.
+        let now = Date()
+        try await other.importVoices(from: file, consentConfirmedAt: now)
+        let ia = try #require(other.voice(a.id)), ib = try #require(other.voice(b.id))
+        #expect(ia.consentConfirmedAt == now)
+        #expect(ia.consentConfirmedAt != exporterDate)
+        #expect(ib.consentConfirmedAt == nil)
+        // Saved to disk that way, not just returned.
+        let reread = library("Other").voice(a.id)?.consentConfirmedAt
+        #expect(reread.map { abs($0.timeIntervalSince(now)) < 1 } == true)
+        // Imported voices keep their kind for the next import: the designed one still needs no consent, the clone does.
+        #expect(!ib.needsSpeakerConsent && ia.needsSpeakerConsent)
+
+        // A file of designed voices only needs no consent.
+        let designedOnly = dir.url.appendingPathComponent("Designed.\(VoiceLibrary.fileExtension)")
+        try await lib.export([b.id], to: designedOnly)
+        let third = library("Third")
+        let d = try await third.importVoices(from: designedOnly)
+        #expect(d.map(\.name) == ["Bram"])
+        #expect(d.first?.consentConfirmedAt == nil)
     }
 
     @Test func importRejectsJunk() async throws {
         let lib = library()
         let junk = dir.url.appendingPathComponent("junk.encorevoice")
         try Data("not a zip".utf8).write(to: junk)
-        await #expect(throws: StoreError.self) { try await lib.importVoices(from: junk) }
+        await #expect(throws: StoreError.self) { try await lib.importVoices(from: junk, consentConfirmedAt: Date()) }
         // A valid zip that isn't a voice archive.
         let folder = dir.url.appendingPathComponent("zipme")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try Data("hi".utf8).write(to: folder.appendingPathComponent("readme.txt"))
         let zip = dir.url.appendingPathComponent("other.encorevoice")
         try await StoreFiles.run("/usr/bin/ditto", ["-c", "-k", folder.path, zip.path])
-        await #expect(throws: StoreError.self) { try await lib.importVoices(from: zip) }
+        await #expect(throws: StoreError.self) { try await lib.importVoices(from: zip, consentConfirmedAt: Date()) }
         #expect(lib.voices.isEmpty)
     }
 
@@ -183,11 +230,11 @@ func observes<T>(_ read: () -> T, after change: () throws -> Void) rethrows -> B
         let dir = try TempDir()
         let store = PresetStore(directory: dir.url)
         #expect(store.presets.isEmpty && store.loadError == nil)
-        let warm = Preset(name: "Warm", modelID: "kokoro", parameters: ["speed": .double(0.9)])
-        let alpha = Preset(name: "alpha", modelID: "kokoro", parameters: [:])
+        let warm = Preset(name: "Warm", modelID: "zonos3-mini", parameters: ["speed": .double(0.9)])
+        let alpha = Preset(name: "alpha", modelID: "zonos3-mini", parameters: [:])
         let other = Preset(name: "Fast", modelID: "qwen3", parameters: ["temperature": .double(0.7)])
         try store.save(warm); try store.save(alpha); try store.save(other)
-        #expect(store.presets(for: "kokoro").map(\.name) == ["alpha", "Warm"])
+        #expect(store.presets(for: "zonos3-mini").map(\.name) == ["alpha", "Warm"])
         try store.rename(warm.id, to: " Warmer ")
         #expect(store.preset(warm.id)?.name == "Warmer")
         try store.delete(alpha.id)
@@ -297,17 +344,17 @@ func observes<T>(_ read: () -> T, after change: () throws -> Void) rethrows -> B
         s.ffmpegPath = "/opt/homebrew/bin/ffmpeg"
         s.postProcessing.targetLUFS = -14
         s.setRuntimePreference(.python, for: "chatterbox")
-        s.setRuntimePreference(.automatic, for: "kokoro")
-        s.noteModelUsed("kokoro", for: .speech)
+        s.setRuntimePreference(.automatic, for: "zonos3-mini")
+        s.noteModelUsed("zonos3-mini", for: .speech)
         let snapshot = await Task.detached { s.snapshot() }.value
         #expect(snapshot.defaultExportFormat == .m4a && snapshot.postProcessing.targetLUFS == -14)
         #expect(snapshot.runtimePreference(for: "chatterbox") == .python)
-        #expect(snapshot.runtimePreference(for: "kokoro") == .automatic)
+        #expect(snapshot.runtimePreference(for: "zonos3-mini") == .automatic)
 
         let restored = AppSettings(defaults: defaults)
         #expect(restored.values == s.values)
         #expect(restored.idleUnloadMinutes == 0)
-        #expect(restored.lastUsedModels[.speech] == "kokoro")
+        #expect(restored.lastUsedModels[.speech] == "zonos3-mini")
         s.idleUnloadMinutes = -5
         #expect(s.idleUnloadMinutes == 0)
         s.resetToDefaults()

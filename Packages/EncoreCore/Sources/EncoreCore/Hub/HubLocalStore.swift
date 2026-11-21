@@ -84,7 +84,9 @@ public struct HubLocalStore: Sendable {
     func combine(_ repos: [HubRepoStatus]) -> HubVariantStatus {
         let state: HubLocalState
         if repos.allSatisfy(\.isComplete) { state = .downloaded }
-        else if repos.contains(where: { $0.presentBytes > 0 || $0.presentFiles > 0 }) { state = .partial }
+        // The first repo is the variant's own. Companion repos are shared with other models, so one of
+        // them being on disk doesn't make this variant partly downloaded.
+        else if let own = repos.first, own.presentBytes > 0 || own.presentFiles > 0 { state = .partial }
         else { state = .notDownloaded }
         return HubVariantStatus(repos: repos, state: state)
     }

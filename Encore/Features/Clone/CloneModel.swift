@@ -125,6 +125,14 @@ final class CloneModel {
 
     var length: TimeInterval { selection.upperBound - selection.lowerBound }
 
+    /// File lengths for which the trimmer offers "Use whole file": a dropped or chosen file already 5–15 s long,
+    /// capped at the most the chosen model takes so the whole clip can be saved as it is.
+    var wholeFileRange: ClosedRange<TimeInterval>? {
+        guard source?.kind == .file else { return nil }
+        let upper = min(15, target.upperBound + 0.05)
+        return upper >= 5 ? 5...upper : nil
+    }
+
     enum LengthVerdict { case good, short, tooShort, tooLong }
 
     var lengthVerdict: LengthVerdict {

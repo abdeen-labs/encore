@@ -73,9 +73,8 @@ final class ChangerModel {
     }
 
     convenience init(deps: AppDependencies) {
-        let live = SnapshotConfig(arguments: CommandLine.arguments) == nil
         self.init(service: deps.service, settings: deps.settings, voices: deps.voices, shelf: deps.modelShelf,
-                  drafts: live ? .standard : nil)
+                  drafts: deps.drafts)
     }
 
     isolated deinit { recentTask?.cancel(); segmentTask?.cancel() }

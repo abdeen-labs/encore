@@ -80,13 +80,16 @@ public final class EncoreService: Sendable, Observable {
 
     /// Backends able to do `needs` for this model, in the order they'll be tried. Throws when there are none,
     /// saying whether setup would help.
-    public func capableBackends(for manifest: ModelManifest, needs: EngineFeatures) async throws -> [any EngineBackend] {
+    public func capableBackends(for manifest: ModelManifest, needs: EngineFeatures,
+                                prefers: EngineFeatures = []) async throws -> [any EngineBackend] {
         var ordered = backends
-        if let preferred = settings.snapshot().runtimePreference(for: manifest.id).runtime,
-           let i = ordered.firstIndex(where: { $0.runtime == preferred }) {
+        let chosen = settings.snapshot().runtimePreference(for: manifest.id).runtime
+        if let chosen, let i = ordered.firstIndex(where: { $0.runtime == chosen }) {
             ordered.insert(ordered.remove(at: i), at: 0)
         }
         var ready: [any EngineBackend] = []
+        // Ready backends that also offer `prefers`; they go first unless a runtime was chosen in Settings.
+        var favored: [any EngineBackend] = []
         var setup: (EngineRuntime, String)?
         var unavailable: (EngineRuntime, String)?
         var supportedAnywhere: EngineFeatures = []
@@ -95,11 +98,14 @@ public final class EncoreService: Sendable, Observable {
             supportedAnywhere.formUnion(features)
             guard features.isSuperset(of: needs) else { continue }
             switch await backend.availability() {
-            case .ready: ready.append(backend)
+            case .ready:
+                if chosen == nil, !prefers.isEmpty, features.isSuperset(of: prefers) { favored.append(backend) }
+                else { ready.append(backend) }
             case .needsSetup(let m): if setup == nil { setup = (backend.runtime, m) }
             case .unavailable(let m): if unavailable == nil { unavailable = (backend.runtime, m) }
             }
         }
+        ready = favored + ready
         if !ready.isEmpty { return ready }
         if let setup { throw ServiceError.backendNeedsSetup(runtime: setup.0, message: setup.1) }
         if let unavailable { throw ServiceError.backendUnavailable(runtime: unavailable.0, message: unavailable.1) }
@@ -111,11 +117,12 @@ public final class EncoreService: Sendable, Observable {
     }
 
     /// Which runtime a model would run on for these needs ("Native" vs "Python helper"), or why none can.
-    public func plannedRuntime(modelID: String, needs: EngineFeatures? = nil) async -> Result<EngineRuntime, ServiceError> {
+    public func plannedRuntime(modelID: String, needs: EngineFeatures? = nil,
+                               prefers: EngineFeatures = []) async -> Result<EngineRuntime, ServiceError> {
         do {
             let m = try manifest(modelID)
             let needs = needs ?? Self.basicNeeds(m)
-            return .success(try await capableBackends(for: m, needs: needs)[0].runtime)
+            return .success(try await capableBackends(for: m, needs: needs, prefers: prefers)[0].runtime)
         } catch let e as ServiceError { return .failure(e) }
         catch { return .failure(.generationFailed(error.localizedDescription)) }
     }

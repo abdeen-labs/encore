@@ -60,10 +60,13 @@ struct TestZip {
         return zip
     }
 
+    /// Consent is given, so a refusal comes from the archive checks and not from the consent rule. Looking inside
+    /// first (as the import sheet does) is refused the same way.
     func expectRefused(_ zip: TestZip, sourceLocation: SourceLocation = #_sourceLocation) async throws {
         let url = dir.url.appendingPathComponent("hostile-\(UUID().uuidString).encorevoice")
         try zip.write(to: url)
-        await #expect(throws: StoreError.self, sourceLocation: sourceLocation) { try await lib.importVoices(from: url) }
+        await #expect(throws: StoreError.self, sourceLocation: sourceLocation) { try await lib.inspectArchive(url) }
+        await #expect(throws: StoreError.self, sourceLocation: sourceLocation) { try await lib.importVoices(from: url, consentConfirmedAt: Date()) }
         #expect(lib.voices.isEmpty, sourceLocation: sourceLocation)
     }
 
@@ -79,7 +82,7 @@ struct TestZip {
         zip.file("\(id.uuidString)/reference.wav", "RIFF")
         let url = dir.url.appendingPathComponent("good.encorevoice")
         try zip.write(to: url)
-        let imported = try await lib.importVoices(from: url)
+        let imported = try await lib.importVoices(from: url, consentConfirmedAt: Date())
         #expect(imported.map(\.name) == ["Evil"])
         #expect(try Data(contentsOf: lib.referenceAudioURL(for: imported[0].id)!) == Data("RIFF".utf8))
     }
@@ -128,7 +131,7 @@ struct TestZip {
                                                    withDestinationPath: "/etc/hosts")
         let url = dir.url.appendingPathComponent("ditto.encorevoice")
         try await StoreFiles.run("/usr/bin/ditto", ["-c", "-k", src.path, url.path])
-        await #expect(throws: StoreError.self) { try await lib.importVoices(from: url) }
+        await #expect(throws: StoreError.self) { try await lib.importVoices(from: url, consentConfirmedAt: Date()) }
         #expect(lib.voices.isEmpty)
     }
 

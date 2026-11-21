@@ -83,7 +83,7 @@ private struct SpotCone: Shape {
 
 /// An inline message that lives in the layout (not floating). Tone sets the lamp color.
 ///
-///     Banner(.warning, title: "Model not downloaded", message: "Download Kokoro to perform.") {
+///     Banner(.warning, title: "Model not downloaded", message: "Download Soprano to perform.") {
 ///         Button("Download") { … }.buttonStyle(.secondary)
 ///     }
 ///     Banner(.danger, title: "Generation failed", message: error.localizedDescription, onDismiss: { error = nil })

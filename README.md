@@ -41,7 +41,7 @@ cd Packages/EncoreCore && xcodebuild -scheme encore-cli -configuration Debug -de
 ```
 
 ```bash
-build/cli/Build/Products/Debug/encore-cli service speak --model kokoro --text "Hello from Encore." --out hello.wav --root /tmp/encore-test
+build/cli/Build/Products/Debug/encore-cli service speak --model soprano --text "Hello from Encore." --out hello.wav --root /tmp/encore-test
 ```
 
 Run `encore-cli` with no arguments for the other commands. `--root` keeps history and voices out of the app's real folders.

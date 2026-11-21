@@ -33,6 +33,19 @@ import Testing
         #expect(env["PATH"]?.hasPrefix("/x/python/bin:/opt/ffmpeg/bin:") == true)
         #expect(env["HF_HUB_CACHE"] == EncorePaths.huggingFaceHub.path)
         #expect(env["PYTHONHOME"] == nil)
+        #expect(env["HF_TOKEN_PATH"] == EncorePaths.huggingFaceTokenFile.path)
+        #expect(env["HF_HUB_DISABLE_IMPLICIT_TOKEN"] == nil)
+        #expect(env["HF_TOKEN"] == nil)
+    }
+
+    @Test func helperDoesNotSeeSharedTokenWhenSignedOutOfEncoreOnly() {
+        let runtime = PythonRuntime(executable: URL(fileURLWithPath: "/x/python/bin/python3"),
+                                    helperRoot: URL(fileURLWithPath: "/x/PythonHelper"), origin: .override)
+        let env = runtime.environment(ffmpegDirectory: nil, sharedHubToken: false)
+        #expect(env["HF_TOKEN_PATH"] == "/dev/null")
+        #expect(env["HF_HUB_DISABLE_IMPLICIT_TOKEN"] == "1")
+        #expect(env["HF_TOKEN"] == nil)
+        #expect(env["HF_HUB_OFFLINE"] == "1")
     }
 
     @Test func voiceConversionManifestDecodes() throws {

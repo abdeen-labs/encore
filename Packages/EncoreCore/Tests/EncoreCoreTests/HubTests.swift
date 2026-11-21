@@ -54,8 +54,8 @@ private func install(_ layout: HubCacheLayout, repo: String, commit: String = co
 
 @Test func hubCacheLayoutPaths() {
     let layout = HubCacheLayout(root: URL(fileURLWithPath: "/c/hub"))
-    #expect(HubCacheLayout.folderName(repo: "mlx-community/Kokoro-82M-bf16") == "models--mlx-community--Kokoro-82M-bf16")
-    #expect(HubCacheLayout.repo(fromFolderName: "models--mlx-community--Kokoro-82M-bf16") == "mlx-community/Kokoro-82M-bf16")
+    #expect(HubCacheLayout.folderName(repo: "mlx-community/Soprano-1.1-80M-bf16") == "models--mlx-community--Soprano-1.1-80M-bf16")
+    #expect(HubCacheLayout.repo(fromFolderName: "models--mlx-community--Soprano-1.1-80M-bf16") == "mlx-community/Soprano-1.1-80M-bf16")
     #expect(HubCacheLayout.repo(fromFolderName: "datasets--a--b") == nil)
     #expect(HubCacheLayout.repo(fromFolderName: ".locks") == nil)
     #expect(layout.blob("a/b", etag: "e").path == "/c/hub/models--a--b/blobs/e")
@@ -173,8 +173,57 @@ func hubGlobMatchesPython(path: String, pattern: String, expected: Bool) {
     #expect(open.licenseID == "mit")
     #expect(HubService.licenseFileCandidates(open) == ["LICENSE", "LICENSE-MODEL.md", "COPYING"])
     #expect(HubService.parseRepoInfo(["gated": "auto"], repo: "a/b", endpoint: endpoint).gate == .auto)
-    #expect(HubLicenseCatalog.url(for: "Apache-2.0")?.absoluteString == "https://spdx.org/licenses/Apache-2.0.html")
-    #expect(HubLicenseCatalog.url(for: "other") == nil)
+    #expect(HubLicenseCatalog.spdxID(for: "apache-2.0") == "Apache-2.0")
+    #expect(HubLicenseCatalog.spdxID(for: "other") == nil)
+}
+
+// MARK: - Bundled license texts
+
+@Test func bundledLicenseTextsCoverTheCatalog() {
+    let bundled = HubLicenseCatalog.bundledIDs
+    // Every license the catalog declares, plus the other common model-repo licenses.
+    let (catalog, _) = ModelCatalog.bundled()
+    var expected: Set<String> = ["MIT", "Apache-2.0", "BSD-3-Clause", "CC-BY-4.0", "CC-BY-NC-4.0", "CC-BY-SA-4.0",
+                                 "CC-BY-NC-SA-4.0", "CC0-1.0"]
+    #expect(!catalog.models.isEmpty)
+    for manifest in catalog.models {
+        // A custom license (no SPDX id) has no standard text; the details view links to the model's page instead.
+        if let id = HubLicenseCatalog.spdxID(for: manifest.license.name) { expected.insert(id) }
+    }
+    #expect(expected.isSubset(of: bundled), "missing: \(expected.subtracting(bundled).sorted())")
+    for id in bundled {
+        #expect(HubLicenseCatalog.bundledText(for: id)?.isEmpty == false, "\(id) is empty")
+    }
+}
+
+@Test func bundledLicenseLookupAcceptsHubSpellings() throws {
+    let apache = try #require(HubLicenseCatalog.bundledText(for: "apache-2.0"))
+    #expect(apache.hasPrefix("Apache License\nVersion 2.0, January 2004"))
+    #expect(HubLicenseCatalog.bundledText(for: "Apache-2.0") == apache)
+    #expect(HubLicenseCatalog.bundledText(for: "mit")?.hasPrefix("MIT License") == true)
+    #expect(HubLicenseCatalog.bundledText(for: "cc-by-nc-4.0")?.hasPrefix("Creative Commons Attribution-NonCommercial 4.0 International") == true)
+    #expect(HubLicenseCatalog.bundledText(for: "cc-by-4.0")?.hasPrefix("Creative Commons Attribution 4.0 International") == true)
+    #expect(HubLicenseCatalog.bundledText(for: "cc0-1.0")?.contains("CC0 1.0 Universal") == true)
+    #expect(HubLicenseCatalog.bundledText(for: "gpl-3.0") == nil)  // known id, not bundled
+    #expect(HubLicenseCatalog.bundledText(for: "llama3.2") == nil)
+    #expect(HubLicenseCatalog.bundledText(for: nil) == nil)
+}
+
+@Test func licenseTextUsesBundledTextAndNeverTheNetwork() async {
+    // A closed local port: any request would fail, and nothing here should make one (no files, no README, no link).
+    let hub = HubService(endpoint: URL(string: "http://127.0.0.1:9")!, token: { nil })
+    let page = URL(string: "https://huggingface.co/x/y")!
+    let mit = await hub.licenseText(for: HubRepoInfo(id: "x/y", licenseID: "mit", pageURL: page))
+    #expect(mit.source == .standard("MIT"))
+    #expect(mit.text?.hasPrefix("MIT License") == true)
+    #expect(mit.url == page)
+
+    // Not bundled, no gate prompt: no text, and the link is the model's page.
+    let other = await hub.licenseText(for: HubRepoInfo(id: "x/y", licenseID: "gpl-3.0", pageURL: page))
+    #expect(other.source == HubLicenseText.Source.none && other.text == nil && other.url == page)
+
+    let gated = await hub.licenseText(for: HubRepoInfo(id: "x/y", licenseID: "llama3.2", gatePrompt: "Terms", pageURL: page))
+    #expect(gated.source == .gatePrompt && gated.text == "Terms")
 }
 
 @Test func hubExtractsLicenseSectionFromModelCard() {
@@ -375,6 +424,102 @@ func hubGlobMatchesPython(path: String, pattern: String, expected: Bool) {
     #expect(!FileManager.default.fileExists(atPath: file.path))
 }
 
+/// A store on a throwaway Keychain service and a token file in a temp folder: never the user's real token.
+private func scratchTokenStore() -> (store: HubTokenStore, file: URL) {
+    let file = tempDir().appendingPathComponent("hf/token")
+    let store = HubTokenStore(service: "dev.abdeen.Encore.huggingface.unit-test-\(UUID().uuidString)", tokenFile: file, readsEnvironment: false)
+    return (store, file)
+}
+
+private func writeFile(_ text: String, to file: URL) throws {
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data(text.utf8).write(to: file)
+}
+
+@Test func hubTokenFileWinsOverKeychain() throws {
+    let (store, file) = scratchTokenStore()
+    defer { try? store.clear() }
+    try store.save("hf_old")
+    #expect(store.current()?.source == .keychain)
+
+    // Something else (the hf tool) logs in with another token: the file wins and the Keychain copy follows.
+    try writeFile("hf_new\n", to: file)
+    let first = store.current()
+    #expect(first?.token == "hf_new" && first?.source == .tokenFile)
+    #expect(try store.keychainToken() == "hf_new")
+    #expect(store.current()?.source == .keychain)  // now in agreement
+
+    // No file: the Keychain copy is used, and the file isn't written back.
+    try FileManager.default.removeItem(at: file)
+    let keychainOnly = store.current()
+    #expect(keychainOnly?.token == "hf_new" && keychainOnly?.source == .keychain)
+    #expect(!FileManager.default.fileExists(atPath: file.path))
+
+    // A blank file counts as no file.
+    try writeFile("  \n", to: file)
+    #expect(store.current()?.token == "hf_new")
+    #expect(try String(contentsOf: file, encoding: .utf8) == "  \n")
+}
+
+@Test func hubTokenEncoreOnlySignOutIgnoresFileUntilSignIn() throws {
+    let (store, file) = scratchTokenStore()
+    defer { try? store.clear() }
+    try store.save("hf_a")
+    #expect(!store.isSignedOutOfEncoreOnly)
+
+    try store.signOutOfEncoreOnly()
+    #expect(store.isSignedOutOfEncoreOnly)
+    #expect(!store.hasKeychainToken)
+    #expect(try String(contentsOf: file, encoding: .utf8) == "hf_a")  // the shared file is left alone
+    #expect(store.current()?.token == nil)
+
+    // A relaunch is a fresh store on the same service and file: still signed out, even when the file changes.
+    let relaunched = HubTokenStore(service: store.service, tokenFile: file, readsEnvironment: false)
+    #expect(relaunched.isSignedOutOfEncoreOnly)
+    #expect(relaunched.current()?.token == nil)
+    try writeFile("hf_b", to: file)
+    #expect(relaunched.current()?.token == nil)
+    #expect(!relaunched.hasKeychainToken)  // nothing was adopted
+
+    // Signing in again in Encore ends it.
+    try relaunched.save("hf_c")
+    #expect(!relaunched.isSignedOutOfEncoreOnly)
+    #expect(relaunched.current()?.token == "hf_c")
+
+    // Choosing to use the shared token again picks up the file.
+    try store.signOutOfEncoreOnly()
+    try writeFile("hf_d", to: file)
+    #expect(store.current()?.token == nil)
+    try store.clearEncoreOnlySignOut()
+    #expect(store.current()?.token == "hf_d")
+
+    // Signing out everywhere clears the state too.
+    try store.signOutOfEncoreOnly()
+    try store.clear()
+    #expect(!store.isSignedOutOfEncoreOnly)
+    #expect(!FileManager.default.fileExists(atPath: file.path))
+}
+
+@MainActor @Test func hubAccountEncoreOnlySignOutSurvivesRefresh() async throws {
+    let (store, file) = scratchTokenStore()
+    defer { try? store.clear() }
+    try store.save("hf_a")
+    // A closed local port: whoami would fail as "unreachable", and the signed-out path makes no request at all.
+    let account = HubAccountModel(tokenStore: store, endpoint: URL(string: "http://127.0.0.1:9")!)
+    #expect(account.signOutOfEncoreOnly())
+    #expect(account.status == .signedOut && account.isSignedOutOfEncoreOnly && account.sharedTokenFileExists)
+
+    let relaunched = HubAccountModel(tokenStore: HubTokenStore(service: store.service, tokenFile: file, readsEnvironment: false),
+                                     endpoint: URL(string: "http://127.0.0.1:9")!)
+    await relaunched.refresh()
+    #expect(relaunched.status == .signedOut)
+    #expect(relaunched.isSignedOutOfEncoreOnly && relaunched.tokenSource == nil)
+
+    account.signOut()
+    #expect(!store.isSignedOutOfEncoreOnly && !account.isSignedOutOfEncoreOnly)
+    #expect(!FileManager.default.fileExists(atPath: file.path))
+}
+
 // MARK: - Download center
 
 @MainActor @Test func hubDownloadStateFromStatus() {
@@ -386,4 +531,62 @@ func hubGlobMatchesPython(path: String, pattern: String, expected: Bool) {
                                 activeFiles: [], totalFiles: 2, completedFiles: 1)
     #expect(p.fractionCompleted == 0.25)
     #expect(p.estimatedSecondsRemaining == 6)
+}
+
+
+// MARK: - Shared repos
+
+private func manifest(_ id: String, variants: [(id: String, repo: String, companions: [String])]) -> ModelManifest {
+    let json: [String: Any] = [
+        "id": id, "name": id, "family": id, "summary": "", "tasks": ["tts"], "engine": "x",
+        "variants": variants.map { ["id": $0.id, "label": "8-bit", "repo": $0.repo, "companionRepos": $0.companions,
+                                    "downloadBytes": 0, "memoryBytes": 0] as [String: Any] },
+        "license": ["name": "MIT"], "capabilities": [String: Any](), "languages": [Any](), "presetVoices": [Any](),
+        "expressiveTags": [Any](), "parameters": [Any](), "maxChunkCharacters": 300, "sampleRate": 24000,
+    ]
+    return try! JSONDecoder().decode(ModelManifest.self, from: JSONSerialization.data(withJSONObject: json))
+}
+
+@Test func hubCompanionAloneIsNotAPartialDownload() {
+    let layout = HubCacheLayout(root: tempDir())
+    _ = install(layout, repo: "m/codec", files: [("codec.safetensors", "c", true)])
+    let store = HubLocalStore(layout: layout)
+    // The model's own repo has nothing on disk; only the shared companion does.
+    #expect(store.status(of: variant("m/turbo", companions: ["m/codec"])).state == .notDownloaded)
+    _ = install(layout, repo: "m/turbo", files: [("w.bin", "12345", true)])
+    #expect(store.status(of: variant("m/turbo", companions: ["m/codec"])).state == .downloaded)
+}
+
+@MainActor @Test func hubDeleteHandlesSharedCompanionsAndSharedRepos() async throws {
+    let layout = HubCacheLayout(root: tempDir())
+    let store = HubLocalStore(layout: layout)
+    // turbo (two variants) and multi share a companion; multi and changer live in the same repo.
+    let turbo = manifest("turbo", variants: [("8bit", "m/turbo-8", ["m/codec"]), ("4bit", "m/turbo-4", ["m/codec"])])
+    let multi = manifest("multi", variants: [("v3", "m/multi", ["m/codec"])])
+    let changer = manifest("changer", variants: [("v3", "m/multi", ["m/codec"])])
+    for repo in ["m/turbo-8", "m/multi", "m/codec"] { _ = install(layout, repo: repo, files: [("w.bin", "12345", true)]) }
+    let center = ModelDownloadCenter(catalog: ModelCatalog(models: [turbo, multi, changer]),
+                                     downloader: HubDownloader(store: store))
+    await center.refresh(verifyOnline: false)
+    func exists(_ repo: String) -> Bool { FileManager.default.fileExists(atPath: layout.repoDirectory(repo).path) }
+
+    // The variant that was never downloaded isn't "partial" just because the shared companion is there.
+    #expect(center.state(turbo, turbo.variants[1]) == .notDownloaded)
+
+    // Deleting turbo removes its own repo and keeps the companion another model still needs.
+    #expect(center.deletionPlan(turbo, turbo.variants[0]).repos == ["m/turbo-8"])
+    try await center.delete(turbo, turbo.variants[0])
+    #expect(!exists("m/turbo-8") && exists("m/codec"))
+    #expect(center.state(turbo, turbo.variants[0]) == .notDownloaded)
+    #expect(center.state(multi, multi.variants[0]).isDownloaded)
+
+    // Deleting a model that shares its repo with another names that model and removes both, and now that
+    // nothing on disk needs the companion, it goes too.
+    let plan = center.deletionPlan(multi, multi.variants[0])
+    #expect(plan.alsoRemoves.map(\.id) == ["changer"])
+    #expect(Set(plan.repos) == ["m/multi", "m/codec"])
+    try await center.delete(multi, multi.variants[0])
+    #expect(!exists("m/multi") && !exists("m/codec"))
+    #expect(center.state(multi, multi.variants[0]) == .notDownloaded)
+    #expect(center.state(changer, changer.variants[0]) == .notDownloaded)
 }

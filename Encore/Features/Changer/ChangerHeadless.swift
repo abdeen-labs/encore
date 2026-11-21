@@ -14,20 +14,20 @@ enum ChangerHeadless {
         let targetText = "Good evening. This is my voice, recorded clearly, so the changer can learn exactly how I sound."
         let source: URL, target: URL
         do {
-            source = try await h.speak(sourceText, voice: "af_heart", name: "source-short.wav")
-            target = try await h.speak(targetText, voice: "am_onyx", name: "target-voice.wav", speed: 0.95)
+            source = try await h.speak(sourceText, voice: 0, name: "source-short.wav")
+            target = try await h.speak(targetText, voice: 1, name: "target-voice.wav")
         } catch { log("FAIL synthesizing test audio: \(error)"); return false }
         let voice: Voice
         do {
             let d = try await AudioReader.probe(target).duration
-            voice = try await h.voices.add(Voice(name: "Onyx", origin: .imported, transcript: targetText, language: "en", duration: d),
+            voice = try await h.voices.add(Voice(name: "Target", origin: .imported, transcript: targetText, language: "en", duration: d),
                                            referenceAudio: target)
         } catch { log("FAIL adding the target voice: \(error)"); return false }
 
         let model = ChangerModel(service: h.service, settings: h.settings, voices: h.voices, shelf: h.shelf, drafts: nil)
         await model.prepare()
-        guard let vc = h.catalog.model("chatterbox-vc") else { log("FAIL no chatterbox-vc manifest"); return false }
-        model.debugSet(choice: ModelChoice(modelID: vc.id, variantID: h.shelf.preferredVariant(vc).id), voiceID: voice.id)
+        guard let vc = ProofModels.voiceChange(h.catalog) else { log("FAIL no voice changer in the catalog"); return false }
+        model.debugSet(choice: ProofModels.choice(vc, shelf: h.shelf), voiceID: voice.id)
         log("helper problem: \(model.helperProblem ?? "none"); downloaded: \(model.isDownloaded)")
 
         var ok = true
@@ -42,7 +42,7 @@ enum ChangerHeadless {
             "When the footsteps finally came, they were slower than she remembered, but she knew them all the same.",
         ]
         let long: URL
-        do { long = try await h.speak(paragraphs.joined(separator: " [pause 0.8s] "), voice: "bf_emma", name: "source-long.wav") }
+        do { long = try await h.speak(paragraphs.joined(separator: " [pause 0.8s] "), voice: 2, name: "source-long.wav") }
         catch { log("FAIL synthesizing the long source: \(error)"); return false }
         model.pieceSeconds = 10
         ok = await convert(model, h: h, source: long, text: paragraphs.joined(separator: " "), target: target, label: "long") && ok

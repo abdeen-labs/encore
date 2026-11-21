@@ -5,7 +5,7 @@ import EncoreCore
 import Foundation
 
 /// The Conversations screen's own model rendering real scripts: a labeled .txt and a screenplay printed to .pdf are
-/// imported, cast with Kokoro voices and rendered; then one line is edited and the script re-rendered, showing that
+/// imported, cast with preset voices and rendered; then one line is edited and the script re-rendered, showing that
 /// only that line is generated again. Also auditions a line (not saved to History) and round-trips the text export.
 /// Part of `--produce-headless`.
 @MainActor
@@ -28,8 +28,8 @@ enum ConversationsHeadless {
         let model = ConversationsModel(service: h.service, settings: h.settings, voices: h.voices, pronunciations: h.pronunciations,
                                        shelf: h.shelf, drafts: nil)
         await model.prepare()
-        guard let kokoro = h.catalog.model("kokoro") else { log("FAIL no kokoro"); return false }
-        model.choice = ModelChoice(modelID: kokoro.id, variantID: h.shelf.preferredVariant(kokoro).id)
+        guard let speakers = ProofModels.speakers(h.catalog) else { log("FAIL no model with preset voices"); return false }
+        model.choice = ProofModels.choice(speakers, shelf: h.shelf)
         var ok = true
 
         // 1. A labeled .txt script.
@@ -70,6 +70,24 @@ enum ConversationsHeadless {
         ok = ProduceHeadless.check(back.lines.count == model.lines.count && back.lines.map(\.text) == model.lines.map(\.text)
                                    && back.lines.map(\.pauseAfter) == model.lines.map(\.pauseAfter),
                                    "export → import round-trips lines, text and pauses") && ok
+
+        // A script without speaker names asks first: nothing changes until the user picks one voice or alternating.
+        let prose = h.media.appendingPathComponent("Ferry, draft 2.txt")
+        try? ConversationsFixtures.paragraphs.write(to: prose, atomically: true, encoding: .utf8)
+        let scriptBefore = model.script
+        do { try model.importScript(from: prose) } catch { log("FAIL importing prose: \(error)"); return false }
+        ok = ProduceHeadless.check(model.pendingUnnamedImport?.paragraphs == 4 && model.script == scriptBefore,
+                                   "no speaker names: the import asks, the working script is untouched") && ok
+        model.cancelUnnamedImport()
+        ok = ProduceHeadless.check(model.pendingUnnamedImport == nil && model.script == scriptBefore, "dismissing the question keeps the script") && ok
+        try? model.importScript(from: prose)
+        model.finishUnnamedImport(.oneVoice)
+        ok = ProduceHeadless.check(model.speakers.map(\.name) == ["Narrator"] && model.lines.count == 4, "one voice: every paragraph read by one speaker") && ok
+        try? model.importScript(from: prose)
+        model.finishUnnamedImport(.alternating)
+        ok = ProduceHeadless.check(model.speakers.count == 2 && model.lines.count == 4
+                                   && model.lines.map(\.speakerID) == [0, 1, 0, 1].map { model.speakers[$0].id },
+                                   "alternating: paragraphs alternate between two speakers") && ok
 
         // 2. A screenplay, printed to PDF.
         let pdf = h.media.appendingPathComponent("The Lighthouse Keeper.pdf")

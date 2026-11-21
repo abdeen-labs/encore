@@ -55,6 +55,14 @@ public final class PronunciationStore {
 
     public func replaceAll(_ newEntries: [PronunciationEntry]) throws { try commit(newEntries) }
 
+    /// Removes every entry and the file itself (as on first launch).
+    public func deleteAll() throws {
+        if FileManager.default.fileExists(atPath: fileURL.path) { try FileManager.default.removeItem(at: fileURL) }
+        entries = []
+        snapshot.withLock { $0 = [] }
+        loadError = nil
+    }
+
     private func commit(_ all: [PronunciationEntry]) throws {
         try StoreFiles.write(all, to: fileURL)
         entries = all

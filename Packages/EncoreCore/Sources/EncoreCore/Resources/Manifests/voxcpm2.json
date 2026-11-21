@@ -2,6 +2,7 @@
   "id": "voxcpm2",
   "name": "VoxCPM2",
   "family": "VoxCPM",
+  "author": "OpenBMB",
   "summary": "OpenBMB's 2B multilingual model with 48 kHz studio-quality output: clones a voice or designs one from a description, in 30 languages.",
   "tasks": [
     "tts"
@@ -13,8 +14,7 @@
       "label": "8-bit",
       "repo": "mlx-community/VoxCPM2-8bit",
       "downloadBytes": 3227000000,
-      "memoryBytes": 9100000000,
-      "recommended": true
+      "memoryBytes": 9100000000
     },
     {
       "id": "4bit",

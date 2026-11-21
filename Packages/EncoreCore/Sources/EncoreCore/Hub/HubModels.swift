@@ -54,14 +54,14 @@ public struct HubLicenseText: Sendable, Hashable {
         case gatePrompt
         /// The "License" section of the model card.
         case modelCard
-        /// The standard text of the declared license (SPDX id), from spdx.org.
+        /// The standard text of the declared license (SPDX id), bundled with Encore.
         case standard(String)
-        /// No text available; `url` (if any) points at the license.
+        /// No text available; `url` points at the model's page.
         case none
     }
     public var source: Source
     public var text: String?
-    /// Where to read the license in a browser: the card's link, the file on huggingface.co, or the SPDX page.
+    /// Where to read the license in a browser: the card's link, the file on huggingface.co, or the model's page.
     public var url: URL?
 
     public init(source: Source, text: String?, url: URL?) { self.source = source; self.text = text; self.url = url }

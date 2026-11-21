@@ -169,6 +169,7 @@ struct HLine: Shape {
 // MARK: - Key-value row
 
 /// A label on the left, a monospaced value on the right, joined by a dotted leader.
+/// When space runs short the leader shrinks first, then the value wraps (right-aligned); neither side truncates.
 ///
 ///     KeyValueRow("Sample rate", value: "24 kHz")
 ///     KeyValueRow("Model") { StatusBadge("Loaded", tone: .success) }
@@ -184,11 +185,17 @@ struct KeyValueRow<Value: View>: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
             Text(key).textRole(.body, color: .textSecondary)
+                .lineLimit(1)
+                .fixedSize()
+                .layoutPriority(2)
             HLine()
                 .stroke(Color.hairlineStrong, style: StrokeStyle(lineWidth: 1.2, lineCap: .round, dash: [0.1, 4]))
-                .frame(minWidth: 12)
+                .frame(minWidth: 4, maxWidth: .infinity)
                 .frame(height: 1.2)
             value
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
         }
         .padding(.vertical, 3)
         .accessibilityElement(children: .combine)

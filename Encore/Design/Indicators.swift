@@ -278,3 +278,33 @@ struct Waveform: View {
         }
     }
 }
+
+// MARK: - Count badge
+
+/// A small count set apart from the label it belongs to: a dim mono numeral in a pill.
+///
+///     HStack { Text("Auditions").textRole(.heading); CountBadge(6) }
+///     SegmentedControl(selection: $kind, options: kinds, count: { model.count($0) }) { $0.title }
+struct CountBadge: View {
+    let value: Int
+    var isEmphasized = false
+    @Environment(\.controlSize) private var controlSize
+
+    init(_ value: Int, isEmphasized: Bool = false) {
+        self.value = value
+        self.isEmphasized = isEmphasized
+    }
+
+    var body: some View {
+        let small = controlSize == .small || controlSize == .mini
+        Text(value.formatted())
+            .font(.mono(small ? 9.5 : 10.5, weight: .medium))
+            .monospacedDigit()
+            .foregroundStyle(isEmphasized ? Color.tungsten : .textTertiary)
+            .padding(.horizontal, small ? 5 : 6)
+            .frame(minWidth: small ? 16 : 18, minHeight: small ? 14 : 16)
+            .background(Capsule().fill(isEmphasized ? Color.tungsten.opacity(0.14) : Color.textPrimary.opacity(0.06)))
+            .fixedSize()
+            .accessibilityLabel("\(value)")
+    }
+}
