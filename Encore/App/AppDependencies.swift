@@ -25,6 +25,8 @@ import SwiftUI
     let service: EncoreService
     /// Things that went wrong while starting (a damaged history database, manifests that didn't decode), for the UI to show.
     let startupProblems: [String]
+    /// Long-lived per-screen state; use `screenModel(_:make:)` (Features/Shared/ModelShelf.swift).
+    @ObservationIgnored var screenModels: [String: AnyObject] = [:]
 
     /// Snapshots (`--snapshot`) get throwaway stores in a temporary folder and an empty model cache, so rendering
     /// never touches the user's data, never loads a model and never starts the Python helper.
@@ -39,8 +41,8 @@ import SwiftUI
         problems += manifestProblems.map { "Model manifest \($0)" }
         self.catalog = catalog
 
-        settings = isSnapshot ? AppSettings(defaults: UserDefaults(suiteName: "EncoreSnapshot")!)
-            : AppSettings()
+        // Snapshots: a throwaway suite, removed (domain and plist) when the run exits.
+        settings = isSnapshot ? AppSettings(defaults: ThrowawayDefaults.make("EncoreSnapshot").defaults) : AppSettings()
         let database: HistoryDatabase
         do {
             database = try HistoryDatabase(directory: locations.history)
@@ -54,8 +56,9 @@ import SwiftUI
         pronunciations = PronunciationStore(directory: locations.support)
 
         let hubStore = HubLocalStore(layout: HubCacheLayout(root: locations.hubCache))
-        hubAccount = HubAccountModel()
-        downloads = ModelDownloadCenter(catalog: catalog, downloader: HubDownloader(store: hubStore))
+        let tokens = isSnapshot ? HubTokenStore.snapshot(in: locations.support) : .standard  // snapshots never read the real token
+        hubAccount = HubAccountModel(tokenStore: tokens)
+        downloads = ModelDownloadCenter(catalog: catalog, downloader: HubDownloader(service: HubService(tokenStore: tokens), store: hubStore))
 
         let status = RuntimeStatus()
         runtimeStatus = status

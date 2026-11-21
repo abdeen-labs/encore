@@ -240,5 +240,6 @@
   },
   "maxChunkCharacters": 300,
   "sampleRate": 24000,
-  "homepage": "https://github.com/k2-fsa/OmniVoice"
+  "homepage": "https://github.com/k2-fsa/OmniVoice",
+  "descriptionHelp": "OmniVoice takes attributes, not a description: one from any of gender (male, female), age (child, teenager, young adult, middle-aged, elderly), pitch (very low, low, moderate, high or very high pitch), whisper, and an English accent (american, british, australian, canadian, indian, chinese, korean, japanese, portuguese or russian accent), separated by commas. For example: female, young adult, low pitch, british accent."
 }

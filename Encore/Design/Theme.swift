@@ -3,9 +3,9 @@ import SwiftUI
 
 // MARK: - Palette
 
-/// The semantic colour slots of an Encore theme.
+/// The semantic color slots of an Encore theme.
 ///
-/// Only `Palette.afterDark` exists today. Everything in the UI reads colours through the
+/// Only `Palette.afterDark` exists today. Everything in the UI reads colors through the
 /// `Color` tokens below (`.backdrop`, `.textPrimary`, `.tungsten`, …), never through raw
 /// hex values, so a second palette can be introduced later by swapping `Palette.active`
 /// (or making the tokens appearance-dynamic) without touching any view.
@@ -17,7 +17,7 @@ struct Palette: Sendable {
     var surface: UInt32           // cards and panels
     var surfaceRaised: UInt32     // controls, popovers, things on top of cards
     var surfaceSunken: UInt32     // input wells, tracks
-    var hairline: UInt32          // base colour for hairline borders (used with alpha)
+    var hairline: UInt32          // base color for hairline borders (used with alpha)
 
     // Text
     var textPrimary: UInt32
@@ -32,6 +32,7 @@ struct Palette: Sendable {
     var velvetDeep: UInt32
     var mint: UInt32              // ready / success
     var footlight: UInt32         // warnings (an orange that stays distinct from tungsten)
+    var gel: UInt32               // a lavender lighting gel: voice cues (voice-switch tags), distinct from every other light
 
     /// The one authored theme: the stage after dark.
     static let afterDark = Palette(
@@ -51,7 +52,8 @@ struct Palette: Sendable {
         velvet: 0xD7263D,
         velvetDeep: 0x8C1426,
         mint: 0x7FD1C7,
-        footlight: 0xF2874E
+        footlight: 0xF2874E,
+        gel: 0xC9A7FF
     )
 
     /// The palette the app renders with.
@@ -59,7 +61,7 @@ struct Palette: Sendable {
 }
 
 extension Color {
-    /// Creates a colour from a 24-bit `0xRRGGBB` value.
+    /// Creates a color from a 24-bit `0xRRGGBB` value.
     init(hex: UInt32, opacity: Double = 1) {
         self.init(
             .sRGB,
@@ -71,9 +73,9 @@ extension Color {
     }
 }
 
-// MARK: - Colour tokens
+// MARK: - Color tokens
 
-/// Semantic colour tokens. Use these everywhere (`.foregroundStyle(.textSecondary)`,
+/// Semantic color tokens. Use these everywhere (`.foregroundStyle(.textSecondary)`,
 /// `.background(Color.surface)`), never hex literals.
 extension Color {
     private static var p: Palette { Palette.active }
@@ -86,7 +88,7 @@ extension Color {
     static let surfaceSunken = Color(hex: p.surfaceSunken)
     /// Default 1px border on surfaces and controls.
     static let hairline = Color(hex: p.hairline, opacity: 0.09)
-    /// Border for hovered / emphasised controls.
+    /// Border for hovered / emphasized controls.
     static let hairlineStrong = Color(hex: p.hairline, opacity: 0.18)
 
     static let textPrimary = Color(hex: p.textPrimary)
@@ -100,6 +102,8 @@ extension Color {
     static let velvetDeep = Color(hex: p.velvetDeep)
     static let mint = Color(hex: p.mint)
     static let footlight = Color(hex: p.footlight)
+    /// Voice cues: voice-switch tags and the chips that insert them.
+    static let gel = Color(hex: p.gel)
 }
 
 extension ShapeStyle where Self == Color {
@@ -121,6 +125,7 @@ extension ShapeStyle where Self == Color {
     static var velvetDeep: Color { .velvetDeep }
     static var mint: Color { .mint }
     static var footlight: Color { .footlight }
+    static var gel: Color { .gel }
 }
 
 // MARK: - Tone
@@ -240,7 +245,7 @@ extension View {
     }
 }
 
-/// `withAnimation` that honours Reduce Motion. Use from button actions.
+/// `withAnimation` that honors Reduce Motion. Use from button actions.
 @discardableResult
 func withStageAnimation<Result>(_ animation: Animation = Theme.Motion.standard, _ body: () throws -> Result) rethrows -> Result {
     let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion

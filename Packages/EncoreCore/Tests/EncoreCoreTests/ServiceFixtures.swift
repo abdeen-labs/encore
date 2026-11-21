@@ -129,8 +129,9 @@ final class ServiceWorld {
         history = try HistoryDatabase(directory: dir.url.appendingPathComponent("History"))
         voices = VoiceLibrary(directory: dir.url.appendingPathComponent("Voices"), deletesToTrash: false)
         pronunciations = PronunciationStore(directory: dir.url)
-        settingsKey = "settings-\(UUID().uuidString)"
-        settings = AppSettings(defaults: UserDefaults(suiteName: "EncoreServiceTests")!, key: settingsKey)
+        settingsKey = "settings"
+        // Defaults kept inside this world's temp folder (never ~/Library/Preferences); they go when the folder goes.
+        settings = AppSettings(defaults: ThrowawayDefaults.defaults(in: dir.url.appendingPathComponent("Defaults")), key: settingsKey)
         scratch = dir.url.appendingPathComponent("Scratch")
         catalog = ModelCatalog(models: models)
         self.backends = backends
@@ -145,7 +146,6 @@ final class ServiceWorld {
                                 backends: backends, runtime: runtime, scratchDirectory: scratch)
     }
 
-    deinit { UserDefaults(suiteName: "EncoreServiceTests")?.removeObject(forKey: settingsKey) }
 
     static func fakeSnapshot(_ repo: String, root: URL) throws {
         let layout = HubCacheLayout(root: root)

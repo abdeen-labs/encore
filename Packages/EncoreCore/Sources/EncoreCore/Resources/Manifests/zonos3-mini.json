@@ -21,7 +21,7 @@
     "name": "Apache-2.0",
     "url": "https://huggingface.co/Zyphra/ZONOS3-Mini",
     "commercialUse": true,
-    "summary": "Free to use, change and sell, including commercially. Keep the licence notice if you redistribute the model.",
+    "summary": "Free to use, change and sell, including commercially. Keep the license notice if you redistribute the model.",
     "gated": false
   },
   "capabilities": {

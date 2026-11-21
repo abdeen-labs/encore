@@ -87,7 +87,7 @@ public struct SilenceRemovalOptions: Sendable, Hashable, Codable {
 }
 
 public enum PostProcessor {
-    /// Applies `PostProcessingOptions` in the right order: silence removal, then loudness normalisation
+    /// Applies `PostProcessingOptions` in the right order: silence removal, then loudness normalization
     /// (with a true-peak ceiling so it never clips).
     public static func apply(_ options: PostProcessingOptions, to buffer: AudioBuffer,
                              truePeakCeiling: Double = Loudness.defaultTruePeakCeiling) -> AudioBuffer {

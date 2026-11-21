@@ -103,7 +103,7 @@ public typealias EngineProgress = @Sendable (Double) -> Void
 
 /// A place models run. There is one backend per runtime. For each request the service layer picks
 /// the first backend (MLX Swift, then Python, unless the user prefers otherwise) whose
-/// `engineFeatures()[manifest.engine]` covers what the request needs. Calls honour task cancellation.
+/// `engineFeatures()[manifest.engine]` covers what the request needs. Calls honor task cancellation.
 public protocol EngineBackend: AnyObject, Sendable {
     var runtime: EngineRuntime { get }
     /// Engine key (`ModelManifest.engine`) → what this backend can do with it.

@@ -139,7 +139,7 @@ import Testing
         var jobs = await rt.snapshot().jobs
         #expect(jobs.map(\.title) == ["first", "second", "third"])
         #expect(jobs.map(\.state) == [.running, .queued, .queued])
-        // A queued job that's cancelled leaves the queue.
+        // A queued job that's canceled leaves the queue.
         third.cancel()
         await #expect(throws: CancellationError.self) { try await third.value }
         jobs = await rt.snapshot().jobs

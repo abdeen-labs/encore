@@ -386,7 +386,7 @@ public enum ConversationImporter {
         }
     }
 
-    // MARK: Serialising
+    // MARK: Serializing
 
     /// `Title: …`, a blank line, then one `Name: text` line per turn. `pauseAfter` is written as a trailing
     /// `[pause 1.2s]`. `parse` reads this back to the same speakers, lines and pauses.

@@ -74,6 +74,23 @@ import Testing
         #expect(try await db.count(.init(kinds: [.voiceDesign])) == 0)
     }
 
+    @Test func facetsAndPresetVoiceFilter() async throws {
+        let ava = UUID()
+        try await db.insert(try generation("A", model: "kokoro", voice: "Heart"))
+        try await db.insert(try generation("B", model: "kokoro", voice: "Heart", minutes: 1))
+        try await db.insert(try generation("C", model: "qwen3", voice: "Ava", voiceID: ava, minutes: 2))
+        try await db.insert(try generation("D", kind: .conversation, model: "qwen3", voice: "Ava, Bram", minutes: 3))
+        try await db.insert(transcription("E", text: "words", minutes: 4))
+        let f = try await db.facets()
+        #expect(f.models.map(\.id) == ["kokoro", "qwen3", "whisper"])
+        #expect(f.models.map(\.count) == [2, 2, 1])
+        #expect(f.voices.map(\.name) == ["Heart", "Ava"])
+        #expect(f.voices.first { $0.name == "Ava" }?.voiceID == ava)
+        #expect(f.kinds == [.speech: 3, .conversation: 1, .transcription: 1] && f.total == 5)
+        #expect(try await titles(.init(voiceName: "Heart")) == ["B", "A"])
+        #expect(HistoryQuery(voiceName: "Heart").hasFilters && !HistoryQuery(search: "x").hasFilters)
+    }
+
     @Test func fullTextSearch() async throws {
         try await db.insert(try generation("Morning news", text: "General Kenobi arrived at the café.", model: "kokoro", voice: "Zoë"))
         try await db.insert(try generation("Bedtime", text: "Rock'n'roll lullaby, sung softly.", model: "qwen3", voice: "Bram"))

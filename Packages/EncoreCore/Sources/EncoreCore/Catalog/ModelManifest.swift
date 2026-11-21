@@ -1,6 +1,6 @@
 import Foundation
 
-/// Describes one model family: where its weights live, its licence, what it can do,
+/// Describes one model family: where its weights live, its license, what it can do,
 /// and every generation control it exposes. Manifests are JSON files in
 /// `Resources/Manifests`; the UI is rendered from them.
 public struct ModelManifest: Codable, Identifiable, Sendable, Hashable {
@@ -25,6 +25,8 @@ public struct ModelManifest: Codable, Identifiable, Sendable, Hashable {
     public var maxChunkCharacters: Int
     public var sampleRate: Int
     public var homepage: String?
+    /// How this model wants a voice description (voice design), when it is particular about it.
+    public var descriptionHelp: String?
 
     public var defaultVariant: ModelVariant { variants.first(where: { $0.recommended == true }) ?? variants[0] }
     public func variant(_ id: String?) -> ModelVariant { variants.first(where: { $0.id == id }) ?? defaultVariant }
@@ -60,11 +62,11 @@ public struct ModelVariant: Codable, Identifiable, Sendable, Hashable {
 }
 
 public struct ModelLicense: Codable, Sendable, Hashable {
-    /// SPDX id when there is one, otherwise the licence's own name.
+    /// SPDX id when there is one, otherwise the license's own name.
     public var name: String
     public var url: String?
     public var commercialUse: Bool?
-    /// One or two plain sentences on what the licence asks of the user.
+    /// One or two plain sentences on what the license asks of the user.
     public var summary: String?
     /// True when the upstream repo is gated on Hugging Face (as of writing; the hub is re-checked at download time).
     public var gated: Bool?

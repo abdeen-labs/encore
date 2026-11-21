@@ -2,7 +2,7 @@
   "id": "parakeet-tdt-v3",
   "name": "Parakeet TDT v3",
   "family": "Parakeet",
-  "summary": "NVIDIA's very fast, accurate recogniser for 25 European languages, with punctuation and sentence timestamps.",
+  "summary": "NVIDIA's very fast, accurate recognizer for 25 European languages, with punctuation and sentence timestamps.",
   "tasks": [
     "stt"
   ],

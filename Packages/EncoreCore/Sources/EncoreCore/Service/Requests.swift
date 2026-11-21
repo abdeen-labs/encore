@@ -38,6 +38,9 @@ public struct SpeechRequest: Codable, Sendable {
     /// Silence inserted between auto-chunks, seconds.
     public var chunkGapSeconds: Double = 0.15
     public var title: String?
+    /// False renders without a History record (auditions, try-outs): the result's `audioPath` is a scratch file the
+    /// caller deletes when done (anything left is swept after a day).
+    public var saveToHistory: Bool = true
 
     public init(modelID: String, text: String) { self.modelID = modelID; self.text = text }
 }
@@ -62,6 +65,8 @@ public struct VoiceConversionRequest: Codable, Sendable {
     public var parameters: ParamValues = [:]
     public var post = PostProcessingOptions()
     public var title: String?
+    /// False renders without a History record; see `SpeechRequest.saveToHistory`.
+    public var saveToHistory: Bool = true
 
     public init(modelID: String, sourcePath: String, voice: VoiceSelection) {
         self.modelID = modelID; self.sourcePath = sourcePath; self.voice = voice
@@ -120,6 +125,8 @@ public struct ConversationRequest: Codable, Sendable {
     public var applyPronunciations: Bool = true
     /// Reuse lines rendered earlier with exactly the same text, voice and settings (only changed lines regenerate).
     public var reuseRenderedLines: Bool = true
+    /// False renders without a History record (e.g. auditioning one line); see `SpeechRequest.saveToHistory`.
+    public var saveToHistory: Bool = true
 
     public init(modelID: String, script: ConversationScript) { self.modelID = modelID; self.script = script }
 }
@@ -156,10 +163,20 @@ public struct VoiceDesignCandidate: Codable, Sendable, Identifiable, Hashable {
     public var duration: TimeInterval
     /// The seed this candidate was generated with, when the request fixed one.
     public var seed: Int?
+    // How it was made, so a kept candidate's history record is complete. Nil in candidates made before these existed.
+    public var variantID: String?
+    public var language: String?
+    /// Every parameter it was made with (defaults merged with the request's), seed included.
+    public var parameters: ParamValues?
+    public var runtime: EngineRuntime?
+    public var elapsed: TimeInterval?
     public init(id: UUID = UUID(), audioPath: String, transcript: String, description: String,
-                modelID: String, duration: TimeInterval, seed: Int? = nil) {
+                modelID: String, duration: TimeInterval, seed: Int? = nil, variantID: String? = nil, language: String? = nil,
+                parameters: ParamValues? = nil, runtime: EngineRuntime? = nil, elapsed: TimeInterval? = nil) {
         self.id = id; self.audioPath = audioPath; self.transcript = transcript
         self.description = description; self.modelID = modelID; self.duration = duration; self.seed = seed
+        self.variantID = variantID; self.language = language; self.parameters = parameters; self.runtime = runtime
+        self.elapsed = elapsed
     }
 }
 
@@ -230,6 +247,7 @@ extension SpeechRequest {
         applyPronunciations = try c.value(.applyPronunciations, default: applyPronunciations)
         chunkGapSeconds = try c.value(.chunkGapSeconds, default: chunkGapSeconds)
         title = try c.decodeIfPresent(String.self, forKey: .title)
+        saveToHistory = try c.value(.saveToHistory, default: saveToHistory)
     }
 }
 
@@ -253,6 +271,7 @@ extension VoiceConversionRequest {
         parameters = try c.value(.parameters, default: parameters)
         post = try c.value(.post, default: post)
         title = try c.decodeIfPresent(String.self, forKey: .title)
+        saveToHistory = try c.value(.saveToHistory, default: saveToHistory)
     }
 }
 
@@ -307,6 +326,7 @@ extension ConversationRequest {
         post = try c.value(.post, default: post)
         applyPronunciations = try c.value(.applyPronunciations, default: applyPronunciations)
         reuseRenderedLines = try c.value(.reuseRenderedLines, default: reuseRenderedLines)
+        saveToHistory = try c.value(.saveToHistory, default: saveToHistory)
     }
 }
 

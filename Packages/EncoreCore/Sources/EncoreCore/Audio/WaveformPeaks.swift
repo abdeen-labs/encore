@@ -13,14 +13,14 @@ public struct PeakBucket: Sendable, Equatable, Hashable, Codable {
 /// Min/max/RMS summary of audio at a fixed base resolution. Compute it once (from a buffer, or streamed from a
 /// file of any length), then call `buckets(count:in:)` for each zoom level — that's cheap (O(base buckets in range)).
 public struct WaveformPeaks: Sendable, Equatable, Codable {
-    /// Sample rate of the analysed audio.
+    /// Sample rate of the analyzed audio.
     public var sampleRate: Double
     /// Source samples per base bucket.
     public var samplesPerBucket: Int
     public var mins: [Float]
     public var maxs: [Float]
     public var rms: [Float]
-    /// Duration of the whole source. While a file is still being analysed this is larger than `coveredDuration`.
+    /// Duration of the whole source. While a file is still being analyzed this is larger than `coveredDuration`.
     public var duration: TimeInterval
 
     public var count: Int { mins.count }
@@ -48,7 +48,7 @@ public struct WaveformPeaks: Sendable, Equatable, Codable {
 
     /// Streams a media file of any length (memory stays bounded by the peaks themselves: ~200 buckets/s).
     /// `onUpdate` receives growing partial results a few times a second, for progressive drawing.
-    /// Honours task cancellation.
+    /// Honors task cancellation.
     public static func compute(fileAt url: URL, bucketsPerSecond: Double = 200,
                                onUpdate: (@Sendable (WaveformPeaks) -> Void)? = nil) async throws -> WaveformPeaks {
         let reader = try await AudioFileReader(url: url)

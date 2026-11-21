@@ -285,12 +285,8 @@ func observes<T>(_ read: () -> T, after change: () throws -> Void) rethrows -> B
 // MARK: - Settings
 
 @MainActor @Suite struct StoreSettingsTests {
-    func freshDefaults() -> UserDefaults {
-        let name = "EncoreTests-\(UUID().uuidString)"
-        let d = UserDefaults(suiteName: name)!
-        d.removePersistentDomain(forName: name)
-        return d
-    }
+    /// A throwaway suite in a temp folder (never ~/Library/Preferences), deleted when the test process exits.
+    func freshDefaults() -> UserDefaults { ThrowawayDefaults.make("EncoreTests").defaults }
 
     @Test func persistsAndRestores() async throws {
         let defaults = freshDefaults()
@@ -333,5 +329,23 @@ func observes<T>(_ read: () -> T, after change: () throws -> Void) rethrows -> B
         let s = AppSettings(defaults: freshDefaults())
         #expect(observes({ s.idleUnloadMinutes }) { s.idleUnloadMinutes = 30 })
         #expect(observes({ s.postProcessing }) { s.postProcessing.removeSilence = true })
+    }
+}
+
+
+@Suite struct ThrowawayDefaultsTests {
+    @Test func suitesNeverTouchLibraryPreferences() {
+        let scratch = ThrowawayDefaults.make("EncoreThrowawayTest")
+        scratch.defaults.set("x", forKey: "k")
+        CFPreferencesAppSynchronize(scratch.suite as CFString)
+        let folder = URL(fileURLWithPath: scratch.suite).deletingLastPathComponent()
+        #expect(FileManager.default.fileExists(atPath: scratch.suite + ".plist"))
+        #expect(folder.path.hasPrefix(FileManager.default.temporaryDirectory.path))
+        let preferences = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences")
+        let leaked = (try? FileManager.default.contentsOfDirectory(atPath: preferences.path))?
+            .filter { $0.hasPrefix(folder.lastPathComponent) } ?? []
+        #expect(leaked.isEmpty)
+        ThrowawayDefaults.remove(scratch.suite)
+        #expect(!FileManager.default.fileExists(atPath: folder.path))
     }
 }

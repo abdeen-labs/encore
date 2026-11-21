@@ -69,7 +69,7 @@ final class HubFileLock: @unchecked Sendable {
         return nil
     }
 
-    /// Waits (cancellably) until the lock is free.
+    /// Waits (cancelably) until the lock is free.
     static func acquire(_ url: URL) async throws -> HubFileLock {
         while true {
             if let lock = try tryAcquire(url) { return lock }

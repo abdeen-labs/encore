@@ -77,7 +77,9 @@ public final class AppSettings {
 
     public var idleUnloadMinutes: Int { didSet { if idleUnloadMinutes < 0 { idleUnloadMinutes = 0 } else { save() } } }
     public var defaultExportFormat: ExportFormat { didSet { save() } }
-    public var ffmpegPath: String? { didSet { save() } }
+    /// The source of truth for the ffmpeg override. Mirrored to `FFmpeg.userPathDefaultsKey` in the same
+    /// UserDefaults, which is what `FFmpeg.locate()` reads.
+    public var ffmpegPath: String? { didSet { save(); mirrorFFmpegPath() } }
     public var postProcessing: PostProcessingOptions { didSet { save() } }
     public var preferredRuntimes: [String: RuntimePreference] { didSet { save() } }
     public var lastUsedModels: [Feature: String] { didSet { save() } }
@@ -91,6 +93,8 @@ public final class AppSettings {
         self.key = key
         var v = Values()
         if let data = defaults.data(forKey: key), let decoded = try? JSONDecoder().decode(Values.self, from: data) { v = decoded }
+        // Adopt an override written straight to the audio layer's key before settings owned it.
+        if v.ffmpegPath == nil, let legacy = defaults.string(forKey: FFmpeg.userPathDefaultsKey), !legacy.isEmpty { v.ffmpegPath = legacy }
         idleUnloadMinutes = v.idleUnloadMinutes
         defaultExportFormat = v.defaultExportFormat
         ffmpegPath = v.ffmpegPath
@@ -98,6 +102,12 @@ public final class AppSettings {
         preferredRuntimes = v.preferredRuntimes
         lastUsedModels = v.lastUsedModels
         current.withLock { $0 = v }
+        mirrorFFmpegPath()
+    }
+
+    private func mirrorFFmpegPath() {
+        if let path = values.ffmpegPath { defaults.set(path, forKey: FFmpeg.userPathDefaultsKey) }
+        else { defaults.removeObject(forKey: FFmpeg.userPathDefaultsKey) }
     }
 
     /// The current values, from any isolation.

@@ -15,6 +15,8 @@ struct SnapshotConfig {
     var outputDirectory: URL
     var only: [String]?
     var fullHeight: Bool
+    /// `--snapshot-size 940x600`: render the window at this size instead of the default.
+    var size: CGSize?
 
     init?(arguments: [String]) {
         func value(after flag: String) -> String? {
@@ -32,6 +34,10 @@ struct SnapshotConfig {
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
         fullHeight = arguments.contains("--full")
+        size = value(after: "--snapshot-size").flatMap { v in
+            let p = v.lowercased().split(separator: "x").compactMap { Double($0) }
+            return p.count == 2 ? CGSize(width: p[0], height: p[1]) : nil
+        }
     }
 }
 
@@ -39,11 +45,18 @@ struct SnapshotConfig {
 private enum SnapshotTarget {
     case section(AppSection)
     case gallery
+    #if DEBUG
+    /// Fixture states of a screen (see `FeatureFixture`). Not part of the default run; name them with --snapshot-only.
+    case fixture(FeatureFixture)
+    #endif
 
     var name: String {
         switch self {
         case .section(let s): s.rawValue
         case .gallery: "Gallery"
+        #if DEBUG
+        case .fixture(let f): f.name
+        #endif
         }
     }
 
@@ -53,6 +66,14 @@ private enum SnapshotTarget {
         targets.append(.gallery)
         #endif
         return targets
+    }
+
+    static var named: [SnapshotTarget] {
+        #if DEBUG
+        return all + FeatureFixture.all.map(SnapshotTarget.fixture)
+        #else
+        return all
+        #endif
     }
 }
 
@@ -87,8 +108,8 @@ private final class SnapshotDelegate: NSObject, NSApplicationDelegate {
         if let only = config.only {
             var picked: [SnapshotTarget] = []
             for name in only {
-                guard let t = SnapshotTarget.all.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
-                    let known = SnapshotTarget.all.map(\.name).joined(separator: ", ")
+                guard let t = SnapshotTarget.named.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                    let known = SnapshotTarget.named.map(\.name).joined(separator: ", ")
                     FileHandle.standardError.write(Data("snapshot: unknown name '\(name)'. Known: \(known)\n".utf8))
                     return 2
                 }
@@ -106,13 +127,36 @@ private final class SnapshotDelegate: NSObject, NSApplicationDelegate {
 
         var failed = false
         for target in targets {
-            let windowSize = EncoreApp.defaultWindowSize
+            let windowSize = config.size ?? EncoreApp.defaultWindowSize
             let deps = AppDependencies(router: Router(section: {
                 if case .section(let s) = target { return s }
+                #if DEBUG
+                if case .fixture(let f) = target { return f.section }
+                #endif
                 return .studio
             }()))
             if case .gallery = target { deps.router.isShowingGallery = true }
+            #if DEBUG
+            await StudioFixtures.prepare(deps)  // `--fixtures`: seeded temp stores (Features/Studio/StudioFixtures.swift)
+            await VoiceFixtures.prepare(deps)  // `--voice-fixture`: Clone/Voices/Design states (Features/Voices/VoiceFixtures.swift)
+            await ChangerFixtures.prepare(deps); await ConversationsFixtures.prepare(deps); await TranscribeFixtures.prepare(deps)  // `--<screen>-fixture <state>`
+            #endif
 
+            #if DEBUG
+            if case .fixture(let fixture) = target {
+                await fixture.seed?(deps)
+                let o = fixture.prepare(deps)
+                let content = fixture.sheet.map { $0(deps, o) } ?? AnyView(RootView())
+                let view = content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.backdrop)
+                    .environment(\.modelsLibraryOverride, o.library)
+                    .environment(\.settingsModelOverride, o.settingsModel)
+                    .appDependencies(deps)
+                failed = !(await write(view, size: fixture.size ?? windowSize, name: target.name)) || failed
+                continue
+            }
+            #endif
             let window = RootView().appDependencies(deps)
             failed = !(await write(window, size: windowSize, name: target.name)) || failed
 
@@ -143,6 +187,9 @@ private final class SnapshotDelegate: NSObject, NSApplicationDelegate {
             #else
             EmptyView()
             #endif
+        #if DEBUG
+        case .fixture(let f): SectionScreen(section: f.section)
+        #endif
         }
     }
 

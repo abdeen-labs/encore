@@ -49,8 +49,8 @@ import Testing
             "Then Mrs. J. R. Jones arrived, e.g. late. It was fine.",
         ])
         checkInvariants(text, 110)
-        let analysed = TextChunker.breakStrengths(text, chars: Array(text), idx: Array(text.indices) + [text.endIndex], tags: [])
-        let sentenceOffsets = analysed.enumerated().filter { $0.element == .sentence }.map(\.offset)
+        let analyzed = TextChunker.breakStrengths(text, chars: Array(text), idx: Array(text.indices) + [text.endIndex], tags: [])
+        let sentenceOffsets = analyzed.enumerated().filter { $0.element == .sentence }.map(\.offset)
         let chars = Array(text)
         let ends = sentenceOffsets.map { String(chars[max(0, $0 - 5)..<$0]) }
         #expect(ends == ["oday.", "late."])

@@ -32,13 +32,13 @@ func runHubCommand(_ args: [String]) async throws {
         print("repo:     \(info.id) @ \(info.commit ?? "?")")
         print("gated:    \(info.gate.rawValue)")
         print("private:  \(info.isPrivate)")
-        print("licence:  \(info.licenseID ?? "-")\(info.licenseName.map { " (\($0))" } ?? "")")
+        print("license:  \(info.licenseID ?? "-")\(info.licenseName.map { " (\($0))" } ?? "")")
         if let link = info.licenseLink { print("link:     \(link.absoluteString)") }
         if let prompt = info.gatePrompt { print("gate:     \(prompt.prefix(160).replacingOccurrences(of: "\n", with: " "))…") }
         print("files:    \(info.files.count)")
         if opts.flag("--license") {
             let text = await service.licenseText(for: info)
-            print("licence text source: \(text.source)  url: \(text.url?.absoluteString ?? "-")")
+            print("license text source: \(text.source)  url: \(text.url?.absoluteString ?? "-")")
             if let body = text.text {
                 print("---- \(body.count) chars ----")
                 print(body.prefix(600))
@@ -70,7 +70,7 @@ func runHubCommand(_ args: [String]) async throws {
             for (repo, dir) in dirs.sorted(by: { $0.key < $1.key }) { print("\(repo) -> \(dir.path)") }
         } catch is CancellationError {
             printer.finish()
-            print("cancelled; on disk: \(f.string(fromByteCount: store.status(of: variant).presentBytes))")
+            print("canceled; on disk: \(f.string(fromByteCount: store.status(of: variant).presentBytes))")
         } catch let error as HubError {
             printer.finish()
             if let repo = error.gatedRepo {
@@ -203,7 +203,7 @@ final class ProgressPrinter: @unchecked Sendable {
     }
 }
 
-/// Exercises the SwiftUI-facing download centre end to end: refresh, download, cancel part-way,
+/// Exercises the SwiftUI-facing download center end to end: refresh, download, cancel part-way,
 /// retry (resumes), load context, delete.
 @MainActor
 func runDownloadCenterDemo(variant: ModelVariant, downloader: HubDownloader, cancelAt: Double, keep: Bool) async throws {

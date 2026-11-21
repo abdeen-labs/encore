@@ -40,6 +40,15 @@ public final class ModelDownloadCenter {
     public private(set) var catalog: ModelCatalog
     public let downloader: HubDownloader
     @ObservationIgnored private var tasks: [ModelVariantKey: Task<Void, Never>] = [:]
+    /// Set by `showFixture`: refreshes leave the fixture states alone.
+    @ObservationIgnored public private(set) var isShowingFixture = false
+
+    /// Shows made-up states (snapshots and previews). Refreshes no longer touch the cache afterwards.
+    public func showFixture(states: [ModelVariantKey: ModelDownloadState], totalBytesOnDisk: Int64) {
+        isShowingFixture = true
+        self.states = states
+        self.totalBytesOnDisk = totalBytesOnDisk
+    }
 
     public init(catalog: ModelCatalog, downloader: HubDownloader = HubDownloader()) {
         self.catalog = catalog
@@ -63,6 +72,7 @@ public final class ModelDownloadCenter {
     /// Re-reads the cache for every variant. Fetches file lists Encore hasn't recorded (one small
     /// request per repo, once), so models downloaded outside Encore are verified too.
     public func refresh(verifyOnline: Bool = true) async {
+        guard !isShowingFixture else { return }
         let pairs = catalog.models.flatMap { m in m.variants.map { (ModelVariantKey(m, $0), $0) } }
         let store = self.store, service = self.service
         let results = await Task.detached(priority: .utility) { () -> [(ModelVariantKey, HubVariantStatus)] in
@@ -77,6 +87,7 @@ public final class ModelDownloadCenter {
     }
 
     public func refresh(_ manifest: ModelManifest, _ variant: ModelVariant) async {
+        guard !isShowingFixture else { return }
         let store = self.store, service = self.service
         let status = await Task.detached(priority: .utility) { await store.status(of: variant, service: service) }.value
         apply(status, to: ModelVariantKey(manifest, variant))
@@ -201,6 +212,15 @@ public final class HubAccountModel {
     public let tokenStore: HubTokenStore
     public let endpoint: URL
 
+    @ObservationIgnored public private(set) var isShowingFixture = false
+
+    /// Shows a made-up sign-in state (snapshots and previews) without reading any token.
+    public func showFixture(_ status: Status, source: HubTokenSource? = nil) {
+        isShowingFixture = true
+        self.status = status
+        tokenSource = source
+    }
+
     public init(tokenStore: HubTokenStore = .standard, endpoint: URL = HubService.defaultEndpoint) {
         self.tokenStore = tokenStore
         self.endpoint = endpoint
@@ -210,6 +230,7 @@ public final class HubAccountModel {
 
     /// Loads the stored token (adopting an existing HF token file) and validates it.
     public func refresh() async {
+        guard !isShowingFixture else { return }
         let store = tokenStore
         let current = await Task.detached { store.current() }.value
         tokenSource = current?.source

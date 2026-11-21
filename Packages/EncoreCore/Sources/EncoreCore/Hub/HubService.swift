@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Hugging Face Hub API calls Encore needs: account, repo info and licence, access checks,
+/// The Hugging Face Hub API calls Encore needs: account, repo info and license, access checks,
 /// revision resolution and file listings. Stateless and cheap to create.
 public struct HubService: Sendable {
     public var endpoint: URL
@@ -48,7 +48,7 @@ public struct HubService: Sendable {
                           tokenRole: access?["role"] as? String, tokenName: access?["displayName"] as? String)
     }
 
-    // MARK: Repo info and licence
+    // MARK: Repo info and license
 
     public func repoInfo(_ repo: String) async throws -> HubRepoInfo {
         let (data, response) = try await send(request(path: "api/models/\(Self.escapeRepo(repo))"))
@@ -90,9 +90,9 @@ public struct HubService: Sendable {
             pageURL: page)
     }
 
-    /// The licence text to show for a repo, best source first: the file the card links to, a
+    /// The license text to show for a repo, best source first: the file the card links to, a
     /// LICENSE-like file in the repo, the card's "License" section, the standard text of a
-    /// well-known licence (from spdx.org), the gate prompt. Never throws;
+    /// well-known license (from spdx.org), the gate prompt. Never throws;
     /// a gated repo whose files can't be read falls through to the next source.
     public func licenseText(for info: HubRepoInfo) async -> HubLicenseText {
         let fallbackURL = info.licenseLink ?? HubLicenseCatalog.url(for: info.licenseID)
@@ -119,7 +119,7 @@ public struct HubService: Sendable {
         return HubLicenseText(source: .none, text: nil, url: fallbackURL)
     }
 
-    /// Repo files worth trying as the licence text, most specific first.
+    /// Repo files worth trying as the license text, most specific first.
     static func licenseFileCandidates(_ info: HubRepoInfo) -> [String] {
         var out: [String] = []
         if let link = info.licenseLink?.absoluteString {
@@ -339,7 +339,7 @@ public struct HubService: Sendable {
     }
 }
 
-/// Licence ids as Hugging Face cards spell them → canonical reference pages.
+/// License ids as Hugging Face cards spell them → canonical reference pages.
 enum HubLicenseCatalog {
     static let spdx: [String: String] = [
         "apache-2.0": "Apache-2.0", "mit": "MIT", "bsd-2-clause": "BSD-2-Clause", "bsd-3-clause": "BSD-3-Clause",

@@ -60,7 +60,7 @@ public enum FFmpeg {
     }
 
     /// Runs a tool to completion, returning stdout. Stderr is collected for error messages.
-    /// Cancelling the calling task terminates the process.
+    /// Canceling the calling task terminates the process.
     @discardableResult
     static func run(_ executable: URL, _ arguments: [String]) async throws -> Data {
         let process = Process()

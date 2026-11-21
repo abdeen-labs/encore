@@ -34,7 +34,7 @@
     "name": "Apache-2.0",
     "url": "https://huggingface.co/canopylabs/orpheus-3b-0.1-ft",
     "commercialUse": true,
-    "summary": "Released under Apache-2.0 (free to use, change and sell). It is fine-tuned from Meta's Llama 3.2, whose licence terms may also apply. The original repo asks you to accept its terms on Hugging Face.",
+    "summary": "Released under Apache-2.0 (free to use, change and sell). It is fine-tuned from Meta's Llama 3.2, whose license terms may also apply. The original repo asks you to accept its terms on Hugging Face.",
     "gated": true
   },
   "capabilities": {

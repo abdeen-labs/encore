@@ -6,6 +6,12 @@ import SwiftUI
 @main
 enum Main {
     static func main() {
+        #if DEBUG
+        if StudioHeadless.isRequested { StudioHeadless.run() }  // Features/Studio/StudioHeadless.swift
+        if VoiceHeadless.isRequested { VoiceHeadless.run() }  // Clone/Design/Voices proofs: Features/Voices/VoiceHeadless.swift
+        if ProduceHeadless.isRequested { ProduceHeadless.run() }  // Changer, Conversations, Transcribe: Features/Changer/ProduceHeadless.swift
+        if HistoryHeadless.isRequested { HistoryHeadless.run() }  // Features/History/HistoryHeadless.swift
+        #endif
         if let config = SnapshotConfig(arguments: CommandLine.arguments) {
             SnapshotRunner.run(config)
         } else {

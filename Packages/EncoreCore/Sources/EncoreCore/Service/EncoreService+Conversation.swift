@@ -77,12 +77,13 @@ extension EncoreService {
                 let processed = try await self.postProcess(audio, request.post, report: report)
                 await report.stage("Saving")
                 let names = script.speakers.filter { s in planned.contains { $0.speaker.id == s.id } }.map(\.name)
-                return try await self.commit(processed) { url in
+                return try await self.commit(processed, save: request.saveToHistory) { url in
                     GenerationRecord(kind: .conversation, title: title, text: ConversationImporter.text(for: script),
                                      modelID: manifest.id, modelName: manifest.name, voiceName: names.joined(separator: ", "),
                                      parameters: manifest.defaultParameters.merging(request.parameters) { $1 },
                                      audioPath: url.path, duration: processed.duration, sampleRate: processed.sampleRate,
-                                     elapsed: Date().timeIntervalSince(started))
+                                     elapsed: Date().timeIntervalSince(started), variantID: context.variant.id,
+                                     language: request.language, post: request.post, runtime: session.runtime)
                 }
             }
             await self.noteUsed(manifest.id, for: .conversation)

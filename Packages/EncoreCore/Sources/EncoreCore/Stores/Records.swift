@@ -51,17 +51,31 @@ public struct GenerationRecord: Codable, Sendable, Identifiable, Hashable {
     /// Wall-clock seconds the generation took.
     public var elapsed: TimeInterval
     public var favorite: Bool
+    // Added later; nil in records written before they existed.
+    /// The model variant it was made with.
+    public var variantID: String?
+    /// The language asked for (nil: the model's default / automatic).
+    public var language: String?
+    /// Style direction or voice description sent to the model.
+    public var instruct: String?
+    /// Post-processing applied to the result.
+    public var post: PostProcessingOptions?
+    /// Where the model ran.
+    public var runtime: EngineRuntime?
 
     public enum Kind: String, Codable, Sendable, CaseIterable { case speech, conversation, voiceChange, voiceDesign }
 
     public init(id: UUID = UUID(), kind: Kind, title: String, text: String, modelID: String, modelName: String,
                 voiceName: String? = nil, voiceID: UUID? = nil, parameters: ParamValues = [:], audioPath: String,
                 duration: TimeInterval, sampleRate: Double, createdAt: Date = Date(), elapsed: TimeInterval = 0,
-                favorite: Bool = false) {
+                favorite: Bool = false, variantID: String? = nil, language: String? = nil, instruct: String? = nil,
+                post: PostProcessingOptions? = nil, runtime: EngineRuntime? = nil) {
         self.id = id; self.kind = kind; self.title = title; self.text = text; self.modelID = modelID
         self.modelName = modelName; self.voiceName = voiceName; self.voiceID = voiceID
         self.parameters = parameters; self.audioPath = audioPath; self.duration = duration
         self.sampleRate = sampleRate; self.createdAt = createdAt; self.elapsed = elapsed; self.favorite = favorite
+        self.variantID = variantID; self.language = language; self.instruct = instruct; self.post = post
+        self.runtime = runtime
     }
 
     public var audioURL: URL { URL(fileURLWithPath: audioPath) }
@@ -76,11 +90,22 @@ public struct TranscriptionRecord: Codable, Sendable, Identifiable, Hashable {
     public var transcript: Transcript
     public var createdAt: Date
     public var elapsed: TimeInterval
+    // Added later; nil in records written before they existed.
+    public var variantID: String?
+    /// The language asked for (nil: detected).
+    public var language: String?
+    public var timestamps: TimestampGranularity?
+    public var parameters: ParamValues?
+    public var runtime: EngineRuntime?
 
     public init(id: UUID = UUID(), sourceName: String, sourcePath: String, modelID: String, modelName: String,
-                transcript: Transcript, createdAt: Date = Date(), elapsed: TimeInterval = 0) {
+                transcript: Transcript, createdAt: Date = Date(), elapsed: TimeInterval = 0, variantID: String? = nil,
+                language: String? = nil, timestamps: TimestampGranularity? = nil, parameters: ParamValues? = nil,
+                runtime: EngineRuntime? = nil) {
         self.id = id; self.sourceName = sourceName; self.sourcePath = sourcePath; self.modelID = modelID
         self.modelName = modelName; self.transcript = transcript; self.createdAt = createdAt; self.elapsed = elapsed
+        self.variantID = variantID; self.language = language; self.timestamps = timestamps
+        self.parameters = parameters; self.runtime = runtime
     }
     public static func == (a: Self, b: Self) -> Bool { a.id == b.id && a.transcript == b.transcript }
     public func hash(into hasher: inout Hasher) { hasher.combine(id) }

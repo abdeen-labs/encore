@@ -43,6 +43,27 @@ import Testing
         #expect(record.text.contains("Ben: Hi Ann, how are you?"))
     }
 
+    @Test func unsavedRendersLeaveHistoryAlone() async throws {
+        let backend = FakeBackend(.mlxSwift, features: ["speaker": [.synthesis, .cloning]])
+        let w = try ServiceWorld(models: [Self.speaker], backends: [backend])
+        var r = ConversationRequest(modelID: "speaker", script: conversation().0)
+        r.post = noPost()
+        r.saveToHistory = false
+        let record = try #require(finishedRecord(try await collect(w.service.renderConversation(r))))
+        var s = SpeechRequest(modelID: "speaker", text: "Just a try-out.")
+        s.voice = .preset("p1")
+        s.saveToHistory = false
+        let take = try #require(finishedRecord(try await collect(w.service.speak(s))))
+        #expect(try await w.history.count() == 0)
+        for url in [record.audioURL, take.audioURL] {
+            #expect(url.deletingLastPathComponent().standardizedFileURL == w.service.unsavedDirectory.standardizedFileURL)
+            #expect(try await AudioReader.read(url).duration > 0)
+        }
+        // Older JSON without the field still saves.
+        let decoded = try JSONDecoder().decode(SpeechRequest.self, from: Data(#"{"modelID":"speaker","text":"Hi."}"#.utf8))
+        #expect(decoded.saveToHistory)
+    }
+
     @Test func reRenderingOnlyRegeneratesChangedLines() async throws {
         let backend = FakeBackend(.mlxSwift, features: ["speaker": .synthesis])
         let w = try ServiceWorld(models: [Self.speaker], backends: [backend])
@@ -107,7 +128,7 @@ import Testing
         }
     }
 
-    @Test func cancelledDesignDeletesItsCandidates() async throws {
+    @Test func canceledDesignDeletesItsCandidates() async throws {
         let backend = FakeBackend(.mlxSwift, features: ["speaker": [.synthesis, .voiceDesign]])
         let w = try ServiceWorld(models: [Self.designer], backends: [backend])
         backend.delay = .milliseconds(300)

@@ -17,7 +17,7 @@ import traceback
 from . import HELPER_VERSION, PROTOCOL_VERSION
 from .engines import LoadedModel, available_engines, load_module, spec_for, synthesize, transcribe
 from .hub import check_dirs, local_repos
-from .protocol import HelperError, JobCancelled, log, send
+from .protocol import HelperError, JobCanceled, log, send
 
 IMMEDIATE_OPS = {"hello", "list", "memory", "cancel", "shutdown"}
 JOB_OPS = {"load", "unload", "synthesize", "transcribe", "convert_voice"}
@@ -52,12 +52,12 @@ class Job:
     def __init__(self, request: dict):
         self.request = request
         self.id = request.get("id")
-        self.cancelled = threading.Event()
+        self.canceled = threading.Event()
         self._last_progress = 0.0
 
     def check(self) -> None:
-        if self.cancelled.is_set():
-            raise JobCancelled()
+        if self.canceled.is_set():
+            raise JobCanceled()
 
     def progress(self, fraction, stage=None) -> None:
         now = time.monotonic()
@@ -104,7 +104,7 @@ class Worker:
         self.jobs: queue.Queue = queue.Queue()
         self.lock = threading.Lock()
         self.current: Job | None = None
-        self.cancelled_ids: set = set()
+        self.canceled_ids: set = set()
         self.main_thread_id = threading.get_ident()
         self.shutting_down = False
 
@@ -128,13 +128,13 @@ class Worker:
         with self.lock:
             job = self.current
             if job is not None and job.id == target:
-                job.cancelled.set()
+                job.canceled.set()
                 # Interrupt Python code inside the model's generation loop, not only at our own checkpoints.
                 ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_ulong(self.main_thread_id),
-                                                           ctypes.py_object(JobCancelled))
-                return {"cancelled": "running"}
-            self.cancelled_ids.add(target)
-        return {"cancelled": "queued"}
+                                                           ctypes.py_object(JobCanceled))
+                return {"canceled": "running"}
+            self.canceled_ids.add(target)
+        return {"canceled": "queued"}
 
     def shutdown(self, req) -> dict:
         self.shutting_down = True
@@ -148,7 +148,7 @@ class Worker:
             except queue.Empty:
                 break
             if queued is not None:
-                send({"id": queued.get("id"), "ok": False, "error": {"code": "cancelled", "message": "Cancelled."}})
+                send({"id": queued.get("id"), "ok": False, "error": {"code": "canceled", "message": "Canceled."}})
         self.jobs.put(None)
         threading.Timer(5.0, lambda: os._exit(0)).start()  # don't wait forever on a stuck job
         return {}
@@ -186,7 +186,7 @@ class Worker:
             with local_repos(repo_dirs):
                 module = load_module(loader, root, lazy=spec.kind == "vc")
             if spec.kind == "vc":
-                # Drop the TTS-only T3 and voice encoder before their weights are ever materialised.
+                # Drop the TTS-only T3 and voice encoder before their weights are ever materialized.
                 import mlx.core as mx
 
                 for part in ("t3", "ve"):
@@ -284,7 +284,7 @@ class Worker:
                     self.current = None
                     ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_ulong(self.main_thread_id), None)
                 return
-            except JobCancelled:
+            except JobCanceled:
                 continue
 
     def run_jobs(self) -> None:
@@ -294,9 +294,9 @@ class Worker:
                 break
             job = Job(request)
             with self.lock:
-                if job.id in self.cancelled_ids:
-                    self.cancelled_ids.discard(job.id)
-                    send({"id": job.id, "ok": False, "error": {"code": "cancelled", "message": "Cancelled."}})
+                if job.id in self.canceled_ids:
+                    self.canceled_ids.discard(job.id)
+                    send({"id": job.id, "ok": False, "error": {"code": "canceled", "message": "Canceled."}})
                     continue
                 self.current = job
             reply = None
@@ -306,9 +306,9 @@ class Worker:
                     reply = {"id": job.id, "ok": True, "result": result}
                 finally:
                     self._finish()
-            except JobCancelled:
+            except JobCanceled:
                 self._finish()
-                reply = {"id": job.id, "ok": False, "error": {"code": "cancelled", "message": "Cancelled."}}
+                reply = {"id": job.id, "ok": False, "error": {"code": "canceled", "message": "Canceled."}}
             except HelperError as e:
                 reply = {"id": job.id, "ok": False, "error": e.payload()}
             except KeyError as e:

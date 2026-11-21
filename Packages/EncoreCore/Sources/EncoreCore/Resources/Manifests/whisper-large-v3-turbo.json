@@ -2,7 +2,7 @@
   "id": "whisper-large-v3-turbo",
   "name": "Whisper large-v3 turbo",
   "family": "Whisper",
-  "summary": "OpenAI's fast multilingual speech recogniser: nearly large-v3 accuracy in 99 languages at several times the speed.",
+  "summary": "OpenAI's fast multilingual speech recognizer: nearly large-v3 accuracy in 99 languages at several times the speed.",
   "tasks": [
     "stt"
   ],

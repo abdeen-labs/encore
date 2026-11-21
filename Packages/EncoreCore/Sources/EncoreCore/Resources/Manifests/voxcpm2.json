@@ -35,7 +35,7 @@
     "name": "Apache-2.0",
     "url": "https://huggingface.co/openbmb/VoxCPM2",
     "commercialUse": true,
-    "summary": "Free to use, change and sell, including commercially. Keep the licence notice if you redistribute the model.",
+    "summary": "Free to use, change and sell, including commercially. Keep the license notice if you redistribute the model.",
     "gated": false
   },
   "capabilities": {
@@ -194,5 +194,6 @@
   },
   "maxChunkCharacters": 300,
   "sampleRate": 48000,
-  "homepage": "https://github.com/OpenBMB/VoxCPM"
+  "homepage": "https://github.com/OpenBMB/VoxCPM",
+  "descriptionHelp": "VoxCPM2 reads a short description of the voice and its style, such as: a calm, low-voiced late-night radio host."
 }

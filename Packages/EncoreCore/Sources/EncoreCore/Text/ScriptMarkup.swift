@@ -128,7 +128,7 @@ public enum ScriptTagKind: String, Sendable, Hashable, Codable {
     case unrecognized
 }
 
-/// A recognised tag in the script, for highlighting.
+/// A recognized tag in the script, for highlighting.
 public struct ScriptTag: Sendable, Hashable {
     public var kind: ScriptTagKind
     public var range: Range<String.Index>
@@ -165,7 +165,7 @@ public struct ScriptSegment: Sendable, Hashable {
 
 public struct ParsedScript: Sendable {
     public var segments: [ScriptSegment] = []
-    /// Every tag found, in order — Encore's, the model's, and unrecognised ones.
+    /// Every tag found, in order — Encore's, the model's, and unrecognized ones.
     public var tags: [ScriptTag] = []
     public var issues: [ScriptIssue] = []
     /// `[voice:]` names that matched nothing, in order of first appearance.

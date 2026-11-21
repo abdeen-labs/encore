@@ -63,7 +63,7 @@ struct AudioLoudnessTests {
         }
     }
 
-    /// When reaching the target would mean squashing sustained material (not just brief peaks), normalisation
+    /// When reaching the target would mean squashing sustained material (not just brief peaks), normalization
     /// lowers the gain instead and falls short of the target — and still never exceeds the ceiling.
     @Test func normalizeFallsShortRatherThanSquash() {
         // A quiet bed with loud 80 ms bursts four times a second: the bursts carry the loudness.

@@ -116,7 +116,7 @@ struct AudioFileTests {
         #expect(diff < 1e-6)
     }
 
-    @Test func peaksComputationIsCancellable() async throws {
+    @Test func peaksComputationIsCancelable() async throws {
         let url = dir.appendingPathComponent("long-for-cancel.wav")
         try AudioExporter.writeWAV(AudioBuffer(samples: Signal.noise(seconds: 600, rmsDB: -20, rate: 16_000), sampleRate: 16_000),
                                    to: url, encoding: .pcm16)
@@ -132,7 +132,7 @@ struct AudioFileTests {
         await #expect(throws: (any Error).self) { try await AudioReader.read(junk) }
     }
 
-    @Test func ffmpegLocatorHonoursConfiguredPath() {
+    @Test func ffmpegLocatorHonorsConfiguredPath() {
         #expect(FFmpeg.locate(configuredPath: "/nonexistent/ffmpeg") == FFmpeg.locate(configuredPath: ""))
         if let found = FFmpeg.locate() {
             #expect(FFmpeg.locate(configuredPath: found.deletingLastPathComponent().path) == found)

@@ -9,7 +9,7 @@ import NaturalLanguage
 /// Runs models in-process with MLX Swift (mlx-audio-swift).
 ///
 /// Loads read only local snapshot directories (`ModelLoadContext.repoDirectories`); nothing touches the
-/// network. All model work is serialised: MLX models are not safe to drive from two tasks at once.
+/// network. All model work is serialized: MLX models are not safe to drive from two tasks at once.
 public final class MLXSwiftBackend: EngineBackend, @unchecked Sendable {
     public let runtime: EngineRuntime = .mlxSwift
     private let host = MLXModelHost()
@@ -87,7 +87,7 @@ private final class MLXModelHost: @unchecked Sendable {
 
     private var models: [String: Loaded] = [:]
     /// Flat directories Encore staged for mlx-audio, refcounted across loaded models.
-    private var staged: [String: (url: URL, created: Bool, count: Int)] = [:]
+    private var staged: [String: (claim: MLXRepoStaging.Claim, count: Int)] = [:]
     private var sweptStaging = false
 
     private let idsLock = NSLock()
@@ -205,11 +205,11 @@ private final class MLXModelHost: @unchecked Sendable {
         if var entry = staged[repo] {
             entry.count += 1
             staged[repo] = entry
-            return entry.url
+            return entry.claim.url
         }
-        let result = try MLXRepoStaging.stage(repo: repo, snapshot: snapshot)
-        staged[repo] = (result.url, result.created, 1)
-        return result.url
+        let claim = try MLXRepoStaging.stage(repo: repo, snapshot: snapshot)
+        staged[repo] = (claim, 1)
+        return claim.url
     }
 
     private func releaseStaged(_ repo: String) {
@@ -217,6 +217,6 @@ private final class MLXModelHost: @unchecked Sendable {
         entry.count -= 1
         if entry.count > 0 { staged[repo] = entry; return }
         staged[repo] = nil
-        if entry.created { MLXRepoStaging.remove(entry.url) }
+        MLXRepoStaging.release(entry.claim)
     }
 }

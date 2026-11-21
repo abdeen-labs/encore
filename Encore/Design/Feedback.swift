@@ -81,7 +81,7 @@ private struct SpotCone: Shape {
 
 // MARK: - Banner
 
-/// An inline message that lives in the layout (not floating). Tone sets the lamp colour.
+/// An inline message that lives in the layout (not floating). Tone sets the lamp color.
 ///
 ///     Banner(.warning, title: "Model not downloaded", message: "Download Kokoro to perform.") {
 ///         Button("Download") { … }.buttonStyle(.secondary)

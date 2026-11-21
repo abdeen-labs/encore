@@ -46,12 +46,13 @@ extension EncoreService {
                 let stitched = try SpeechSegmenter.stitch(pieces, sampleRate: rate)
                 let processed = try await self.postProcess(stitched, request.post, report: report)
                 await report.stage("Saving")
-                return try await self.commit(processed) { url in
+                return try await self.commit(processed, save: request.saveToHistory) { url in
                     GenerationRecord(kind: .voiceChange, title: title, text: source.lastPathComponent, modelID: manifest.id,
                                      modelName: manifest.name, voiceName: target.name, voiceID: target.libraryID,
                                      parameters: manifest.defaultParameters.merging(request.parameters) { $1 },
                                      audioPath: url.path, duration: processed.duration, sampleRate: processed.sampleRate,
-                                     elapsed: Date().timeIntervalSince(started))
+                                     elapsed: Date().timeIntervalSince(started), variantID: context.variant.id,
+                                     post: request.post, runtime: session.runtime)
                 }
             }
             await self.noteUsed(manifest.id, for: .voiceChange)

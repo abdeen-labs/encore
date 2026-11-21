@@ -32,7 +32,7 @@ public enum AudioEdit {
         return AudioBuffer(samples: out, sampleRate: rate)
     }
 
-    /// Joins buffers end to end. With a crossfade, each join overlaps the neighbours by that long
+    /// Joins buffers end to end. With a crossfade, each join overlaps the neighbors by that long
     /// (shortened if a piece is too short). Buffers at other rates are resampled to the first one's rate.
     public static func concatenate(_ buffers: [AudioBuffer], crossfade: TimeInterval = 0,
                                    curve: CrossfadeCurve = .equalPower) throws -> AudioBuffer {

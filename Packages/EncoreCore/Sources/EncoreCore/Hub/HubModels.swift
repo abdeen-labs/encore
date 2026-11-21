@@ -9,6 +9,10 @@ public struct HubAccount: Codable, Sendable, Hashable {
     public var tokenRole: String?
     /// The token's own display name on huggingface.co.
     public var tokenName: String?
+
+    public init(name: String, fullName: String? = nil, avatarURL: URL? = nil, tokenRole: String? = nil, tokenName: String? = nil) {
+        self.name = name; self.fullName = fullName; self.avatarURL = avatarURL; self.tokenRole = tokenRole; self.tokenName = tokenName
+    }
 }
 
 /// What the details view shows about a repo, from `GET /api/models/{id}` (works anonymously, gated or not).
@@ -17,13 +21,13 @@ public struct HubRepoInfo: Codable, Sendable, Hashable {
     public var commit: String?
     public var gate: HubGateKind
     public var isPrivate: Bool
-    /// Licence id as the card declares it (`apache-2.0`, `cc-by-nc-4.0`, `other`, …).
+    /// License id as the card declares it (`apache-2.0`, `cc-by-nc-4.0`, `other`, …).
     public var licenseID: String?
-    /// `license_name` from the card, set for custom (`other`) licences.
+    /// `license_name` from the card, set for custom (`other`) licenses.
     public var licenseName: String?
     /// `license_link` from the card, resolved to an absolute URL.
     public var licenseLink: URL?
-    /// The text shown on the gate (`extra_gated_prompt`), often the licence itself.
+    /// The text shown on the gate (`extra_gated_prompt`), often the license itself.
     public var gatePrompt: String?
     /// `extra_gated_description`.
     public var gateDescription: String?
@@ -31,26 +35,36 @@ public struct HubRepoInfo: Codable, Sendable, Hashable {
     public var files: [String]
     public var lastModified: Date?
     public var pageURL: URL
+
+    public init(id: String, commit: String? = nil, gate: HubGateKind = .none, isPrivate: Bool = false, licenseID: String? = nil,
+                licenseName: String? = nil, licenseLink: URL? = nil, gatePrompt: String? = nil, gateDescription: String? = nil,
+                files: [String] = [], lastModified: Date? = nil, pageURL: URL) {
+        self.id = id; self.commit = commit; self.gate = gate; self.isPrivate = isPrivate; self.licenseID = licenseID
+        self.licenseName = licenseName; self.licenseLink = licenseLink; self.gatePrompt = gatePrompt
+        self.gateDescription = gateDescription; self.files = files; self.lastModified = lastModified; self.pageURL = pageURL
+    }
 }
 
-/// Licence text to display, with where it came from.
+/// License text to display, with where it came from.
 public struct HubLicenseText: Sendable, Hashable {
     public enum Source: Sendable, Hashable {
-        /// A licence file in the repo (path in repo).
+        /// A license file in the repo (path in repo).
         case repoFile(String)
         /// The gate prompt (`extra_gated_prompt`), shown when it carries the terms.
         case gatePrompt
         /// The "License" section of the model card.
         case modelCard
-        /// The standard text of the declared licence (SPDX id), from spdx.org.
+        /// The standard text of the declared license (SPDX id), from spdx.org.
         case standard(String)
-        /// No text available; `url` (if any) points at the licence.
+        /// No text available; `url` (if any) points at the license.
         case none
     }
     public var source: Source
     public var text: String?
-    /// Where to read the licence in a browser: the card's link, the file on huggingface.co, or the SPDX page.
+    /// Where to read the license in a browser: the card's link, the file on huggingface.co, or the SPDX page.
     public var url: URL?
+
+    public init(source: Source, text: String?, url: URL?) { self.source = source; self.text = text; self.url = url }
 }
 
 /// Whether the current token (or anonymous access) can download a repo.

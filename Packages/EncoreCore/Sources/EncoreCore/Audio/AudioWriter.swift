@@ -59,7 +59,7 @@ public struct AudioExportOptions: Codable, Sendable, Hashable {
 /// The one entry point the UI calls to save audio.
 public enum AudioExporter {
     /// Writes `buffer` to `url` in `format`. The file is written to a temporary name and moved into place,
-    /// so a failed or cancelled export never leaves a half-written file behind.
+    /// so a failed or canceled export never leaves a half-written file behind.
     public static func export(_ buffer: AudioBuffer, to url: URL, format: AudioFileFormat,
                               options: AudioExportOptions = AudioExportOptions()) async throws {
         var buffer = buffer
@@ -213,7 +213,7 @@ public final class WAVWriter {
             case .float32:
                 samples.withUnsafeBytes { raw.copyMemory(from: $0) }
             case .pcm16:
-                // Scale, add TPDF dither (±1 LSB) from a precomputed table, clip, round — all vectorised.
+                // Scale, add TPDF dither (±1 LSB) from a precomputed table, clip, round — all vectorized.
                 let n = samples.count
                 var scaled = [Float](repeating: 0, count: n)
                 var scale: Float = 32_767

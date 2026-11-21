@@ -193,7 +193,7 @@ func hubGlobMatchesPython(path: String, pattern: String, expected: Bool) {
     @misc{}
     """
     #expect(HubService.licenseSection(ofModelCard: card) == "Code is Apache-2.0; weights are CC-BY-NC-4.0.\n\n### Notes\nAttribution required.")
-    #expect(HubService.licenseSection(ofModelCard: "# A\nno licence here") == nil)
+    #expect(HubService.licenseSection(ofModelCard: "# A\nno license here") == nil)
 }
 
 // MARK: - Tree cache (huggingface_hub's trees/<commit>.json)
@@ -375,7 +375,7 @@ func hubGlobMatchesPython(path: String, pattern: String, expected: Bool) {
     #expect(!FileManager.default.fileExists(atPath: file.path))
 }
 
-// MARK: - Download centre
+// MARK: - Download center
 
 @MainActor @Test func hubDownloadStateFromStatus() {
     let repo = HubRepoStatus(repo: "a/b", revision: "main", commit: commitA, snapshotDirectory: nil, isVerified: true,

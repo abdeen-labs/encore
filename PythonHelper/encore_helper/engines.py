@@ -87,7 +87,7 @@ class LoadedModel:
 
 
 def load_module(kind: str, path: str, lazy: bool = False):
-    """Builds the mlx-audio model from a local snapshot directory. With `lazy`, weights stay unmaterialised
+    """Builds the mlx-audio model from a local snapshot directory. With `lazy`, weights stay unmaterialized
     until the caller evaluates them (so parts it doesn't need never take memory)."""
     if kind == "stt":
         from mlx_audio.stt.utils import load

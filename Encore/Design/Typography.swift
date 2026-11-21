@@ -61,7 +61,7 @@ enum FontResolver {
 // MARK: - Text roles
 
 /// Semantic text roles. Apply with `.textRole(.body)`; the role sets face, size, tracking and
-/// a default colour (override colour with `.foregroundStyle` after it if needed).
+/// a default color (override color with `.foregroundStyle` after it if needed).
 enum TextRole: CaseIterable, Sendable {
     /// Screen titles in the scaffold. Display serif, 40pt.
     case marquee
@@ -69,13 +69,13 @@ enum TextRole: CaseIterable, Sendable {
     case title
     /// Card titles and section headings. Display serif, 19pt.
     case heading
-    /// Emphasised UI text: row titles, control labels that matter. Avenir Next DemiBold 13.
+    /// Emphasized UI text: row titles, control labels that matter. Avenir Next DemiBold 13.
     case headline
     /// Default reading text. Avenir Next Regular 13.
     case body
     /// Control labels. Avenir Next Medium 12.
     case label
-    /// Secondary explanatory text. Avenir Next Regular 11.5, secondary colour.
+    /// Secondary explanatory text. Avenir Next Regular 11.5, secondary color.
     case caption
     /// Small uppercase tracked label above things ("ADVANCED", group names in the rail).
     case eyebrow
@@ -128,9 +128,9 @@ enum TextRole: CaseIterable, Sendable {
 }
 
 extension View {
-    /// Applies an Encore text role: face, size, tracking, line spacing and colour (the role's
+    /// Applies an Encore text role: face, size, tracking, line spacing and color (the role's
     /// default unless `color` is given). A `.foregroundStyle` applied after this will NOT
-    /// override the colour (the innermost style wins), so pass `color:` instead.
+    /// override the color (the innermost style wins), so pass `color:` instead.
     func textRole(_ role: TextRole, color: Color? = nil) -> some View {
         self
             .font(role.font)

@@ -2,7 +2,7 @@ import Foundation
 
 /// The memory governor and GPU job queue. Owns loading and unloading across every backend:
 ///
-/// - Jobs run one at a time in arrival order (`run(_:_:)`); later ones wait in a visible queue and leave it when cancelled.
+/// - Jobs run one at a time in arrival order (`run(_:_:)`); later ones wait in a visible queue and leave it when canceled.
 /// - Inside a job, `RuntimeJob.ensureLoaded` loads the model on the chosen backend, first unloading least-recently-used
 ///   idle models when the new one wouldn't otherwise fit (`MemoryPolicy`). A model in use by a job is never unloaded;
 ///   a manual unload of a busy model happens when its job ends.
@@ -33,7 +33,7 @@ public final class ModelRuntime: Sendable {
 
     // MARK: Jobs
 
-    /// Runs `body` when the GPU slot is free. Waiting honours cancellation (the job leaves the queue).
+    /// Runs `body` when the GPU slot is free. Waiting honors cancellation (the job leaves the queue).
     public func run<T: Sendable>(_ kind: JobKind, title: String, model: ModelManifest,
                                  _ body: @Sendable (RuntimeJob) async throws -> T) async throws -> T {
         let job = RuntimeJob(id: UUID(), runtime: self)

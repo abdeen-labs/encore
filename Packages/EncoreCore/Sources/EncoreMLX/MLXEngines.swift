@@ -165,7 +165,7 @@ final class VoxCPM2Engine: MLXSpeechEngine {
     var sampleRate: Int { model.sampleRate }
 
     func synthesize(_ job: SynthesisJob, reference: MaterializedArray?, parameters: ResolvedParameters) async throws -> MLXArray {
-        // Voice design is a parenthesised description in front of the text, as upstream does it.
+        // Voice design is a parenthesized description in front of the text, as upstream does it.
         var text = job.text
         if let instruct = job.instruct?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
             text = "(\(instruct))\(text)"
@@ -183,6 +183,8 @@ final class OmniVoiceEngine: MLXSpeechEngine {
     var sampleRate: Int { model.sampleRate }
 
     func synthesize(_ job: SynthesisJob, reference: MaterializedArray?, parameters: ResolvedParameters) async throws -> MLXArray {
+        // Prose would be spoken or ignored: only the documented attribute list designs a voice.
+        if let instruct = job.instruct, let problem = OmniVoiceAttributes.problem(with: instruct) { throw EngineError.unsupported(problem) }
         var p = OmniVoiceGenerateParameters()
         if let v = parameters.int("num_steps") { p.numStep = v }
         if let v = parameters.float("guidance_scale") { p.guidanceScale = v }

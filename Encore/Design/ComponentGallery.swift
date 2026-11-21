@@ -20,7 +20,7 @@ struct ComponentGallery: View {
     @State private var name = "Narrator — Warm"
     @State private var empty = ""
     @State private var query = "captain"
-    @State private var script = "The house lights dim. A single spot finds the centre of the stage, and the voice begins — low, unhurried, certain of its audience.\n\nThis is the line we will perform."
+    @State private var script = "The house lights dim. A single spot finds the center of the stage, and the voice begins — low, unhurried, certain of its audience.\n\nThis is the line we will perform."
     @State private var warm = true
     @State private var bright = false
     @State private var tags = ["narration", "calm", "en-GB"]
@@ -30,7 +30,7 @@ struct ComponentGallery: View {
     var body: some View {
         ScreenScaffold("Gallery", subtitle: "Every component, every state.", eyebrow: "Debug · Design system") {
             group("Type") { typeSamples }
-            group("Colour") { swatches }
+            group("Color") { swatches }
             group("Buttons") { buttons }
             HStack(alignment: .top, spacing: Theme.Space.l) {
                 Card {
@@ -43,7 +43,7 @@ struct ComponentGallery: View {
                 Card {
                     SectionHeader("Switches & numbers")
                     Toggle("Stream while generating", isOn: $stream).toggleStyle(.stage)
-                    Toggle("Normalise loudness", isOn: $normalize).toggleStyle(.stage)
+                    Toggle("Normalize loudness", isOn: $normalize).toggleStyle(.stage)
                     Toggle("Disabled", isOn: .constant(true)).toggleStyle(.stage).disabled(true)
                     NumberField("Seed", value: $seed, in: 0...99_999)
                     NumberField("Pause between lines", value: $pause, in: 0...5, step: 0.1) { String(format: "%.1f s", $0) }
@@ -205,7 +205,7 @@ struct ComponentGallery: View {
         let colors: [(String, Color)] = [
             ("backdrop", .backdrop), ("rail", .rail), ("surface", .surface), ("raised", .surfaceRaised),
             ("sunken", .surfaceSunken), ("text", .textPrimary), ("text 2", .textSecondary), ("text 3", .textTertiary),
-            ("tungsten", .tungsten), ("velvet", .velvet), ("mint", .mint), ("footlight", .footlight),
+            ("tungsten", .tungsten), ("velvet", .velvet), ("mint", .mint), ("footlight", .footlight), ("gel", .gel),
         ]
         return HStack(spacing: Theme.Space.s) {
             ForEach(colors, id: \.0) { name, color in

@@ -50,10 +50,35 @@ import Testing
         guard case .found = PythonRuntime.locate() else { return }
         let backend = PythonBackend()
         #expect(await backend.availability() == .ready)
+        try await backend.start()
         let features = await backend.engineFeatures()
         #expect(features["chatterbox_vc"] == .voiceConversion)
         #expect(features["whisper"]?.contains(.wordTimestamps) == true)
         await backend.shutdown()
         #expect(await backend.isRunning == false)
+    }
+
+    /// Asking what the backend can do (as the runtime chips do) must not launch Python.
+    @Test func engineFeaturesDoNotStartTheHelper() async {
+        let backend = PythonBackend()
+        _ = await backend.availability()
+        let features = await backend.engineFeatures()
+        #expect(await backend.isRunning == false)
+        if case .found = PythonRuntime.locate() {
+            #expect(features == PythonBackend.expectedEngines)
+        } else {
+            #expect(features.isEmpty)
+        }
+    }
+
+    /// The static table answers for the helper before it runs, so it must say what the real handshake says.
+    /// Needs the dev runtime (ENCORE_PYTHON_HOME / Scripts/setup-python-runtime.sh); skipped otherwise.
+    @Test func staticEnginesMatchHandshake() async throws {
+        guard case .found = PythonRuntime.locate() else { return }
+        let backend = PythonBackend()
+        let handshake = try await backend.start()
+        await backend.shutdown()
+        #expect(handshake.engines == PythonBackend.expectedEngines,
+                "Update PythonBackend.expectedEngines: helper reports \(handshake.engines.mapValues(\.rawValue))")
     }
 }

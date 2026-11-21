@@ -112,7 +112,7 @@ extension SectionHeader where Trailing == EmptyView {
 ///     PerforatedDivider(bleed: 16)
 struct PerforatedDivider: View {
     var bleed: CGFloat = 0
-    /// Colour that fills the notches; match the ground the card sits on.
+    /// Color that fills the notches; match the ground the card sits on.
     var notchFill: Color = .stage
 
     private let radius: CGFloat = 9

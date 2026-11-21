@@ -6,91 +6,119 @@ import SwiftUI
 /// Playback goes through `NowPlaying`, so starting one card pauses whatever else was playing and the
 /// mini-player dock follows along.
 ///
+/// By default the card keeps its own `PlaybackTrack`. A screen that needs to seek it or follow its playhead
+/// passes one in with `track:`, optionally with cues (transcript segments, script lines) drawn under the
+/// waveform.
+///
 ///     WaveformPlayer(url: take.url, title: "Take 3", subtitle: "Captain · Qwen3-TTS")
 ///     WaveformPlayer(buffer: result, title: "Preview")
 ///     WaveformPlayer(url: line.url, title: line.speaker, style: .compact)
+///     WaveformPlayer(track: model.track, cues: cues, activeCue: active, onCueTap: { model.track.play(from: $0.start) })
 struct WaveformPlayer: View {
     enum Style: Sendable { case regular, compact }
 
-    let source: AudioSource
-    let title: String
-    var subtitle: String?
+    /// A track the caller owns; when nil the card uses its own.
+    private let external: PlaybackTrack?
+    private let source: AudioSource
+    private let title: String
+    private let subtitle: String?
     var style: Style = .regular
-    /// Gallery/preview only: draw the playhead here without a player.
-    var previewTime: TimeInterval?
+    var cues: [TrackCue] = []
+    var activeCue: Int?
+    var onCueTap: ((TrackCue) -> Void)?
+    /// Extra controls in the header, before the export menu (e.g. a take's star and menu). Set with `.accessory { }`.
+    var accessory: AnyView?
 
-    @State private var loader = WaveformLoader()
-    @State private var player: AudioPlayer?
-    @State private var pendingStart: TimeInterval = 0
+    @State private var owned: PlaybackTrack?
     @State private var scrubTime: TimeInterval?
-    @State private var loadError: String?
-    @Environment(ToastCenter.self) private var toasts: ToastCenter?
 
     init(url: URL, title: String, subtitle: String? = nil, style: Style = .regular) {
-        self.source = .file(url); self.title = title; self.subtitle = subtitle; self.style = style
+        self.init(source: .file(url), title: title, subtitle: subtitle, style: style)
     }
 
     init(buffer: AudioBuffer, title: String, subtitle: String? = nil, style: Style = .regular) {
-        self.source = .buffer(buffer); self.title = title; self.subtitle = subtitle; self.style = style
+        self.init(source: .buffer(buffer), title: title, subtitle: subtitle, style: style)
     }
 
     /// Static rendering from peaks, for previews and the gallery (no playback or export).
     init(previewPeaks: WaveformPeaks, title: String, subtitle: String? = nil, style: Style = .regular, time: TimeInterval = 0) {
-        self.source = .preview(previewPeaks); self.title = title; self.subtitle = subtitle; self.style = style
-        self.previewTime = time
-        self._loader = State(initialValue: WaveformLoader(peaks: previewPeaks))
+        self.init(source: .preview(previewPeaks), title: title, subtitle: subtitle, style: style, previewTime: time)
+    }
+
+    /// A track the caller keeps, to seek it or follow its playhead; `cues` are marked under the waveform.
+    init(track: PlaybackTrack, style: Style = .regular, cues: [TrackCue] = [], activeCue: Int? = nil,
+         onCueTap: ((TrackCue) -> Void)? = nil) {
+        external = track
+        source = track.source; title = track.title; subtitle = track.subtitle
+        self.style = style; self.cues = cues; self.activeCue = activeCue; self.onCueTap = onCueTap
+    }
+
+    private init(source: AudioSource, title: String, subtitle: String?, style: Style, previewTime: TimeInterval = 0) {
+        external = nil
+        self.source = source; self.title = title; self.subtitle = subtitle; self.style = style
+        _owned = State(initialValue: PlaybackTrack(source: source, title: title, subtitle: subtitle, previewTime: previewTime))
     }
 
     // MARK: State
 
-    private var duration: TimeInterval { player.map(\.duration).flatMap { $0 > 0 ? $0 : nil } ?? loader.duration }
-    private var isPlaying: Bool { player?.isPlaying ?? false }
-    private var currentTime: TimeInterval {
-        if let scrubTime { return scrubTime }
-        if let player, player.isLoaded { return player.currentTime }
-        return previewTime ?? pendingStart
+    /// The track on show: the caller's, or this card's own (replaced when the card is pointed at other audio).
+    private var track: PlaybackTrack {
+        if let external { return external }
+        return owned ?? PlaybackTrack(source: source, title: title, subtitle: subtitle)
     }
-    /// The playhead is shown once something has started or been scrubbed.
-    private var showsPlayhead: Bool { isPlaying || currentTime > 0.001 }
+    private var isPreview: Bool { if case .preview = source { true } else { false } }
 
     var body: some View {
+        let track = track
         Group {
             switch style {
-            case .regular: regular
-            case .compact: compact
+            case .regular: regular(track)
+            case .compact: compact(track)
             }
         }
-        .task(id: sourceID) { await loadPeaks() }
-        .onAppear(perform: adoptNowPlaying)
+        .task(id: PlaybackTrack.key(for: source)) {
+            if external == nil, owned?.sourceKey != PlaybackTrack.key(for: source) {
+                owned = PlaybackTrack(source: source, title: title, subtitle: subtitle)
+            }
+            await self.track.loadPeaks()
+        }
+        .onChange(of: title) { _, t in if external == nil { owned?.title = t } }
+        .onChange(of: subtitle) { _, s in if external == nil { owned?.subtitle = s } }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(title)
+        .accessibilityLabel(track.title)
     }
 
     // MARK: Layouts
 
-    private var regular: some View {
+    private func regular(_ track: PlaybackTrack) -> some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
             HStack(spacing: Theme.Space.m) {
-                playButton.controlSize(.large)
+                playButton(track).controlSize(.large)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).textRole(.headline).lineLimit(1)
-                    if let subtitle { Text(subtitle).textRole(.caption).lineLimit(1) }
+                    Text(external?.title ?? title).textRole(.headline).lineLimit(1)
+                    if let subtitle = external?.subtitle ?? subtitle { Text(subtitle).textRole(.caption).lineLimit(1) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
-                .onDrag { AudioExportActions.dragProvider(for: source, suggestedName: title) }
-                .help(source.canPlay ? "Drag to Finder or another app" : "")
-                AudioExportMenu(source: source, suggestedName: title)
+                .onDrag { AudioExportActions.dragProvider(for: track.source, suggestedName: track.title) }
+                .help(track.source.canPlay ? "Drag to Finder or another app" : "")
+                if let accessory { accessory }
+                AudioExportMenu(source: track.source, suggestedName: track.title)
             }
-            waveform(height: 54, barWidth: 2.5, gap: 1.5)
+            TrackWaveform(track: track, height: 54, scrubTime: $scrubTime)
+            if !cues.isEmpty {
+                CueLane(cues: cues, duration: track.duration, active: activeCue, onTap: onCueTap)
+                    .padding(.top, -Theme.Space.s)
+            }
             HStack {
-                Text(Timecode.string(currentTime)).textRole(.monoSmall, color: showsPlayhead ? .tungsten : .textTertiary)
+                Text(Timecode.string(scrubTime ?? track.currentTime))
+                    .textRole(.monoSmall, color: track.hasPosition ? .tungsten : .textTertiary)
                 Spacer()
-                if let message = loadError ?? loader.errorMessage {
+                if let message = track.loadError ?? track.loader.errorMessage {
                     Text(message).textRole(.caption, color: .velvet).lineLimit(1)
                     Spacer()
                 }
-                Text(duration > 0 ? Timecode.string(duration) : "–:––").textRole(.monoSmall, color: .textTertiary)
+                Text(track.duration > 0 ? Timecode.string(track.duration) : "–:––").textRole(.monoSmall, color: .textTertiary)
             }
             .padding(.top, -Theme.Space.xs)
         }
@@ -98,15 +126,17 @@ struct WaveformPlayer: View {
         .surface(.card)
     }
 
-    private var compact: some View {
+    private func compact(_ track: PlaybackTrack) -> some View {
         HStack(spacing: Theme.Space.s) {
-            playButton.controlSize(.small)
-            waveform(height: 26, barWidth: 2, gap: 1.25)
-                .onDrag { AudioExportActions.dragProvider(for: source, suggestedName: title) }
-            Text(showsPlayhead ? Timecode.string(currentTime, tenths: false) : Timecode.string(duration, tenths: false))
-                .textRole(.monoSmall, color: showsPlayhead ? .tungsten : .textSecondary)
+            playButton(track).controlSize(.small)
+            TrackWaveform(track: track, height: 26, barWidth: 2, gap: 1.25, scrubTime: $scrubTime)
+                .onDrag { AudioExportActions.dragProvider(for: track.source, suggestedName: track.title) }
+            let shown = track.hasPosition || scrubTime != nil
+            Text(Timecode.string(shown ? (scrubTime ?? track.currentTime) : track.duration, tenths: false))
+                .textRole(.monoSmall, color: shown ? .tungsten : .textSecondary)
                 .frame(minWidth: 38, alignment: .trailing)
-            AudioExportMenu(source: source, suggestedName: title, symbol: "ellipsis")
+            if let accessory { accessory }
+            AudioExportMenu(source: track.source, suggestedName: track.title, symbol: "ellipsis")
                 .controlSize(.small)
         }
         .padding(.horizontal, Theme.Space.s)
@@ -115,96 +145,17 @@ struct WaveformPlayer: View {
         .surface(.sunken, radius: Theme.Radius.m)
     }
 
-    private var playButton: some View {
-        Button(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill") { toggle() }
+    private func playButton(_ track: PlaybackTrack) -> some View {
+        Button(track.isPlaying ? "Pause" : "Play", systemImage: track.isPlaying ? "pause.fill" : "play.fill") { track.toggle() }
             .buttonStyle(.icon(tone: .accent, filled: true))
-            .disabled(!source.canPlay && previewTime == nil)
-            .help(isPlaying ? "Pause" : "Play")
+            .disabled(!track.source.canPlay && !(isPreview && track.hasPosition))
+            .help(track.isPlaying ? "Pause" : "Play")
     }
 
-    private func waveform(height: CGFloat, barWidth: CGFloat, gap: CGFloat) -> some View {
-        GeometryReader { geo in
-            let d = max(duration, 0.001)
-            ZStack(alignment: .leading) {
-                PeaksWaveform(peaks: loader.peaks, played: showsPlayhead ? currentTime : nil, tint: .tungsten,
-                              gain: loader.displayGain, barWidth: barWidth, gap: gap, duration: duration > 0 ? duration : nil)
-                if showsPlayhead {
-                    Playhead().offset(x: min(geo.size.width - 1.5, geo.size.width * currentTime / d))
-                }
-            }
-            .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { g in scrubTime = min(max(0, g.location.x / max(geo.size.width, 1)), 1) * d }
-                .onEnded { _ in
-                    if let t = scrubTime { seek(to: t) }
-                    scrubTime = nil
-                })
-        }
-        .frame(height: height)
-        .accessibilityElement()
-        .accessibilityLabel("Waveform")
-        .accessibilityValue("\(Timecode.string(currentTime)) of \(Timecode.string(duration))")
-        .accessibilityAdjustableAction { direction in
-            seek(to: currentTime + (direction == .increment ? 5 : -5))
-        }
-    }
-
-    // MARK: Actions
-
-    private var sourceID: String {
-        switch source {
-        case .file(let url): url.path
-        case .buffer(let b): "buffer-\(b.samples.count)-\(b.sampleRate)"
-        case .preview: "preview"
-        }
-    }
-
-    private func loadPeaks() async {
-        switch source {
-        case .file(let url): await loader.load(url: url)
-        case .buffer(let b): await loader.load(buffer: b)
-        case .preview: break
-        }
-        player?.waveform = loader.peaks
-    }
-
-    /// If the dock is already playing this file (e.g. the card scrolled away and back), take over that player.
-    private func adoptNowPlaying() {
-        guard player == nil, let url = source.fileURL, let current = NowPlaying.shared.player,
-              current.url?.standardizedFileURL == url.standardizedFileURL else { return }
-        player = current
-    }
-
-    private func toggle() {
-        if let player, player.isLoaded {
-            player.toggle()
-            return
-        }
-        Task { await startPlayback() }
-    }
-
-    private func startPlayback() async {
-        let p = player ?? AudioPlayer(title: title)
-        p.title = title
-        p.subtitle = subtitle
-        do {
-            switch source {
-            case .file(let url): try await p.load(url: url, title: title)
-            case .buffer(let b): p.load(buffer: b, title: title)
-            case .preview: return
-            }
-        } catch {
-            loadError = error.localizedDescription
-            return
-        }
-        p.waveform = loader.peaks
-        player = p
-        if pendingStart > 0 { p.seek(to: pendingStart) }
-        p.play()
-    }
-
-    private func seek(to t: TimeInterval) {
-        let t = min(max(0, t), duration)
-        if let player, player.isLoaded { player.seek(to: t) } else { pendingStart = t }
+    /// Adds controls to the card's header, before the export menu.
+    func accessory<V: View>(@ViewBuilder _ content: () -> V) -> WaveformPlayer {
+        var copy = self
+        copy.accessory = AnyView(content())
+        return copy
     }
 }

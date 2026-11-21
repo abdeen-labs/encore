@@ -26,7 +26,7 @@ struct PeaksWaveform: View {
             let mid = size.height / 2
             let usable = size.height
             guard let peaks, peaks.count > 0 else {
-                // Waiting for peaks: a quiet dotted centre line.
+                // Waiting for peaks: a quiet dotted center line.
                 var x: CGFloat = 0
                 while x < size.width {
                     ctx.fill(Path(CGRect(x: x, y: mid - 0.5, width: barWidth, height: 1)), with: .color(Color.textTertiary.opacity(0.35)))

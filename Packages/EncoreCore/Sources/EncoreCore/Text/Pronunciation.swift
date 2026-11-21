@@ -84,7 +84,7 @@ public struct PronunciationApplier: Sendable {
         return out
     }
 
-    /// Whether a neighbouring character continues the word (so a match here isn't a whole word).
+    /// Whether a neighboring character continues the word (so a match here isn't a whole word).
     private static func joins(_ c: Character) -> Bool { TextClass.isWordCharacter(c) && !TextClass.isNoSpaceScript(c) }
 
     private static func same(_ a: Character, _ b: Character) -> Bool { a == b || (isApostrophe(a) && isApostrophe(b)) }

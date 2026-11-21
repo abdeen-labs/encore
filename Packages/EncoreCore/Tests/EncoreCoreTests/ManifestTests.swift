@@ -31,11 +31,11 @@ import Testing
             #expect(Set(v.allRepos).count == v.allRepos.count, "\(m.id)/\(v.id) repeats a repo")
         }
 
-        // Licence
-        #expect(!m.license.name.isEmpty, "\(m.id) licence name")
-        #expect(m.license.url?.hasPrefix("https://") == true, "\(m.id) licence url")
+        // License
+        #expect(!m.license.name.isEmpty, "\(m.id) license name")
+        #expect(m.license.url?.hasPrefix("https://") == true, "\(m.id) license url")
         #expect(m.license.commercialUse != nil, "\(m.id) must say whether commercial use is allowed")
-        #expect(!(m.license.summary ?? "").isEmpty, "\(m.id) licence summary")
+        #expect(!(m.license.summary ?? "").isEmpty, "\(m.id) license summary")
         #expect(m.license.gated != nil, "\(m.id) gated flag")
 
         // Parameters

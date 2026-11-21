@@ -54,14 +54,14 @@ func runServiceCommand(_ args: [String]) async throws {
             let stream = env.service.speak(request)
             let consumer = Task { try await env.drive(stream) }
             try await Task.sleep(for: .seconds(after))
-            let cancelled = Date()
+            let canceled = Date()
             consumer.cancel()
             do { _ = try await consumer.value } catch { print("consumer ended: \(error.localizedDescription)") }
             await env.service.runtime.waitUntilIdle()
             let scratch = (FileManager.default.subpaths(atPath: env.service.scratchDirectory.path) ?? []).filter { !$0.hasPrefix("Design") }
             let audioFiles = (try? FileManager.default.contentsOfDirectory(atPath: env.history.audioDirectory.path))?.count ?? 0
-            print(String(format: "cancelled; request stopped %.2f s later. New history records: %d. Scratch files: %d. "
-                         + "History audio files: %d for %d records.", Date().timeIntervalSince(cancelled),
+            print(String(format: "canceled; request stopped %.2f s later. New history records: %d. Scratch files: %d. "
+                         + "History audio files: %d for %d records.", Date().timeIntervalSince(canceled),
                          try await env.history.count() - historyBefore, scratch.count, audioFiles, try await env.history.count()))
             return
         }
@@ -261,8 +261,10 @@ private final class ServiceCLIEnvironment {
 
     init(_ o: ServiceCLIOptions) throws {
         root = o["root"].map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true) }
-        suite = "settings-\(ProcessInfo.processInfo.processIdentifier)"
-        settings = AppSettings(defaults: UserDefaults(suiteName: "encore-cli")!, key: suite)
+        // A throwaway defaults suite per run; tearDown (or exit) removes its domain and plist from ~/Library/Preferences.
+        let scratch = ThrowawayDefaults.make("encore-cli")
+        suite = scratch.suite
+        settings = AppSettings(defaults: scratch.defaults, key: "settings")
         if let m = o["idle-minutes"].flatMap(Int.init) { settings.idleUnloadMinutes = m }
         for p in o.all("prefer") {
             let kv = p.split(separator: "=").map(String.init)
@@ -285,7 +287,7 @@ private final class ServiceCLIEnvironment {
         jsonEvents = o["events"] == "json"
     }
 
-    func tearDown() { UserDefaults(suiteName: "encore-cli")?.removeObject(forKey: suite) }
+    func tearDown() { ThrowawayDefaults.remove(suite) }
 
     /// "automatic", a preset id, "preset:x", "library:<name|uuid>", or a library voice's name.
     func voice(_ spec: String?) throws -> VoiceSelection {
@@ -434,3 +436,4 @@ private struct ServiceCLIOptions {
         return p
     }
 }
+

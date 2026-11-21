@@ -56,12 +56,40 @@ public struct HistoryQuery: Sendable, Hashable {
     public var from: Date?
     /// Exclusive upper bound.
     public var until: Date?
+    /// Exact voice name, for voices that aren't in the library (a model's preset voices have no `voiceID`).
+    public var voiceName: String?
 
     public init(search: String = "", kinds: Set<HistoryKind> = [], favoritesOnly: Bool = false, modelID: String? = nil,
-                voiceID: UUID? = nil, from: Date? = nil, until: Date? = nil) {
+                voiceID: UUID? = nil, from: Date? = nil, until: Date? = nil, voiceName: String? = nil) {
         self.search = search; self.kinds = kinds; self.favoritesOnly = favoritesOnly; self.modelID = modelID
-        self.voiceID = voiceID; self.from = from; self.until = until
+        self.voiceID = voiceID; self.from = from; self.until = until; self.voiceName = voiceName
     }
+
+    /// True when anything other than the search narrows the results.
+    public var hasFilters: Bool {
+        !kinds.isEmpty || favoritesOnly || modelID != nil || voiceID != nil || voiceName != nil || from != nil || until != nil
+    }
+}
+
+/// What the history holds, for filter menus: the models and voices used (most used first) and items per kind.
+public struct HistoryFacets: Sendable, Equatable {
+    public struct Model: Sendable, Hashable, Identifiable {
+        public var id: String
+        public var name: String
+        public var count: Int
+    }
+    public struct Voice: Sendable, Hashable, Identifiable {
+        /// The library voice, when it is one.
+        public var voiceID: UUID?
+        public var name: String
+        public var count: Int
+        public var id: String { voiceID?.uuidString ?? "name:" + name }
+    }
+    public var models: [Model] = []
+    public var voices: [Voice] = []
+    public var kinds: [HistoryKind: Int] = [:]
+    public var total: Int { kinds.values.reduce(0, +) }
+    public init() {}
 }
 
 // MARK: - Database
@@ -139,7 +167,7 @@ public final class HistoryDatabase: Sendable {
         try await pool.write { db in try Self.row(for: .transcription(record), title: record.sourceName, favorite: false).insert(db) }
     }
 
-    /// Replaces a generation's stored record (title and favourite follow the record).
+    /// Replaces a generation's stored record (title and favorite follow the record).
     public func update(_ record: GenerationRecord) async throws {
         try await pool.write { db in
             guard try ItemRow.exists(db, key: record.id.uuidString) else { throw StoreError.notFound("The history item") }
@@ -249,10 +277,41 @@ public final class HistoryDatabase: Sendable {
         if q.favoritesOnly { clauses.append("item.favorite = 1") }
         if let m = q.modelID { clauses.append("item.modelID = ?"); args += [m] }
         if let v = q.voiceID { clauses.append("item.voiceID = ?"); args += [v.uuidString] }
+        if let n = q.voiceName { clauses.append("item.voiceName = ?"); args += [n] }
         if let f = q.from { clauses.append("item.createdAt >= ?"); args += [f.timeIntervalSince1970] }
         if let u = q.until { clauses.append("item.createdAt < ?"); args += [u.timeIntervalSince1970] }
         if !clauses.isEmpty { sql += " WHERE " + clauses.joined(separator: " AND ") }
         return (sql, args)
+    }
+
+    public func facets() async throws -> HistoryFacets {
+        try await pool.read { db in try Self.facets(db) }
+    }
+
+    /// Observes the facets: emits them now and whenever the history changes them.
+    public func observeFacets() -> AsyncValueObservation<HistoryFacets> {
+        ValueObservation.tracking { db in try Self.facets(db) }.removeDuplicates().values(in: pool)
+    }
+
+    static func facets(_ db: Database) throws -> HistoryFacets {
+        var f = HistoryFacets()
+        for row in try Row.fetchAll(db, sql: "SELECT modelID, MAX(modelName) AS name, COUNT(*) AS n FROM item GROUP BY modelID ORDER BY n DESC, name") {
+            f.models.append(.init(id: row["modelID"], name: row["name"], count: row["n"]))
+        }
+        // Conversations list every speaker in one name; they aren't one voice.
+        let sql = """
+            SELECT voiceID, voiceName AS name, COUNT(*) AS n FROM item
+            WHERE voiceName IS NOT NULL AND voiceName != '' AND kind != 'conversation'
+            GROUP BY IFNULL(voiceID, ''), voiceName ORDER BY n DESC, name
+            """
+        for row in try Row.fetchAll(db, sql: sql) {
+            let id: String? = row["voiceID"]
+            f.voices.append(.init(voiceID: id.flatMap(UUID.init(uuidString:)), name: row["name"], count: row["n"]))
+        }
+        for row in try Row.fetchAll(db, sql: "SELECT kind, COUNT(*) AS n FROM item GROUP BY kind") {
+            if let k = HistoryKind(rawValue: row["kind"]) { f.kinds[k] = row["n"] }
+        }
+        return f
     }
 
     /// Observes a query: emits the first `limit` items and the total count, again whenever they change.

@@ -32,7 +32,10 @@ extension EncoreService {
                 try Task.checkCancellation()
                 let record = TranscriptionRecord(sourceName: source.lastPathComponent, sourcePath: source.path, modelID: manifest.id,
                                                  modelName: manifest.name, transcript: transcript,
-                                                 elapsed: Date().timeIntervalSince(started))
+                                                 elapsed: Date().timeIntervalSince(started), variantID: context.variant.id,
+                                                 language: request.language, timestamps: request.timestamps,
+                                                 parameters: manifest.defaultParameters.merging(request.parameters) { $1 },
+                                                 runtime: session.runtime)
                 try await self.history.insert(record)
                 return record
             }

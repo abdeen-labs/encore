@@ -40,7 +40,7 @@ public struct TextChunk: Sendable, Hashable {
 /// longer text breaks at sentence ends, else clause punctuation or line breaks, else between words
 /// (dictionary-based for scripts without spaces, such as Chinese, Japanese or Thai), and only as a last
 /// resort inside a word. Tag-like spans (`[laugh]`, `[pause 1s]`, `<break …/>`) are never split.
-/// A tiny last piece is rebalanced with its neighbour. Lengths are counted in characters (grapheme clusters).
+/// A tiny last piece is rebalanced with its neighbor. Lengths are counted in characters (grapheme clusters).
 public struct TextChunker: Sendable {
     public var maxCharacters: Int
 
@@ -135,7 +135,7 @@ public struct TextChunker: Sendable {
             start = p.offset
         }
 
-        // Rebalance a tiny trailing chunk with its neighbour.
+        // Rebalance a tiny trailing chunk with its neighbor.
         if spans.count >= 2 {
             let last = spans[spans.count - 1], prev = spans[spans.count - 2]
             let minTail = max(1, limit / 4)

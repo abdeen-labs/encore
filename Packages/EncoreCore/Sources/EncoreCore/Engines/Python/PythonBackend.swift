@@ -6,13 +6,13 @@ import os
 ///
 /// The helper starts on first use and stops after `idleShutdown` with nothing to do (which frees every
 /// model it held). Models the app loaded are remembered, so after an idle stop or a crash the next job
-/// reloads its model transparently. Cancelling the calling task cancels the helper's job; if the helper
+/// reloads its model transparently. Canceling the calling task cancels the helper's job; if the helper
 /// doesn't stop within `cancelGrace`, it's killed and restarted on next use.
 public actor PythonBackend: EngineBackend {
     public struct Configuration: Sendable {
         /// Stop the helper process after this long without work.
         public var idleShutdown: TimeInterval = 300
-        /// How long a cancelled job may take to stop before the helper is killed.
+        /// How long a canceled job may take to stop before the helper is killed.
         public var cancelGrace: TimeInterval = 15
         /// Directory holding the user's ffmpeg/ffprobe, when Encore found them somewhere unusual.
         public var ffmpegDirectory: URL?
@@ -50,7 +50,7 @@ public actor PythonBackend: EngineBackend {
     private var stopping: Set<Int> = []  // generations we stopped on purpose
     private var pending: [Int: Pending] = [:]
     private var nextID = 1
-    private var cancelledIDs: Set<Int> = []
+    private var canceledIDs: Set<Int> = []
     private var contexts: [String: ModelLoadContext] = [:]
     private var resident: Set<String> = []
     private var idleTask: Task<Void, Never>?
@@ -79,11 +79,33 @@ public actor PythonBackend: EngineBackend {
         }
     }
 
+    /// Answered without starting the helper: its own handshake once it has run, otherwise `expectedEngines`
+    /// (when a runtime is installed). So showing which runtime a model will use never launches Python.
     public func engineFeatures() async -> [String: EngineFeatures] {
         if let handshake { return handshake.engines }
         guard case .found = locateRuntime() else { return [:] }
-        return (try? await ensureStarted().engines) ?? [:]
+        return Self.expectedEngines
     }
+
+    /// What the shipped helper reports in its handshake (`engines` in PythonHelper/encore_helper/engines.py, minus
+    /// what the bundled runtime doesn't install: Kokoro needs misaki, which pulls in torch). Keep the two in step;
+    /// `PythonBackendTests.staticEnginesMatchHandshake` compares them against a real helper. If an install turns
+    /// out to lack an engine, `load` throws `.unsupported` and the service falls through to the next backend.
+    public static let expectedEngines: [String: EngineFeatures] = [
+        "qwen3_tts": [.synthesis, .cloning, .voiceDesign],
+        "chatterbox": [.synthesis, .cloning],
+        "chatterbox_turbo": [.synthesis, .cloning],
+        "voxcpm2": [.synthesis, .cloning, .voiceDesign],
+        "omnivoice": [.synthesis, .cloning, .voiceDesign],
+        "llama": [.synthesis],
+        "dia": [.synthesis, .cloning],
+        "zonos3": [.synthesis, .cloning],
+        "soprano": [.synthesis],
+        "pocket_tts": [.synthesis, .cloning],
+        "whisper": [.transcription, .wordTimestamps],
+        "parakeet": [.transcription],
+        "chatterbox_vc": [.voiceConversion],
+    ]
 
     public func load(_ context: ModelLoadContext) async throws {
         let info = try await ensureStarted()
@@ -265,7 +287,7 @@ public actor PythonBackend: EngineBackend {
             } else {
                 entry.continuation.resume(throwing: Self.error(from: message["error"] as? [String: Any], op: entry.op))
             }
-            cancelledIDs.remove(id)
+            canceledIDs.remove(id)
             if pending.isEmpty { scheduleIdleShutdown() }
 
         case .exited(let status, let signaled):
@@ -283,7 +305,7 @@ public actor PythonBackend: EngineBackend {
             if !intentional { Self.log.error("\(message, privacy: .public)") }
             for (id, entry) in pending where entry.generation == g {
                 pending[id] = nil
-                if cancelledIDs.remove(id) != nil {
+                if canceledIDs.remove(id) != nil {
                     entry.continuation.resume(throwing: CancellationError())
                 } else {
                     entry.continuation.resume(throwing: EngineError.failed(intentional ? "The Python helper was stopped." : message))
@@ -352,7 +374,7 @@ public actor PythonBackend: EngineBackend {
 
     private func requestCancel(_ id: Int) {
         guard let entry = pending[id], let helper, entry.generation == generation else { return }
-        guard cancelledIDs.insert(id).inserted else { return }
+        guard canceledIDs.insert(id).inserted else { return }
         if let data = try? JSONSerialization.data(withJSONObject: ["id": nextID, "op": "cancel", "target": id]) {
             nextID += 1
             try? helper.send(data)
@@ -360,7 +382,7 @@ public actor PythonBackend: EngineBackend {
         let g = generation, grace = configuration.cancelGrace
         Task {
             try? await Task.sleep(for: .seconds(grace))
-            await self.enforceCancel(id, generation: g)
+            self.enforceCancel(id, generation: g)
         }
     }
 
@@ -421,7 +443,7 @@ public actor PythonBackend: EngineBackend {
             log.error("\(op, privacy: .public) failed [\(code, privacy: .public)]: \(message, privacy: .public) — \(detail, privacy: .public)")
         }
         switch code {
-        case "cancelled": return CancellationError()
+        case "canceled": return CancellationError()
         case "model_not_loaded": return EngineError.failed(message)
         case "unsupported", "unsupported_engine": return EngineError.unsupported(message)
         default: return EngineError.failed(message)

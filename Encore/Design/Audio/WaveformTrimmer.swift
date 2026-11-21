@@ -9,6 +9,10 @@ import SwiftUI
 ///
 ///     WaveformTrimmer(url: droppedFile, selection: $clipRange)
 ///     WaveformTrimmer(url: droppedFile, selection: $clipRange, target: 5...15)
+///     WaveformTrimmer(url: file, selection: $chosen, suggestsSelection: false)   // keep the caller's selection
+///
+/// Once the file is read it suggests the best-sounding stretch, unless `suggestsSelection` is false (the caller
+/// already has a selection the user chose, e.g. the trimmer is reappearing).
 ///
 /// Keyboard: ← → nudge the active edge (or the whole selection) by 0.1 s, ⇧ for 1 s; Space plays the selection.
 struct WaveformTrimmer: View {
@@ -16,6 +20,8 @@ struct WaveformTrimmer: View {
     @Binding var selection: ClosedRange<TimeInterval>
     var target: ClosedRange<TimeInterval> = 5...15
     var title: String?
+    /// Suggest the best-sounding stretch once the file is read (off when the caller's selection should stay).
+    var suggestsSelection = true
 
     @State private var loader: WaveformLoader
     @State private var visible: ClosedRange<TimeInterval>?
@@ -32,12 +38,15 @@ struct WaveformTrimmer: View {
     private struct DragState { var mode: Mode; var startSelection: ClosedRange<TimeInterval>; var startVisible: ClosedRange<TimeInterval> }
     private enum Mode { case start, end, body, pan }
 
-    init(url: URL, selection: Binding<ClosedRange<TimeInterval>>, target: ClosedRange<TimeInterval> = 5...15, title: String? = nil) {
+    init(url: URL, selection: Binding<ClosedRange<TimeInterval>>, target: ClosedRange<TimeInterval> = 5...15, title: String? = nil,
+         suggestsSelection: Bool = true) {
         source = .file(url)
         _selection = selection
         self.target = target
         self.title = title ?? url.lastPathComponent
         _loader = State(initialValue: WaveformLoader())
+        self.suggestsSelection = suggestsSelection
+        _didSuggest = State(initialValue: !suggestsSelection)
     }
 
     /// Static peaks (previews, the gallery). Play is disabled.
@@ -103,6 +112,7 @@ struct WaveformTrimmer: View {
         .task(id: source.fileURL) {
             if let url = source.fileURL { await loader.load(url: url) }
         }
+        .onChange(of: source.fileURL) { didSuggest = !suggestsSelection }
         .onChange(of: loader.peaks?.isComplete ?? false) { _, complete in
             if complete { suggestIfNeeded() }
         }
@@ -139,7 +149,7 @@ struct WaveformTrimmer: View {
         parts.append(duration > 0 ? Timecode.string(duration, tenths: duration < 60) : "Reading…")
         if loader.sampleRate > 0 { parts.append(String(format: "%g kHz", loader.sampleRate / 1000)) }
         if loader.isLoading, let p = loader.peaks, duration > 0 {
-            parts.append("analysing \(Int(min(1, p.coveredDuration / duration) * 100))%")
+            parts.append("analyzing \(Int(min(1, p.coveredDuration / duration) * 100))%")
         }
         return parts.joined(separator: "  ·  ")
     }

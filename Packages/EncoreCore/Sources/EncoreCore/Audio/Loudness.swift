@@ -20,7 +20,7 @@ public struct LoudnessMeasurement: Sendable, Codable, Equatable {
 }
 
 public enum Loudness {
-    /// Default true-peak ceiling for normalisation, dBTP (EBU R128 / common streaming practice).
+    /// Default true-peak ceiling for normalization, dBTP (EBU R128 / common streaming practice).
     public static let defaultTruePeakCeiling: Double = -1
 
     public static func measure(_ buffer: AudioBuffer) -> LoudnessMeasurement {
@@ -67,7 +67,7 @@ public enum Loudness {
         public var limiterReductionDB: Double
     }
 
-    /// Normalises to `targetLUFS` (integrated) without letting the true peak exceed `truePeakCeiling`.
+    /// Normalizes to `targetLUFS` (integrated) without letting the true peak exceed `truePeakCeiling`.
     ///
     /// When reaching the target would push peaks over the ceiling, a look-ahead limiter shaves just those peaks.
     /// Brief transients can be limited as hard as needed; what's capped is the limiter's audible cost, measured as
@@ -271,7 +271,7 @@ public final class LoudnessMeter {
     /// The BS.1770 K-weighting pre-filter, recomputed for any sample rate (same derivation as libebur128).
     /// Returns two biquad sections as [b0, b1, b2, a1, a2] each.
     static func kWeighting(sampleRate fs: Double) -> [Double] {
-        // Stage 1: high shelf (+4 dB above ~1.7 kHz) modelling the head.
+        // Stage 1: high shelf (+4 dB above ~1.7 kHz) modeling the head.
         var f0 = 1681.974450955533
         let gain = 3.999843853973347
         var q = 0.7071752369554196
@@ -347,7 +347,7 @@ public final class TruePeakMeter {
             }
             vDSP_vabs(out, 1, &out, 1, vDSP_Length(n))
             for i in 0..<samples.count {
-                // Output index i + delay corresponds (within half a sample) to input index i; cover both neighbours.
+                // Output index i + delay corresponds (within half a sample) to input index i; cover both neighbors.
                 let a = out[i + delay], b = out[max(0, i + delay - 1)]
                 env[i] = max(env[i], max(a, b))
             }
@@ -369,7 +369,7 @@ public final class TruePeakMeter {
         }
         return (0..<factor).map { k in
             let coeffs = stride(from: k, to: n, by: factor).map { h[$0] }
-            // Normalise each phase to unity DC gain so a constant signal reads exactly its level.
+            // Normalize each phase to unity DC gain so a constant signal reads exactly its level.
             let sum = coeffs.reduce(0, +)
             return coeffs.map { Float($0 / sum) }
         }

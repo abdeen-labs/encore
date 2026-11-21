@@ -22,6 +22,13 @@ public struct HubDownloadProgress: Sendable, Hashable {
     public var totalFiles: Int
     public var completedFiles: Int
 
+    public init(phase: Phase, totalBytes: Int64, completedBytes: Int64, bytesPerSecond: Double?,
+                activeFiles: [HubFileProgress], totalFiles: Int, completedFiles: Int) {
+        self.phase = phase; self.totalBytes = totalBytes; self.completedBytes = completedBytes
+        self.bytesPerSecond = bytesPerSecond; self.activeFiles = activeFiles
+        self.totalFiles = totalFiles; self.completedFiles = completedFiles
+    }
+
     public var fractionCompleted: Double {
         totalBytes > 0 ? min(1, Double(completedBytes) / Double(totalBytes)) : (phase == .finishing ? 1 : 0)
     }

@@ -2,13 +2,17 @@ import Foundation
 
 extension EncoreService {
     /// Text to speech: plans the script (pronunciations, pause tags, voice-switch tags, chunks that fit the model),
-    /// synthesises chunk by chunk in the right voice, joins everything with the planned gaps and pauses, applies
+    /// synthesizes chunk by chunk in the right voice, joins everything with the planned gaps and pauses, applies
     /// post-processing, writes the master and records it in history.
     public func speak(_ request: SpeechRequest) -> AsyncThrowingStream<GenerationEvent, Error> {
         stream { continuation in
             let started = Date()
             let manifest = try self.manifest(request.modelID, for: .tts)
             guard !request.text.trimmed().isEmpty else { throw ServiceError.emptyScript }
+            if manifest.engine == "omnivoice", let instruct = request.instruct?.trimmed(), !instruct.isEmpty,
+               let problem = OmniVoiceAttributes.problem(with: instruct) {
+                throw ServiceError.invalidRequest(problem)
+            }
             let context = try self.loadContext(manifest, variantID: request.variantID)
             let plan = ScriptPlanner(request: request, manifest: manifest, library: await self.libraryVoices(),
                                      pronunciations: self.pronunciations.enabledEntries()).plan(request.text)
@@ -33,12 +37,14 @@ extension EncoreService {
                 let processed = try await self.postProcess(audio, request.post, report: report)
                 await report.stage("Saving")
                 let main = try await voices.resolve(request.voice)
-                return try await self.commit(processed) { url in
+                return try await self.commit(processed, save: request.saveToHistory) { url in
                     GenerationRecord(kind: .speech, title: title, text: request.text, modelID: manifest.id, modelName: manifest.name,
                                      voiceName: main.name, voiceID: main.libraryID,
                                      parameters: manifest.defaultParameters.merging(request.parameters) { $1 },
                                      audioPath: url.path, duration: processed.duration, sampleRate: processed.sampleRate,
-                                     elapsed: Date().timeIntervalSince(started))
+                                     elapsed: Date().timeIntervalSince(started), variantID: context.variant.id,
+                                     language: request.language, instruct: request.instruct.flatMap { $0.trimmed().isEmpty ? nil : $0 },
+                                     post: request.post, runtime: session.runtime)
                 }
             }
             await self.noteUsed(manifest.id, for: selections.contains { if case .library = $0 { true } else { false } } ? .cloning : .speech)
@@ -83,7 +89,7 @@ extension EncoreService {
         return needs
     }
 
-    /// Synthesises every chunk of a plan and joins them with the planned silences, at the first chunk's sample rate.
+    /// Synthesizes every chunk of a plan and joins them with the planned silences, at the first chunk's sample rate.
     func render(_ plan: ScriptPlan, voice: VoiceSelection, settings: SpeechSettings, session: EngineSession, voices: VoiceResolver,
                 report: Reporter<GenerationEvent>, progress range: ClosedRange<Double>,
                 stageLabel: ((Int, Int) -> String)? = nil) async throws -> AudioBuffer {
@@ -130,7 +136,7 @@ extension EncoreService {
             out = PostProcessor.apply(o, to: out)
         }
         if options.normalizeLoudness {
-            await report.stage("Normalising loudness")
+            await report.stage("Normalizing loudness")
             var o = options; o.removeSilence = false
             out = PostProcessor.apply(o, to: out)
         }
@@ -139,7 +145,7 @@ extension EncoreService {
     }
 }
 
-/// Joins synthesised pieces and silences at one sample rate (the first piece's).
+/// Joins synthesized pieces and silences at one sample rate (the first piece's).
 struct Assembler {
     private var parts: [Part] = []
     private var rate: Double?

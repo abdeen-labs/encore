@@ -1,9 +1,9 @@
 #!/bin/bash
 # Builds a distributable Encore: archive → embed the Python runtime and sign it inside-out → sign the app →
-# notarise and staple the app → DMG (or zip) → sign, notarise and staple the DMG.
+# notarize and staple the app → DMG (or zip) → sign, notarize and staple the DMG.
 #
 #   Scripts/release.sh --notary-profile <keychain profile> [--identity "Developer ID Application: …"] [--zip]
-#   Scripts/release.sh --no-notarize      # everything up to notarisation (a locally signed, hardened build)
+#   Scripts/release.sh --no-notarize      # everything up to notarization (a locally signed, hardened build)
 #
 # One-time notary setup (stores credentials in the keychain under a profile name):
 #   xcrun notarytool store-credentials <profile> --apple-id <id> --team-id <team> --password <app-specific password>
@@ -34,14 +34,14 @@ fi
 
 step() { printf '\n==> %s\n' "$*"; }
 notarize() {  # <file>
-    step "Notarising $(basename "$1") (this waits for Apple)"
+    step "Notarizing $(basename "$1") (this waits for Apple)"
     local result id
     result="$(xcrun notarytool submit "$1" --keychain-profile "$PROFILE" --wait --output-format json)" || true
     echo "$result"
     id="$(/usr/bin/plutil -extract id raw - <<<"$result" 2>/dev/null || true)"
     if [[ "$(/usr/bin/plutil -extract status raw - <<<"$result" 2>/dev/null)" != "Accepted" ]]; then
         [[ -n "$id" ]] && xcrun notarytool log "$id" --keychain-profile "$PROFILE" || true
-        echo "Notarisation failed." >&2; exit 1
+        echo "Notarization failed." >&2; exit 1
     fi
 }
 
@@ -108,5 +108,5 @@ spctl --assess --type execute --verbose=2 "$APP" || true
 [[ "$FORMAT" == "dmg" ]] && { spctl --assess --type open --context context:primary-signature --verbose=2 "$PACKAGE" || true; }
 du -sh "$APP" "$PACKAGE"
 if [[ $NOTARIZE == 0 ]]; then
-    echo; echo "Stopped before notarisation (--no-notarize): $PACKAGE is signed but not notarised or stapled."
+    echo; echo "Stopped before notarization (--no-notarize): $PACKAGE is signed but not notarized or stapled."
 fi

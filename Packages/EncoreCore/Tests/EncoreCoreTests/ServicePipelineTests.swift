@@ -116,9 +116,30 @@ import Testing
         #expect(FileManager.default.fileExists(atPath: stored.audioPath))
         #expect(stored.audioURL.deletingLastPathComponent().standardizedFileURL == w.history.audioDirectory.standardizedFileURL)
         #expect(w.settings.lastUsedModels[.cloning] == "speaker")
+        // Everything Studio needs to restore the take.
+        #expect(stored.variantID == w.catalog.model("speaker")?.defaultVariant.id)
+        #expect(stored.post == r.post)
+        #expect(stored.language == nil && stored.instruct == nil)
+        #expect(stored.runtime != nil)
     }
 
-    @Test func cancellingMidRunLeavesNothingBehind() async throws {
+    @Test func recordsWrittenBeforeTheNewFieldsStillDecode() throws {
+        let old = """
+        {"id":"7B4C1F3E-2A4B-4C5D-9E6F-1A2B3C4D5E6F","kind":"speech","title":"Old","text":"Hello","modelID":"kokoro",
+         "modelName":"Kokoro","parameters":{},"audioPath":"/tmp/x.wav","duration":1.5,"sampleRate":24000,
+         "createdAt":700000000,"elapsed":0.4,"favorite":true}
+        """
+        let r = try JSONDecoder().decode(GenerationRecord.self, from: Data(old.utf8))
+        #expect(r.title == "Old" && r.favorite && r.variantID == nil && r.post == nil && r.runtime == nil)
+        let oldT = """
+        {"id":"7B4C1F3E-2A4B-4C5D-9E6F-1A2B3C4D5E60","sourceName":"a.wav","sourcePath":"/tmp/a.wav","modelID":"whisper",
+         "modelName":"Whisper","transcript":{"text":"hi","segments":[]},"createdAt":700000000,"elapsed":1}
+        """
+        let t = try JSONDecoder().decode(TranscriptionRecord.self, from: Data(oldT.utf8))
+        #expect(t.sourceName == "a.wav" && t.language == nil && t.timestamps == nil)
+    }
+
+    @Test func cancelingMidRunLeavesNothingBehind() async throws {
         let (w, b) = try world()
         b.delay = .milliseconds(150)
         var r = SpeechRequest(modelID: "speaker", text: (1...8).map { "Sentence number \($0) is here and long enough." }.joined(separator: "\n\n"))
@@ -127,16 +148,16 @@ import Testing
         let consumer = Task.detached {
             for try await e in stream { if case .stage(let s) = e, s.hasPrefix("Generating 2") { withUnsafeCurrentTask { $0?.cancel() } } }
         }
-        try await consumer.value  // the consuming task cancelled itself: the stream ends and the request stops
-        let cancelledAt = Date()
+        try await consumer.value  // the consuming task canceled itself: the stream ends and the request stops
+        let canceledAt = Date()
         await w.service.runtime.waitUntilIdle()
-        #expect(Date().timeIntervalSince(cancelledAt) < 1)
+        #expect(Date().timeIntervalSince(canceledAt) < 1)
         #expect(b.synthCalls.count <= 3)
         #expect(try await w.history.count() == 0)
         #expect(w.leftovers().isEmpty, "\(w.leftovers())")
     }
 
-    @Test func cancellingTheConsumingTaskStopsPromptly() async throws {
+    @Test func cancelingTheConsumingTaskStopsPromptly() async throws {
         let (w, b) = try world()
         b.delay = .seconds(5)
         var r = SpeechRequest(modelID: "speaker", text: "Only one long chunk to generate.")
@@ -146,7 +167,7 @@ import Testing
         try await Task.sleep(for: .milliseconds(200))
         consumer.cancel()
         let t = Date()
-        let events = try await consumer.value  // a cancelled stream just ends, without a record
+        let events = try await consumer.value  // a canceled stream just ends, without a record
         #expect(finishedRecord(events) == nil)
         await w.service.runtime.waitUntilIdle()
         #expect(Date().timeIntervalSince(t) < 1)

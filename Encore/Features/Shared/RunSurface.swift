@@ -1,0 +1,242 @@
+import EncoreCore
+import SwiftUI
+
+/// The one way every generation screen starts, watches and cancels a job.
+///
+/// Idle: the primary action (⌘↩), plus a note on why it can't run yet or how the last job went.
+/// Waiting: queue position and what is running ahead. Running: stage, progress, elapsed time, Cancel (⌘.).
+/// Memory warning: the numbers, what would be unloaded, and "Run anyway" / "Not now".
+///
+///     RunSurface(runner: runner, title: "Perform", systemImage: "play.fill",
+///                blockedReason: canRun ? nil : "Write something first", action: perform)
+struct RunSurface: View {
+    let runner: JobRunner
+    var title: String
+    var systemImage: String = "play.fill"
+    /// When non-nil the action is disabled and this says why.
+    var blockedReason: String?
+    /// Idle caption shown when nothing else needs saying (e.g. "3 chunks · Kokoro").
+    var idleNote: String?
+    let action: () -> Void
+
+    @Environment(RuntimeStatus.self) private var status
+
+    var body: some View {
+        Group {
+            switch runner.phase {
+            case .idle, .checkingMemory: idle
+            case .confirmMemory(let a): MemoryWarning(assessment: a, modelName: runner.identity?.modelName ?? "This model",
+                                                      onRun: runner.runAnyway, onCancel: runner.dismissMemoryWarning)
+            case .running: running
+            }
+        }
+        .stageAnimation(Theme.Motion.standard, value: runner.phase)
+    }
+
+    // MARK: Idle
+
+    private var idle: some View {
+        HStack(spacing: Theme.Space.m) {
+            Button(title, systemImage: systemImage, action: action)
+                .buttonStyle(.primary)
+                .controlSize(.large)
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(blockedReason != nil || runner.phase == .checkingMemory)
+                .help("\(title) (⌘↩)")
+            VStack(alignment: .leading, spacing: 2) {
+                if runner.phase == .checkingMemory {
+                    Text("Checking memory…").textRole(.caption)
+                } else if let blockedReason {
+                    Text(blockedReason).textRole(.caption, color: .textSecondary).lineLimit(2)
+                } else {
+                    if let note = outcomeNote {
+                        Text(note).textRole(.caption, color: .textSecondary).lineLimit(1)
+                    }
+                    if let idleNote {
+                        Text(idleNote).textRole(.monoSmall, color: .textTertiary).lineLimit(1)
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+            Text("⌘↩").textRole(.monoSmall, color: .textTertiary)
+                .opacity(blockedReason == nil ? 1 : 0)
+                .accessibilityHidden(true)
+        }
+        .frame(minHeight: Theme.ControlHeight.large)
+    }
+
+    private var outcomeNote: String? {
+        switch runner.lastOutcome {
+        case .finished(let t)?: "Done in \(Self.seconds(t))."
+        case .canceled?: "Canceled. Nothing was saved."
+        default: nil
+        }
+    }
+
+    // MARK: Running
+
+    /// Our job's place in the GPU queue (1 = next), and what's running ahead of it.
+    private var queue: (position: Int, ahead: JobStatus?)? {
+        guard let id = runner.identity, !runner.hasStarted else { return nil }
+        let queued = status.queuedJobs
+        guard let i = queued.firstIndex(where: { $0.kind == id.kind && $0.modelID == id.modelID }) else { return nil }
+        return (i + 1, status.runningJob)
+    }
+
+    private var running: some View {
+        HStack(alignment: .center, spacing: Theme.Space.m) {
+            ActivityIndicator(tone: queue == nil ? .accent : .neutral, size: 18)
+                .frame(width: Theme.ControlHeight.large, height: Theme.ControlHeight.large)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(stageLine).textRole(.headline).lineLimit(1)
+                    Spacer(minLength: Theme.Space.s)
+                    ElapsedLabel(since: runner.startedAt)
+                }
+                ProgressBar(value: queue == nil ? runner.progress : nil, tone: queue == nil ? .accent : .neutral)
+            }
+            Button("Cancel", systemImage: "stop.fill", action: runner.cancel)
+                .buttonStyle(.secondary)
+                .keyboardShortcut(".", modifiers: .command)
+                .help("Cancel (⌘.)")
+        }
+        .frame(minHeight: Theme.ControlHeight.large)
+    }
+
+    private var stageLine: String {
+        if let q = queue {
+            let what = q.ahead.map { "“\($0.title)” is running" } ?? "Another job is running"
+            return q.position == 1 ? "Waiting — \(what)" : "Waiting, \(Self.ordinal(q.position)) in line — \(what)"
+        }
+        return runner.stage ?? "Starting…"
+    }
+
+    static func seconds(_ t: TimeInterval) -> String {
+        t < 60 ? String(format: "%.1f s", t) : String(format: "%d:%02d", Int(t) / 60, Int(t) % 60)
+    }
+
+    private static func ordinal(_ n: Int) -> String {
+        let suffix = (11...13).contains(n % 100) ? "th" : ["th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th"][n % 10]
+        return "\(n)\(suffix)"
+    }
+}
+
+/// Seconds since a date, ticking once a second (still while snapshotting).
+private struct ElapsedLabel: View {
+    let since: Date?
+    @Environment(\.isSnapshotting) private var isSnapshotting
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let t = since.map { max(0, (isSnapshotting ? Date() : context.date).timeIntervalSince($0)) } ?? 0
+            Text(String(format: "%d:%02d", Int(t) / 60, Int(t) % 60))
+                .textRole(.monoSmall, color: .textTertiary)
+                .monospacedDigit()
+        }
+    }
+}
+
+// MARK: - Memory warning
+
+/// "This model won't fit comfortably": the verdict in plain words, the numbers, what Encore would unload,
+/// and the decision. Used by `RunSurface`; usable on its own (e.g. before a download).
+struct MemoryWarning: View {
+    let assessment: MemoryAssessment
+    let modelName: String
+    let onRun: () -> Void
+    let onCancel: () -> Void
+
+    private var wontFit: Bool { assessment.verdict == .wontFit }
+
+    var body: some View {
+        let tone: Tone = wontFit ? .danger : .warning
+        VStack(alignment: .leading, spacing: Theme.Space.m) {
+            HStack(alignment: .top, spacing: Theme.Space.m) {
+                Image(systemName: "memorychip")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(tone.color)
+                    .glow(tone.color, radius: 6, intensity: 0.4)
+                    .frame(width: 20)
+                    .padding(.top, 1)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(wontFit ? "\(modelName) won't fit comfortably" : "Memory will be tight for \(modelName)")
+                        .textRole(.headline)
+                    Text(assessment.summary + (assessment.wouldUnload.isEmpty ? ""
+                         : " Encore will unload \(assessment.wouldUnload.joined(separator: ", ")) first."))
+                        .textRole(.caption).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: Theme.Space.s)
+                HStack(spacing: Theme.Space.xs) {
+                    Button("Not now", action: onCancel)
+                        .buttonStyle(.ghost)
+                        .keyboardShortcut(".", modifiers: .command)
+                    Button(wontFit ? "Try anyway" : "Run anyway", systemImage: "play.fill", action: onRun)
+                        .buttonStyle(wontFit ? .destructive : .secondary)
+                        .keyboardShortcut(.return, modifiers: .command)
+                }
+                .fixedSize()
+            }
+            MemoryGauge(assessment: assessment)
+                .padding(.leading, 20 + Theme.Space.m)
+        }
+        .padding(Theme.Space.l)
+        .background {
+            let shape = RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
+            shape.fill(Color.surface)
+                .overlay(shape.fill(LinearGradient(colors: [tone.color.opacity(0.1), .clear], startPoint: .top, endPoint: .bottom)))
+                .overlay(shape.strokeBorder(tone.color.opacity(0.3), lineWidth: 1))
+        }
+    }
+}
+
+/// A bar of the Mac's memory: what Encore's models hold, what this model needs, and what is free.
+struct MemoryGauge: View {
+    let assessment: MemoryAssessment
+
+    var body: some View {
+        let a = assessment
+        let other = Double(max(0, a.memory.usedBytes - a.loadedBytes))
+        let need = Double(a.requiredBytes)
+        // Scale to RAM, or to the overcommitted total when the new model wouldn't fit (the overflow is the point).
+        let total = max(Double(max(a.memory.physicalBytes, 1)), other + Double(a.loadedBytes) + need)
+        let tone: Tone = a.verdict == .wontFit ? .danger : (a.verdict == .tight ? .warning : .success)
+        VStack(alignment: .leading, spacing: 6) {
+            GeometryReader { geo in
+                let w = geo.size.width
+                HStack(spacing: 1.5) {
+                    Rectangle().fill(Color.textTertiary.opacity(0.55)).frame(width: max(0, w * other / total))
+                    Rectangle().fill(Color.textSecondary.opacity(0.7)).frame(width: max(0, w * Double(a.loadedBytes) / total))
+                    Rectangle().fill(tone.color).frame(width: max(2, w * need / total))
+                        .glow(tone.color, radius: 4, intensity: 0.4)
+                    Spacer(minLength: 0)
+                }
+                .frame(width: w, alignment: .leading)
+                .clipShape(Capsule())
+                .background(Capsule().fill(Color.surfaceSunken))
+            }
+            .frame(height: 6)
+            HStack(spacing: Theme.Space.m) {
+                legend("Needs", Self.bytes(a.requiredBytes), tone.color)
+                legend("Free", Self.bytes(a.memory.availableBytes), .textPrimary)
+                if a.loadedBytes > 0 { legend("Encore models", Self.bytes(a.loadedBytes), .textSecondary) }
+                Spacer(minLength: 0)
+                Text("of \(Self.bytes(a.memory.physicalBytes))").textRole(.monoSmall, color: .textTertiary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func legend(_ label: String, _ value: String, _ color: Color) -> some View {
+        HStack(spacing: 4) {
+            Text(label).textRole(.caption, color: .textTertiary)
+            Text(value).textRole(.monoSmall, color: color)
+        }
+        .fixedSize()
+    }
+
+    static func bytes(_ b: Int64) -> String {
+        let f = ByteCountFormatter()
+        f.countStyle = .memory
+        return f.string(fromByteCount: b)
+    }
+}

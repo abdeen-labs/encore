@@ -49,13 +49,13 @@ private func speak(_ o: CLIOptions, backend: MLXSwiftBackend) async throws {
     if let after = o["cancel-after"].flatMap(Double.init) {
         let task = Task { try await backend.synthesize(job, progress: nil) }
         try await Task.sleep(for: .seconds(after))
-        let cancelled = Date()
+        let canceled = Date()
         task.cancel()
         do {
             let audio = try await task.value
-            print(String(format: "finished anyway (%.2f s of audio) %.2f s after cancel", audio.duration, Date().timeIntervalSince(cancelled)))
+            print(String(format: "finished anyway (%.2f s of audio) %.2f s after cancel", audio.duration, Date().timeIntervalSince(canceled)))
         } catch {
-            print(String(format: "stopped %.2f s after cancel: %@", Date().timeIntervalSince(cancelled), "\(error)"))
+            print(String(format: "stopped %.2f s after cancel: %@", Date().timeIntervalSince(canceled), "\(error)"))
         }
         await backend.unload(modelID: manifest.id)
         print("after unload: \(await backend.memory())")

@@ -19,7 +19,7 @@ func rgb(_ hex: UInt32, _ a: CGFloat = 1) -> NSColor {
 func drawMaster(_ ctx: CGContext, side: CGFloat) {
     let s = side / 1024
     ctx.scaleBy(x: s, y: s)
-    // macOS icon grid: 824pt body centred in 1024, continuous-ish corners.
+    // macOS icon grid: 824pt body centered in 1024, continuous-ish corners.
     let body = CGRect(x: 100, y: 100, width: 824, height: 824)
     let path = CGPath(roundedRect: body, cornerWidth: 185, cornerHeight: 185, transform: nil)
 

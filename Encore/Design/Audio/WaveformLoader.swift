@@ -5,6 +5,10 @@ import Observation
 
 /// Loads waveform peaks for a file (streamed, progressively) or a buffer, for the waveform views.
 /// Results for files are cached by path + modification date, so list rows that scroll back in don't re-read.
+///
+/// The reading belongs to the loader, not to the view task that asked for it: a caller whose task is canceled
+/// (a `.task(id:)` restarting, a layout switch) simply stops waiting, and the next caller for the same file
+/// joins the read already in flight. Work stops when a different file is asked for or the loader goes away.
 @Observable final class WaveformLoader {
     private(set) var peaks: WaveformPeaks?
     /// Known as soon as the file is probed, before peaks finish.
@@ -15,57 +19,76 @@ import Observation
     /// Gain that makes the loudest peak fill the drawing height (capped, so near-silence stays flat).
     private(set) var displayGain: Float = 1
 
+    /// The file or buffer the loader holds (or is reading).
     @ObservationIgnored private var loadedKey: String?
+    @ObservationIgnored nonisolated(unsafe) private var work: Task<Void, Never>?
 
     init() {}
 
     /// Fixed peaks (previews, gallery, or peaks computed elsewhere).
     init(peaks: WaveformPeaks) { apply(peaks) }
 
+    deinit { work?.cancel() }
+
+    /// Loads (or joins the load of) `url`'s peaks; returns once they're in (or the read was superseded).
     func load(url: URL) async {
         let key = WaveformCache.key(for: url)
-        guard key != loadedKey else { return }
-        loadedKey = key
-        errorMessage = nil
-        if let cached = WaveformCache.shared[key] {
-            apply(cached)
-            return
-        }
-        isLoading = true
-        defer { isLoading = false }
-        if let info = try? await AudioReader.probe(url) {
-            duration = info.duration
-            sampleRate = info.sampleRate
-        }
-        do {
-            let result = try await WaveformPeaks.compute(fileAt: url, bucketsPerSecond: 200) { partial in
-                // Held only while this load runs.
-                Task { @MainActor in
-                    guard self.loadedKey == key, !(self.peaks?.isComplete ?? false) else { return }
-                    self.apply(partial)
-                }
+        if key != loadedKey {
+            work?.cancel()
+            loadedKey = key
+            errorMessage = nil
+            if let cached = WaveformCache.shared[key] {
+                work = nil
+                apply(cached)
+                return
             }
-            guard loadedKey == key else { return }
-            apply(result)
-            WaveformCache.shared[key] = result
-        } catch is CancellationError {
-            loadedKey = nil
-        } catch {
-            errorMessage = error.localizedDescription
+            work = Task { [weak self] in await self?.read(url: url, key: key) }
         }
+        await work?.value
     }
 
     func load(buffer: AudioBuffer) async {
         let key = "buffer:\(buffer.samples.count):\(buffer.sampleRate):\(buffer.samples.prefix(64).hashValue)"
-        guard key != loadedKey else { return }
-        loadedKey = key
-        duration = buffer.duration
-        sampleRate = buffer.sampleRate
-        let peaks = await Task.detached(priority: .userInitiated) {
-            WaveformPeaks(buffer: buffer, samplesPerBucket: max(1, Int(buffer.sampleRate / 200)))
-        }.value
-        guard loadedKey == key else { return }
-        apply(peaks)
+        if key != loadedKey {
+            work?.cancel()
+            loadedKey = key
+            errorMessage = nil
+            duration = buffer.duration
+            sampleRate = buffer.sampleRate
+            work = Task { [weak self] in
+                let peaks = await Task.detached(priority: .userInitiated) {
+                    WaveformPeaks(buffer: buffer, samplesPerBucket: max(1, Int(buffer.sampleRate / 200)))
+                }.value
+                guard let self, self.loadedKey == key else { return }
+                self.apply(peaks)
+            }
+        }
+        await work?.value
+    }
+
+    private func read(url: URL, key: String) async {
+        isLoading = true
+        defer { if loadedKey == key { isLoading = false } }
+        if let info = try? await AudioReader.probe(url), loadedKey == key {
+            duration = info.duration
+            sampleRate = info.sampleRate
+        }
+        do {
+            let result = try await WaveformPeaks.compute(fileAt: url, bucketsPerSecond: 200) { [weak self] partial in
+                let loader = self
+                Task { @MainActor in
+                    guard let self = loader, self.loadedKey == key, !(self.peaks?.isComplete ?? false) else { return }
+                    self.apply(partial)
+                }
+            }
+            WaveformCache.shared[key] = result
+            guard loadedKey == key else { return }
+            apply(result)
+        } catch is CancellationError {
+            // Superseded by another file, or the loader went away.
+        } catch {
+            if loadedKey == key { errorMessage = error.localizedDescription }
+        }
     }
 
     private func apply(_ peaks: WaveformPeaks) {

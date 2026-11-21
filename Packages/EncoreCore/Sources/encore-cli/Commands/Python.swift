@@ -109,7 +109,7 @@ func runPythonCommand(_ args: [String]) async throws {
             let audio = try await task.value
             print(String(format: "job finished before the cancel landed (%.2f s of audio)", audio.duration))
         } catch is CancellationError {
-            print(String(format: "cancelled after %.2f s; the job stopped %.3f s after cancel()", after, Date().timeIntervalSince(cancelAt)))
+            print(String(format: "canceled after %.2f s; the job stopped %.3f s after cancel()", after, Date().timeIntervalSince(cancelAt)))
         }
         print("helper still running: \(await backend.isRunning), pid \(await backend.helperProcessID ?? -1)")
         var short = job

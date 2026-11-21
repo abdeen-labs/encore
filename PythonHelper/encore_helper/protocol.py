@@ -57,6 +57,6 @@ class HelperError(Exception):
         return {"code": self.code, "message": self.message, "detail": self.detail}
 
 
-class JobCancelled(BaseException):
+class JobCanceled(BaseException):
     """Raised inside a job when the app cancels it. BaseException so model code that catches
     `Exception` can't swallow it."""

@@ -58,7 +58,7 @@ EOF
 rsync -a --delete --exclude='__pycache__/' --exclude='*.pyc' "$SRC_HELPER/" "$RESOURCES/PythonHelper/encore_helper/"
 
 # The app runs Python with -B and the bundle is read-only, so ship bytecode. Hash-based .pyc files stay
-# valid whatever the file dates are after copying, signing and notarising.
+# valid whatever the file dates are after copying, signing and notarizing.
 "$RESOURCES/python/bin/python3" -I -W ignore -m compileall -q -j 0 --invalidation-mode unchecked-hash \
     "$RESOURCES/python/lib/python3.13" "$RESOURCES/PythonHelper" >/dev/null \
     || echo "warning: some Python files didn't precompile; they'll be compiled in memory at run time."

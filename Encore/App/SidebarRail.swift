@@ -1,20 +1,32 @@
+import EncoreCore
 import SwiftUI
 
-/// The custom navigation rail: wordmark, grouped sections, and the lit selection.
+/// The custom navigation rail: wordmark, grouped sections, the lit selection, and (while anything runs) the
+/// activity lamp at its foot.
 struct SidebarRail: View {
     @Environment(Router.self) private var router
+    @Environment(RuntimeStatus.self) private var status
     @Namespace private var spotlight
-
     static let width: CGFloat = 212
 
     var body: some View {
+        // A short window with a job running: the tight layout lets the activity card fit without pushing anything off.
+        ViewThatFits(in: .vertical) {
+            rail(tight: false)
+            rail(tight: true)
+        }
+        .frame(width: Self.width)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private func rail(tight: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark()
-                .padding(.top, 46)
+                .padding(.top, tight ? 40 : 46)
                 .padding(.leading, 22)
-                .padding(.bottom, 26)
+                .padding(.bottom, tight ? 16 : 26)
 
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: tight ? 12 : 22) {
                 ForEach(AppSection.Group.allCases, id: \.self) { group in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(group.rawValue)
@@ -33,18 +45,24 @@ struct SidebarRail: View {
                 }
             }
 
-            Spacer(minLength: Theme.Space.l)
+            Spacer(minLength: Theme.Space.m)
+
+            RailActivity(compact: tight)
+                .padding(.horizontal, 14)
+                .padding(.bottom, tight ? Theme.Space.s : Theme.Space.m)
+                .stageAnimation(Theme.Motion.standard, value: status.isBusy)
 
             #if DEBUG
-            RailItem(title: "Gallery", symbol: "square.grid.2x2", shortcut: "⇧⌘G",
-                     isSelected: router.isShowingGallery, spotlight: spotlight) {
-                router.showGallery()
+            // The gallery steps aside for the activity card when the window is too short for both (⇧⌘G still opens it).
+            if !(tight && status.isBusy) {
+                RailItem(title: "Gallery", symbol: "square.grid.2x2", shortcut: "⇧⌘G",
+                         isSelected: router.isShowingGallery, spotlight: spotlight) {
+                    router.showGallery()
+                }
+                .padding(.bottom, Theme.Space.l)
             }
-            .padding(.bottom, Theme.Space.l)
             #endif
         }
-        .frame(width: Self.width)
-        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 

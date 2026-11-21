@@ -20,7 +20,7 @@ public struct HubTokenStore: Sendable {
     public var account: String
     /// nil → `EncorePaths.huggingFaceTokenFile`, evaluated on each call so env changes apply.
     public var tokenFileOverride: URL?
-    /// Honour `HF_TOKEN` from the environment. Off in tests.
+    /// Honor `HF_TOKEN` from the environment. Off in tests.
     public var readsEnvironment: Bool
 
     public init(service: String = HubTokenStore.defaultService, account: String = "huggingface.co",
@@ -32,6 +32,12 @@ public struct HubTokenStore: Sendable {
     }
 
     public static let standard = HubTokenStore()
+
+    /// An isolated store for snapshots and tests: its own Keychain service, a token file under `directory`,
+    /// no `HF_TOKEN`. Never sees the user's real token.
+    public static func snapshot(in directory: URL) -> HubTokenStore {
+        HubTokenStore(service: defaultService + ".snapshot", tokenFile: directory.appendingPathComponent("hf-token"), readsEnvironment: false)
+    }
 
     public var tokenFile: URL { tokenFileOverride ?? EncorePaths.huggingFaceTokenFile }
 

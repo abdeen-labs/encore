@@ -4,7 +4,7 @@ import Observation
 /// The one place all generation goes through. The app, the CLI and (later) the local HTTP API call these methods;
 /// each returns an `AsyncThrowingStream` of the request's events and ends with the finished record.
 ///
-/// Cancelling the task that consumes a stream stops the engine at its next check, deletes every temporary file
+/// Canceling the task that consumes a stream stops the engine at its next check, deletes every temporary file
 /// and writes no history record. Requests run one at a time on the GPU (see `ModelRuntime`); a request that is
 /// waiting shows up as queued in `runtime.status`.
 ///
@@ -22,6 +22,8 @@ public final class EncoreService: Sendable, Observable {
     public let runtime: ModelRuntime
     /// Temporary files (prepared audio, trimmed references, design candidates). Swept of old leftovers at init.
     public let scratchDirectory: URL
+    /// Where renders made with `saveToHistory: false` land. Callers delete their files; leftovers are swept after a day.
+    public var unsavedDirectory: URL { scratchDirectory.appendingPathComponent("Unsaved", isDirectory: true) }
     let lineCache = RenderCache()
 
     public init(catalog: ModelCatalog, history: HistoryDatabase, voices: VoiceLibrary, pronunciations: PronunciationStore,
@@ -126,7 +128,7 @@ public final class EncoreService: Sendable, Observable {
 
     // MARK: - Streams
 
-    /// Runs `body` in a task tied to the stream: when the consumer stops listening the task is cancelled.
+    /// Runs `body` in a task tied to the stream: when the consumer stops listening the task is canceled.
     func stream<Event: Sendable>(_ body: @escaping @Sendable (AsyncThrowingStream<Event, Error>.Continuation) async throws -> Void)
         -> AsyncThrowingStream<Event, Error> {
         AsyncThrowingStream { continuation in
@@ -227,10 +229,25 @@ public final class EncoreService: Sendable, Observable {
     // MARK: - Writing results
 
     /// Writes the master next to the history database and inserts the record. Nothing is left behind on failure
-    /// or cancellation; once the record is in, the generation counts as finished.
-    func commit(_ audio: AudioBuffer, record make: (URL) -> GenerationRecord) async throws -> GenerationRecord {
+    /// or cancellation; once the record is in, the generation counts as finished. With `save` false the audio goes
+    /// to `unsavedDirectory` instead and no record is inserted (the caller owns the file).
+    func commit(_ audio: AudioBuffer, save: Bool = true, record make: (URL) -> GenerationRecord) async throws -> GenerationRecord {
         try Task.checkCancellation()
         let id = UUID()
+        guard save else {
+            try FileManager.default.createDirectory(at: unsavedDirectory, withIntermediateDirectories: true)
+            let url = unsavedDirectory.appendingPathComponent("\(id.uuidString).wav")
+            do {
+                try AudioExporter.writeWAV(audio, to: url, encoding: .pcm24)
+                try Task.checkCancellation()
+            } catch {
+                try? FileManager.default.removeItem(at: url)
+                throw error
+            }
+            var record = make(url)
+            record.id = id
+            return record
+        }
         let url = history.newAudioURL(id: id)
         let partial = url.deletingLastPathComponent().appendingPathComponent(".\(id.uuidString).partial.wav")
         do {
