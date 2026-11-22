@@ -12,6 +12,8 @@
 <p align="center">
   <a href="https://updates.abdeen.industries/encore/Encore-1.0.dmg"><b>Download for Mac</b></a>
   &nbsp;&middot;&nbsp;
+  <a href="https://abdeen.dev/encore">Website</a>
+  &nbsp;&middot;&nbsp;
   <a href="CHANGELOG.md">What's New</a>
 </p>
 
@@ -82,7 +84,7 @@
 
 ## It stays on your Mac
 
-Nothing you type, record or generate leaves your computer. There is no account and no cloud. The only network traffic goes to Hugging Face: to download the models you pick and, if you add a token for a gated model, to check that it works.
+Nothing you type, record or generate leaves your computer. There is no account and no cloud. Encore goes online for two things only: Hugging Face, to download the models you pick and, if you add a token for a gated model, to check that it works; and updates.abdeen.industries, to check for a new version of Encore. It asks before checking for updates automatically, and the check sends only Encore's version.
 
 ## Writing for a voice
 
