@@ -302,7 +302,7 @@ public struct ScriptParser: Sendable {
                 guard looksIntended else { continue }
                 tag(.unrecognized)
                 if vocabulary.isEmpty {
-                    issue(.info, "\(tagText) isn't a tag Encore knows; the model will see it as text.", r)
+                    issue(.warning, "This model has no sound tags; \(tagText) may be read aloud.", r)
                 } else {
                     issue(.warning, "\(tagText) isn't one of this model's tags; it may be read aloud.", r)
                 }
