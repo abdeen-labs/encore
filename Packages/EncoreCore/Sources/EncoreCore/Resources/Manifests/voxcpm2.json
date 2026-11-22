@@ -40,6 +40,7 @@
   },
   "capabilities": {
     "cloning": true,
+    "cloningUsesTranscript": true,
     "voiceDesign": true
   },
   "languages": [
@@ -190,7 +191,7 @@
   "reference": {
     "minSeconds": 5,
     "maxSeconds": 15,
-    "transcript": "unused"
+    "transcript": "recommended"
   },
   "maxChunkCharacters": 300,
   "sampleRate": 48000,

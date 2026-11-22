@@ -245,6 +245,8 @@ private struct ScriptColumn: View {
                     Button("Open Models") { router.go(.models) }.buttonStyle(.secondary).controlSize(.small)
                 }
             }
+        } else if let m = model.manifest, let pick = model.shelf.missedBestRuntime(for: m) {
+            BestRuntimeNote(manifest: m, pick: pick) { router.go(.settings) }
         }
     }
 }

@@ -215,6 +215,8 @@ private struct DeskView: View {
                    message: downloadMessage(manifest)) {
                 Button("Get it in Models") { router.go(.models) }.buttonStyle(.secondary).controlSize(.small)
             }
+        } else if let pick = model.shelf.missedBestRuntime(for: manifest) {
+            BestRuntimeNote(manifest: manifest, pick: pick) { router.go(.settings) }
         }
     }
 

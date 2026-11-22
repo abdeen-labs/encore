@@ -630,7 +630,7 @@ private struct PythonGroup: View {
 
     var body: some View {
         SettingsSection(title: "Python helper",
-                        subtitle: "Runs the models Swift can't yet, in a separate process. Starts on first use and stops after five idle minutes.") {
+                        subtitle: "Runs the models that work better in Python, or only there, in a separate process. Starts on first use and stops after five idle minutes.") {
             switch model.python {
             case .found(let runtime)?:
                 HStack(spacing: Theme.Space.s) {

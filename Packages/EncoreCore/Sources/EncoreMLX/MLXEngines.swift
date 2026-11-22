@@ -28,6 +28,9 @@ enum MLXEngines {
         // Not "chatterbox" (Multilingual v3): the Swift port has no language tokens or v3 text handling, has no
         // built-in voice for it, and cloned English came back ~66% word errors. It belongs to the Python backend.
         "chatterbox_turbo": [.synthesis, .cloning],
+        // Clones from the reference audio alone: the Swift port has no continuation mode, so the transcript is
+        // unused and the accent can drift (a British reference came back with an American accent). That's why
+        // `BestRuntime` sends VoxCPM2 to the Python helper; this runs it only when the helper can't.
         "voxcpm2": [.synthesis, .cloning, .voiceDesign],
         "omnivoice": [.synthesis, .cloning, .voiceDesign],
         "llama": [.synthesis],  // Orpheus

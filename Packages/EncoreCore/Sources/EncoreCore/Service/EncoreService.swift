@@ -84,7 +84,9 @@ public final class EncoreService: Sendable, Observable {
                                 prefers: EngineFeatures = []) async throws -> [any EngineBackend] {
         var ordered = backends
         let chosen = settings.snapshot().runtimePreference(for: manifest.id).runtime
-        if let chosen, let i = ordered.firstIndex(where: { $0.runtime == chosen }) {
+        // A runtime picked in Settings, else the one that runs this model best.
+        if let first = chosen ?? BestRuntime.pick(for: manifest.engine)?.runtime,
+           let i = ordered.firstIndex(where: { $0.runtime == first }) {
             ordered.insert(ordered.remove(at: i), at: 0)
         }
         var ready: [any EngineBackend] = []
@@ -210,8 +212,10 @@ public final class EncoreService: Sendable, Observable {
                 if duration > spec.maxSeconds + 0.05 {
                     let trimmed = try await trimReference(ref, spec: spec, temp: temp)
                     engine.referenceAudio = trimmed
-                    if engine.referenceText != nil, spec.transcript != .unused {
-                        engine.referenceText = try? await transcribeClip(trimmed, language: voice.language, job: job, temp: temp)?.text
+                    if let full = engine.referenceText, spec.transcript != .unused {
+                        // Some transcription models need the language spelled out; the full transcript names it.
+                        let language = voice.language ?? LanguageGuess.code(for: full)
+                        engine.referenceText = try? await transcribeClip(trimmed, language: language, job: job, temp: temp)?.text
                     }
                 }
             }

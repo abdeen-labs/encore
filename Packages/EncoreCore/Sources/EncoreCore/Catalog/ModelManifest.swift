@@ -83,6 +83,9 @@ public struct ModelCapabilities: Codable, Sendable, Hashable {
     public var voiceDesign: Bool = false
     /// Accepts a style/emotion instruction alongside a voice.
     public var styleInstruction: Bool = false
+    /// Has no automatic language: given none, it reads everything as English. Encore then names the language
+    /// itself, from the script or the voice.
+    public var needsLanguage: Bool = false
     public var expressiveTags: Bool = false
     public var nativeDialogue: Bool = false
     public var segmentTimestamps: Bool = false
@@ -95,6 +98,7 @@ public struct ModelCapabilities: Codable, Sendable, Hashable {
         presetVoices = flag(.presetVoices); cloning = flag(.cloning)
         cloningUsesTranscript = flag(.cloningUsesTranscript); voiceDesign = flag(.voiceDesign)
         styleInstruction = flag(.styleInstruction); expressiveTags = flag(.expressiveTags)
+        needsLanguage = flag(.needsLanguage)
         nativeDialogue = flag(.nativeDialogue); segmentTimestamps = flag(.segmentTimestamps)
         wordTimestamps = flag(.wordTimestamps)
     }

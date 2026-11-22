@@ -31,7 +31,7 @@ struct TakeRow: View {
         self.onReuse = onReuse
         self.onCopy = onCopy
         self.onDelete = onDelete
-        _track = State(initialValue: PlaybackTrack(url: record.audioURL, title: item.title, subtitle: record.voiceName))
+        _track = State(initialValue: PlaybackTrack(url: record.audioURL, title: item.title, subtitle: Self.madeBy(record)))
     }
 
     /// This take is the one in the player dock (playing or paused).
@@ -85,15 +85,20 @@ struct TakeRow: View {
         .accessibilityLabel(item.title)
     }
 
-    /// The voice and the length.
+    /// The voice, the model that made the take, and the length.
     private var caption: String {
-        let length = Timecode.string(record.duration, tenths: false)
-        return [record.voiceName ?? record.modelName, length].joined(separator: " · ")
+        [Self.madeBy(record), Timecode.string(record.duration, tenths: false)].joined(separator: " · ")
+    }
+
+    /// "Voice · Model", or just the model when the take has no named voice.
+    static func madeBy(_ record: GenerationRecord) -> String {
+        [record.voiceName, record.modelName].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     /// The script, then what made it, for the tooltip.
     private var details: String {
         var made = record.modelName
+        if let runtime = record.runtime { made += " (\(runtime.displayName))" }
         if record.elapsed > 0 { made += ", made in \(RunSurface.seconds(record.elapsed))" }
         return "\(record.text)\n\n\(made)"
     }

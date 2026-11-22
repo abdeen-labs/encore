@@ -38,7 +38,8 @@
     "gated": false
   },
   "capabilities": {
-    "cloning": true
+    "cloning": true,
+    "needsLanguage": true
   },
   "languages": [
     {

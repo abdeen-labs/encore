@@ -12,6 +12,7 @@ struct ModelDetailView: View {
 
     @Environment(ModelDownloadCenter.self) private var downloads
     @Environment(ToastCenter.self) private var toasts
+    @Environment(AppDependencies.self) private var deps: AppDependencies?
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingDelete = false
     @State private var isDeleting = false
@@ -167,12 +168,21 @@ struct ModelDetailView: View {
         KeyValueRow(key) { Text(value).textRole(.mono).textSelection(.enabled) }
     }
 
+    /// Where the model runs, and why when that's the runtime it runs best in.
     private func runs(_ plan: ModelsLibrary.RuntimePlan) -> String {
+        let place: String
+        let runtime: EngineRuntime
         switch plan {
-        case .native: "On this Mac's GPU"
-        case .python: "In the bundled Python helper"
-        case .pythonUnavailable: "In the Python helper, which isn't set up yet"
+        case .native: place = "On this Mac's GPU"; runtime = .mlxSwift
+        case .python: place = "In the bundled Python helper"; runtime = .python
+        case .pythonUnavailable: return "In the Python helper, which isn't set up yet"
         }
+        guard let pick = BestRuntime.pick(for: manifest.engine) else { return place }
+        if pick.runtime == runtime { return "\(place), where it \(pick.reason)" }
+        // Automatic had to use the other runtime (the Python helper isn't set up, say).
+        guard deps?.modelShelf.missedBestRuntime(for: manifest) != nil else { return place }
+        return "\(place) for now. It runs best \(BestRuntimeNote.place(pick.runtime)), where it \(pick.reason), "
+            + "but that isn't available on this Mac."
     }
 
     private var languages: String {

@@ -8,7 +8,8 @@ import SwiftUI
 ///
 ///     Encore --snapshot <dir> --snapshot-only Studio --fixtures --studio-fixture ready [--snapshot-size 940x600]
 ///
-/// States: ready, advanced, running, takes, error, memory, notDownloaded, pronunciations, modelPicker, voicePicker.
+/// States: ready, advanced, running, takes, error, memory, notDownloaded, pronunciations, modelPicker, voicePicker,
+/// runtimeFallback.
 /// Nothing here can reach the user's data: it only runs in snapshot mode, whose stores are temporary.
 @MainActor
 enum StudioFixtures {
@@ -28,7 +29,7 @@ enum StudioFixtures {
         shelf.rescan()
         await shelf.waitForScan()
         for (id, runtime) in ["chatterbox-turbo": EngineRuntime.mlxSwift, "qwen3-tts-base": .mlxSwift,
-                              "voxcpm2": .mlxSwift, "omnivoice": .mlxSwift, "chatterbox-multilingual": .python,
+                              "voxcpm2": .python, "omnivoice": .mlxSwift, "chatterbox-multilingual": .python,
                               "qwen3-tts-customvoice": .mlxSwift, "qwen3-tts-voicedesign": .mlxSwift, "orpheus": .mlxSwift,
                               "soprano": .mlxSwift, "zonos3-mini": .mlxSwift] {
             shelf.runtimeOverrides[id] = .runs(runtime)
@@ -190,6 +191,10 @@ enum StudioFixtures {
         case "pronunciations":
             model.debugSet(choice: zonos, voice: .preset("imogen"), script: narrationScript)
             model.wingsTab = .takes
+        case "runtimeFallback":
+            // VoxCPM2 runs best in the Python helper; here it isn't set up, so Automatic runs it natively.
+            deps.modelShelf.runtimeOverrides["voxcpm2"] = .runs(.mlxSwift)
+            model.debugSet(choice: ModelChoice(modelID: "voxcpm2"), voice: .library(ids.captain), script: narrationScript, instruct: "")
         case "modelPicker", "voicePicker":
             model.debugSet(choice: turbo, voice: .library(ids.captain), script: tagged)
         default:

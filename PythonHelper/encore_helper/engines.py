@@ -128,6 +128,24 @@ _RESERVED = {"text", "voice", "ref_audio", "ref_text", "instruct", "lang_code", 
              "verbose", "audio_prompt", "conds", "tokenizer", "text_tokenizer", "input_ids", "ref_tokens"}
 
 
+# Scripts written without spaces between words (Thai/Lao, Tibetan, Myanmar, Khmer, CJK, kana, fullwidth forms).
+_NO_SPACE_RANGES = ((0x0E00, 0x0FFF), (0x1000, 0x109F), (0x1780, 0x17FF), (0x2E80, 0x312F), (0x31A0, 0x9FFF),
+                    (0xF900, 0xFAFF), (0xFF00, 0xFFEF), (0x20000, 0x3FFFF))
+
+
+def _no_space(ch: str) -> bool:
+    return any(lo <= ord(ch) <= hi for lo, hi in _NO_SPACE_RANGES)
+
+
+def _join_prompt(transcript: str, text: str) -> str:
+    """The prompt transcript, ready to run into the script: a space between them, unless either side of the join
+    is a script written without spaces, where a space doesn't belong."""
+    first = text.lstrip()[:1]
+    if _no_space(transcript[-1]) or (first and _no_space(first)):
+        return transcript
+    return transcript + " "
+
+
 def synthesize(loaded: LoadedModel, req: dict, job) -> dict:
     model = loaded.module
     accepted = _generate_params(model)
@@ -149,7 +167,14 @@ def synthesize(loaded: LoadedModel, req: dict, job) -> dict:
             raise HelperError("invalid_input", "The reference audio file doesn't exist.", voice["reference_audio"])
         if not put("ref_audio", voice["reference_audio"]):
             raise HelperError("unsupported", f"{loaded.engine} can't clone from reference audio.")
-        if voice.get("reference_text") and not put("ref_text", voice["reference_text"]):
+        transcript = (voice.get("reference_text") or "").strip()
+        if transcript and {"prompt_audio", "prompt_text"} <= accepted:
+            # VoxCPM: ref_audio alone clones only the timbre, and its ref_text is accepted but never read. Giving
+            # the same clip and its transcript as the prompt too makes the model continue from it, which keeps the
+            # accent and delivery. The prompt text runs straight into the script, so it needs a separator.
+            put("prompt_audio", voice["reference_audio"])
+            put("prompt_text", _join_prompt(transcript, req["text"]))
+        elif transcript and not put("ref_text", transcript):
             ignored.append("ref_text")
     if req.get("instruct") and not put("instruct", req["instruct"]):
         ignored.append("instruct")
@@ -162,6 +187,9 @@ def synthesize(loaded: LoadedModel, req: dict, job) -> dict:
 
     params = dict(req.get("params") or {})
     seed = params.pop("seed", None)
+    # OmniVoice: a length of 0 means "work it out", as in the native port. mlx-audio would make 0 s of audio.
+    if params.get("duration_s") is not None and float(params["duration_s"]) <= 0:
+        del params["duration_s"]
     for key, value in params.items():
         if key in _RESERVED or not put(key, value):
             ignored.append(key)
@@ -198,6 +226,14 @@ def synthesize(loaded: LoadedModel, req: dict, job) -> dict:
 
 # MARK: - Speech to text
 
+def _whisper_temperatures(start) -> tuple:
+    """Whisper retries a passage at rising temperatures when it comes out repetitive or unsure; a single number
+    turns that off. So the setting is where the retries start: 0 → (0, 0.2, …, 1.0), 0.4 → (0.4, 0.6, …, 1.0)."""
+    start = min(max(float(start), 0.0), 1.0)
+    steps = int(round((1.0 - start) / 0.2))
+    return tuple(round(start + 0.2 * i, 2) for i in range(steps + 1)) or (start,)
+
+
 def transcribe(loaded: LoadedModel, req: dict, job) -> dict:
     from .audio import read_mono
 
@@ -215,6 +251,8 @@ def transcribe(loaded: LoadedModel, req: dict, job) -> dict:
 
         if req.get("language"):
             kwargs["language"] = req["language"]
+        if "temperature" in kwargs:
+            kwargs["temperature"] = _whisper_temperatures(kwargs["temperature"])
         kwargs["word_timestamps"] = want_words
         kwargs["verbose"] = False  # enables Whisper's progress bar, which job.track_tqdm turns into events
         with job.track_tqdm():
@@ -238,7 +276,10 @@ def transcribe(loaded: LoadedModel, req: dict, job) -> dict:
             job.progress(current / total if total else None, "Transcribing")
 
         if "chunk_duration" not in kwargs and duration > 120:
-            kwargs["chunk_duration"], kwargs["overlap_duration"] = 120.0, 15.0
+            kwargs["chunk_duration"] = 120.0
+        if "chunk_duration" in kwargs and "overlap_duration" in accepted:
+            # mlx-audio's own overlap is 2 s, little to line the pieces up on. A quarter of a short chunk at most.
+            kwargs["overlap_duration"] = min(15.0, float(kwargs["chunk_duration"]) / 4)
         if "chunk_callback" in accepted:
             kwargs["chunk_callback"] = on_chunk
         out = model.generate(mx.array(audio), **kwargs)

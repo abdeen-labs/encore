@@ -6,7 +6,8 @@ import Testing
 @MainActor @Suite struct ServiceBackendTests {
     nonisolated static let speaker = testManifest("speaker", engine: "spk", capabilities: ["presetVoices": true, "cloning": true],
                                       presets: ["p1"])
-    nonisolated static let whisper = testManifest("whisper-tiny", engine: "whisper", tasks: ["stt"],
+    // A Whisper-like model on an engine key with no `BestRuntime` pick, so these tests see the plain ordering.
+    nonisolated static let whisper = testManifest("whisper-tiny", engine: "stt", tasks: ["stt"],
                                       capabilities: ["segmentTimestamps": true, "wordTimestamps": true])
 
     func noPost() -> PostProcessingOptions { var p = PostProcessingOptions(); p.normalizeLoudness = false; return p }
@@ -46,9 +47,9 @@ import Testing
     }
 
     @Test func fallsThroughOnUnsupportedAtRunTime() async throws {
-        let native = FakeBackend(.mlxSwift, features: ["whisper": .transcription])
+        let native = FakeBackend(.mlxSwift, features: ["stt": .transcription])
         native.unsupportedWithoutLanguage = true
-        let python = FakeBackend(.python, features: ["whisper": .transcription])
+        let python = FakeBackend(.python, features: ["stt": .transcription])
         let w = try ServiceWorld(models: [Self.whisper], backends: [native, python])
         let media = try w.wav("talk.wav", Signal.speechLike(seconds: 3, rate: 44_100), rate: 44_100)
         let events = try await collect(w.service.transcribe(TranscriptionRequest(modelID: "whisper-tiny", mediaPath: media.path)))
@@ -63,8 +64,8 @@ import Testing
     }
 
     @Test func segmentTimingsPreferARuntimeThatAlsoTimesWords() async throws {
-        let native = FakeBackend(.mlxSwift, features: ["whisper": .transcription])
-        let python = FakeBackend(.python, features: ["whisper": [.transcription, .wordTimestamps]])
+        let native = FakeBackend(.mlxSwift, features: ["stt": .transcription])
+        let python = FakeBackend(.python, features: ["stt": [.transcription, .wordTimestamps]])
         let w = try ServiceWorld(models: [Self.whisper], backends: [native, python])
         let media = try w.wav("talk.wav", Signal.speechLike(seconds: 2, rate: 16_000), rate: 16_000)
         let prefers = EncoreService.transcriptionPreference(.segment)
@@ -96,8 +97,47 @@ import Testing
         #expect(await w.service.plannedRuntime(modelID: "whisper-tiny", needs: .transcription, prefers: prefers) == .success(.mlxSwift))
     }
 
+    @Test func automaticRunsEachModelWhereItRunsBest() async throws {
+        // VoxCPM2 runs best in Python, Qwen3-TTS natively, and an engine with no pick natively too.
+        let vox = testManifest("vox", engine: "voxcpm2", capabilities: ["cloning": true])
+        let qwen = testManifest("qwen", engine: "qwen3_tts", capabilities: ["cloning": true])
+        #expect(BestRuntime.pick(for: "voxcpm2")?.runtime == .python)
+        #expect(BestRuntime.pick(for: "qwen3_tts")?.runtime == .mlxSwift)
+        let features: [String: EngineFeatures] = ["voxcpm2": [.synthesis, .cloning], "qwen3_tts": [.synthesis, .cloning],
+                                                  "spk": [.synthesis, .cloning]]
+        let native = FakeBackend(.mlxSwift, features: features)
+        let python = FakeBackend(.python, features: features)
+        let w = try ServiceWorld(models: [vox, qwen, Self.speaker], backends: [native, python])
+        let voice = try await w.addVoice("Ava")
+        func speak(_ id: String) async throws {
+            var r = SpeechRequest(modelID: id, text: "Cloned voice.")
+            r.voice = .library(voice.id)
+            r.post = noPost()
+            _ = try await collect(w.service.speak(r))
+        }
+
+        try await speak("vox")
+        #expect(python.synthCalls.count == 1 && native.synthCalls.isEmpty)
+        #expect(python.synthCalls.first?.voice?.referenceText == "This is my reference voice.")
+        try await speak("qwen")
+        try await speak("speaker")
+        #expect(python.synthCalls.count == 1 && native.synthCalls.count == 2)
+        #expect(await w.service.plannedRuntime(modelID: "vox") == .success(.python))
+
+        // A runtime chosen in Settings still wins.
+        w.settings.setRuntimePreference(.mlxSwift, for: "vox")
+        try await speak("vox")
+        #expect(native.synthCalls.count == 3)
+        w.settings.setRuntimePreference(.automatic, for: "vox")
+
+        // With the helper not set up, the best-in-Python model runs natively instead of failing.
+        python.setAvailability(.needsSetup("Not set up."))
+        try await speak("vox")
+        #expect(native.synthCalls.count == 4 && python.synthCalls.count == 1)
+    }
+
     @Test func unsupportedWithNoFallbackIsATypedError() async throws {
-        let native = FakeBackend(.mlxSwift, features: ["whisper": .transcription])
+        let native = FakeBackend(.mlxSwift, features: ["stt": .transcription])
         native.unsupportedWithoutLanguage = true
         let w = try ServiceWorld(models: [Self.whisper], backends: [native])
         let media = try w.wav("talk.wav", Signal.speechLike(seconds: 2, rate: 16_000), rate: 16_000)
@@ -112,8 +152,8 @@ import Testing
     }
 
     @Test func wordTimestampsNeedABackendThatHasThem() async throws {
-        let native = FakeBackend(.mlxSwift, features: ["whisper": .transcription])
-        let python = FakeBackend(.python, features: ["whisper": [.transcription, .wordTimestamps]])
+        let native = FakeBackend(.mlxSwift, features: ["stt": .transcription])
+        let python = FakeBackend(.python, features: ["stt": [.transcription, .wordTimestamps]])
         let w = try ServiceWorld(models: [Self.whisper], backends: [native, python])
         let media = try w.wav("talk.wav", Signal.speechLike(seconds: 2, rate: 16_000), rate: 16_000)
         var r = TranscriptionRequest(modelID: "whisper-tiny", mediaPath: media.path)
@@ -125,7 +165,7 @@ import Testing
         #expect(try await w.history.item(record.id)?.transcription?.transcript == record.transcript)
 
         // Only the native backend: word timestamps are a typed "unsupported".
-        let w2 = try ServiceWorld(models: [Self.whisper], backends: [FakeBackend(.mlxSwift, features: ["whisper": .transcription])])
+        let w2 = try ServiceWorld(models: [Self.whisper], backends: [FakeBackend(.mlxSwift, features: ["stt": .transcription])])
         await #expect(throws: ServiceError.featureUnsupported(modelID: "whisper-tiny", modelName: "Whisper-Tiny", feature: .wordTimestamps, detail: nil)) {
             _ = try await collect(w2.service.transcribe(r))
         }
@@ -145,7 +185,7 @@ import Testing
     }
 
     @Test func transcriptionPreparesAudioAndCleansUp() async throws {
-        let b = FakeBackend(.mlxSwift, features: ["whisper": .transcription])
+        let b = FakeBackend(.mlxSwift, features: ["stt": .transcription])
         let w = try ServiceWorld(models: [Self.whisper], backends: [b])
         let media = try w.wav("interview.wav", Signal.speechLike(seconds: 3, rate: 48_000), rate: 48_000)
         let events = try await collect(w.service.transcribe(TranscriptionRequest(modelID: "whisper-tiny", mediaPath: media.path)))

@@ -199,4 +199,31 @@ import Testing
         r.voice = .automatic
         await #expect(throws: ServiceError.invalidRequest("Pick the voice to change to.")) { _ = try await collect(w.service.convertVoice(r)) }
     }
+
+    @Test func aModelWithoutAutomaticLanguageGetsTheScriptsOrTheVoices() async throws {
+        var multi = testManifest("multi", capabilities: ["cloning": true, "needsLanguage": true])
+        multi.languages = ["en", "es", "fr"].map { ModelLanguage(code: $0, name: $0) }
+        var auto = testManifest("auto", capabilities: ["cloning": true])
+        auto.languages = multi.languages
+        let backend = FakeBackend(.mlxSwift, features: ["multi": [.synthesis, .cloning], "auto": [.synthesis, .cloning]])
+        let w = try ServiceWorld(models: [multi, auto], backends: [backend])
+        var voice = try await w.addVoice("Ines")
+        voice.language = "fr"
+        try w.voices.update(voice)
+        func speak(_ model: String, _ text: String, language: String? = nil) async throws -> String? {
+            var r = SpeechRequest(modelID: model, text: text)
+            r.voice = .library(voice.id)
+            r.language = language
+            r.post = noPost()
+            _ = try await collect(w.service.speak(r))
+            return backend.synthCalls.last?.language
+        }
+
+        // Automatic: the script's language, else the voice's (instead of the model's English default).
+        #expect(try await speak("multi", "Buenos días, ¿cómo estás? Hoy hace un tiempo estupendo en la ciudad.") == "es")
+        #expect(try await speak("multi", "Ok.") == "fr")
+        // A language that was chosen is used as is, and a model with its own automatic gets nil.
+        #expect(try await speak("multi", "Buenos días, ¿cómo estás? Hoy hace un tiempo estupendo.", language: "en") == "en")
+        #expect(try await speak("auto", "Buenos días, ¿cómo estás? Hoy hace un tiempo estupendo.") == nil)
+    }
 }

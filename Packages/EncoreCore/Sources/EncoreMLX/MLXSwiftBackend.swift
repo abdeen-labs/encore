@@ -4,7 +4,6 @@ import MLX
 import MLXAudioCore
 import MLXAudioSTT
 import MLXAudioTTS
-import NaturalLanguage
 
 /// Runs models in-process with MLX Swift (mlx-audio-swift).
 ///
@@ -187,18 +186,9 @@ private final class MLXModelHost: @unchecked Sendable {
         var transcript = try engine.transcribe(audio, job: job, parameters: parameters)
         try Task.checkCancellation()
         if job.timestamps == .none { transcript.segments = [] }
-        if transcript.language == nil { transcript.language = job.language ?? Self.guessLanguage(transcript.text) }
+        if transcript.language == nil { transcript.language = job.language ?? LanguageGuess.code(for: transcript.text) }
         progress?(1)
         return transcript
-    }
-
-    /// The engines here don't report what language they heard; name it from the text (ISO 639-1, e.g. "en", "zh").
-    static func guessLanguage(_ text: String) -> String? {
-        guard text.count >= 8 else { return nil }
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(text)
-        guard let (language, confidence) = recognizer.languageHypotheses(withMaximum: 1).first, confidence > 0.5 else { return nil }
-        return language.rawValue.split(separator: "-").first.map(String.init)
     }
 
     private func retainStaged(repo: String, snapshot: URL) throws -> URL {

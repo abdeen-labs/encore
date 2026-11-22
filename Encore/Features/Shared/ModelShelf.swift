@@ -130,6 +130,17 @@ final class ModelShelf {
         return runtimes[Self.runtimeKey(manifest.id, requiring)]
     }
 
+    /// Where this model runs best, when Automatic is running it in the other runtime instead (the Python helper
+    /// isn't set up, say). Nil when it runs where it runs best, or a runtime was picked for it in Settings.
+    func missedBestRuntime(for manifest: ModelManifest, requiring: ModelRequirement = []) -> BestRuntime.Pick? {
+        guard let pick = BestRuntime.pick(for: manifest.engine),
+              case .runs(let actual)? = runtime(for: manifest, requiring: requiring) ?? runtime(for: manifest),
+              actual != pick.runtime,
+              service.settings.runtimePreference(for: manifest.id) == .automatic
+        else { return nil }
+        return pick
+    }
+
     func assessment(_ manifest: ModelManifest, variantID: String?) -> MemoryAssessment? {
         assessments[ModelVariantKey(manifest, manifest.variant(variantID))]
     }

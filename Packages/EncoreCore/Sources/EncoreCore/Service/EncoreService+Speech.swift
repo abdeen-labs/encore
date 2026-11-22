@@ -62,6 +62,28 @@ extension EncoreService {
         var parameters: ParamValues
     }
 
+    /// The language each chunk is spoken in. Usually just the one chosen (nil is the model's own automatic). A model
+    /// with no automatic language would read everything as English, so for it Encore names the script's language,
+    /// or else the voice's.
+    struct LanguageChoice {
+        var chosen: String?
+        var needsOne: Bool
+        var codes: Set<String>
+        var scriptLanguage: String?
+
+        init(manifest: ModelManifest, chosen: String?, script: String) {
+            self.chosen = chosen
+            needsOne = chosen == nil && manifest.capabilities.needsLanguage
+            codes = Set(manifest.languages.map(\.code))
+            scriptLanguage = needsOne ? LanguageGuess.code(for: script, among: codes) : nil
+        }
+
+        func language(voice: String?) -> String? {
+            guard needsOne else { return chosen }
+            return scriptLanguage ?? voice.flatMap { codes.contains($0) ? $0 : nil }
+        }
+    }
+
     static func check(_ plan: ScriptPlan) throws {
         if !plan.parsed.unknownVoiceNames.isEmpty { throw ServiceError.unknownVoiceTags(plan.parsed.unknownVoiceNames) }
         if let error = plan.issues.first(where: { $0.severity == .error }) { throw ServiceError.scriptProblem(error.message) }
@@ -98,6 +120,7 @@ extension EncoreService {
         var done = 0.0
         var assembler = Assembler()
         var index = 0
+        let languages = LanguageChoice(manifest: session.context.manifest, chosen: settings.language, script: plan.parsed.speechText)
         for item in plan.items {
             try Task.checkCancellation()
             switch item {
@@ -108,7 +131,8 @@ extension EncoreService {
                 let resolved = try await voices.resolve(chunk.voice ?? voice)
                 let job = SynthesisJob(modelID: settings.modelID, text: chunk.text, voice: resolved.engine,
                                        instruct: resolved.isReference ? nil : settings.instruct,
-                                       language: settings.language, parameters: settings.parameters)
+                                       language: languages.language(voice: resolved.libraryID.flatMap { self.voices.voice($0)?.language }),
+                                       parameters: settings.parameters)
                 let share = Double(chunk.text.count) / totalCharacters
                 let lo = range.lowerBound + (range.upperBound - range.lowerBound) * done
                 let hi = range.lowerBound + (range.upperBound - range.lowerBound) * (done + share)

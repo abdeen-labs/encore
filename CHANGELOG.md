@@ -14,6 +14,31 @@ the update.
      "## [x.y] - YYYY-MM-DD" heading just below, so the entries fall under it; then repoint the [Unreleased] link
      and add a link for the new version at the bottom. -->
 
+## [1.1] - 2026-11-22
+
+VoxCPM2 keeps a cloned voice's accent, and each model now runs where it runs best.
+
+### Fixed
+
+- VoxCPM2 keeps a cloned voice's accent. With a transcript on the voice, it now clones from the clip and its words
+  together (in the Python helper), instead of from the sound of the clip alone, where a British voice could come
+  back with an American accent.
+- Chatterbox Multilingual with the language on Automatic no longer reads everything as English: it speaks the
+  script's language, or else the voice's.
+- Whisper keeps retrying passages that come out stuck or repeating after you change Temperature.
+- Long recordings transcribed by Parakeet in the Python helper overlap their pieces by 15 seconds, so words at the
+  seams line up.
+- A shortened reference clip keeps its transcript when the voice has no language set.
+- OmniVoice in the Python helper makes audio with Length left at automatic, instead of none.
+
+### Changed
+
+- Automatic runs each model where it runs best: VoxCPM2 and Whisper in the Python helper, the rest natively.
+  A model's page says where and why. A runtime you pick for a model still wins.
+- When a model can't run where it runs best (the Python helper isn't set up), Studio, Conversations and
+  Transcribe say so, and what that costs.
+- Studio takes show which model made them, next to the voice and length.
+
 ## [1.0] - 2026-11-21
 
 The first release of Encore: local voice AI for Apple Silicon Macs. Everything runs on your Mac, with no account and no cloud.
@@ -30,5 +55,6 @@ The first release of Encore: local voice AI for Apple Silicon Macs. Everything r
 - Choose from sixteen speech, transcription and voice-changer models, downloaded as you need them.
 - Encore checks for updates and installs them for you.
 
-[Unreleased]: https://github.com/abdeen-labs/encore/compare/v1.0...HEAD
+[Unreleased]: https://github.com/abdeen-labs/encore/compare/v1.1...HEAD
+[1.1]: https://github.com/abdeen-labs/encore/compare/v1.0...v1.1
 [1.0]: https://github.com/abdeen-labs/encore/tree/v1.0

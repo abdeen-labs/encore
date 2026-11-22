@@ -102,7 +102,7 @@ public struct EngineFeatures: OptionSet, Sendable, Hashable {
 public typealias EngineProgress = @Sendable (Double) -> Void
 
 /// A place models run. There is one backend per runtime. For each request the service layer picks
-/// the first backend (MLX Swift, then Python, unless the user prefers otherwise) whose
+/// the first backend (the runtime chosen in Settings, else the model's `BestRuntime`, else MLX Swift) whose
 /// `engineFeatures()[manifest.engine]` covers what the request needs. Calls honor task cancellation.
 public protocol EngineBackend: AnyObject, Sendable {
     var runtime: EngineRuntime { get }

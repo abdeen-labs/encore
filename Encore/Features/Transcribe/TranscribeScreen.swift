@@ -234,6 +234,8 @@ private struct SetupView: View {
         } else if case .blocked(let e)? = model.plannedRuntime, let p = ErrorPresentation(e) {
             ServiceErrorBanner(error: e)
                 .id(p.title)
+        } else if let m = model.manifest, let pick = model.shelf.missedBestRuntime(for: m) {
+            BestRuntimeNote(manifest: m, pick: pick) { router.go(.settings) }
         }
     }
 }
