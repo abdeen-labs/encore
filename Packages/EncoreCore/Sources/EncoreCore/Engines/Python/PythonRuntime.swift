@@ -19,14 +19,14 @@ public struct PythonRuntime: Sendable, Equatable {
 
     public enum Lookup: Sendable, Equatable {
         case found(PythonRuntime)
-        /// A developer build without the repo-local runtime: `Scripts/setup-python-runtime.sh` fixes it.
+        /// A developer build without the repo-local runtime: `scripts/setup-python-runtime.sh` fixes it.
         case needsSetup(String)
         case missing(String)
     }
 
     /// Finds the runtime: `ENCORE_PYTHON_HOME` (+ optional `ENCORE_HELPER_ROOT`) if set; then the copy inside
     /// the app bundle (`Contents/Resources/python` and `Contents/Resources/PythonHelper`); then, in Debug
-    /// builds, the repo-local runtime that `Scripts/setup-python-runtime.sh` creates.
+    /// builds, the repo-local runtime that `scripts/setup-python-runtime.sh` creates.
     public static func locate(bundle: Bundle = .main) -> Lookup {
         let fm = FileManager.default
         func runtime(home: URL, helper: URL, origin: Origin) -> PythonRuntime? {
@@ -58,7 +58,7 @@ public struct PythonRuntime: Sendable, Equatable {
             if let r = runtime(home: helper.appendingPathComponent(".runtime/python"), helper: helper, origin: .development) {
                 return .found(r)
             }
-            return .needsSetup("The Python runtime isn't set up. In the Encore repository, run Scripts/setup-python-runtime.sh, then try again.")
+            return .needsSetup("The Python runtime isn't set up. In the Encore repository, run scripts/setup-python-runtime.sh, then try again.")
         }
         #endif
         return .missing("This copy of Encore is missing its Python runtime. Reinstall Encore to use models that run in Python.")

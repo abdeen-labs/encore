@@ -4,7 +4,7 @@ All notable changes to Encore are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-At release time, `Scripts/publish-release.sh` puts the section for the version being shipped in the appcast, and
+At release time, `scripts/publish-release.sh` puts the section for the version being shipped in the appcast, and
 Encore's update window shows it, so keep entries user-facing and write them for someone deciding whether to install
 the update.
 

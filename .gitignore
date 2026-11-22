@@ -11,7 +11,7 @@ __pycache__/
 .claude/worktrees/
 *.profraw
 
-# Python helper runtime (Scripts/setup-python-runtime.sh)
+# Python helper runtime (scripts/setup-python-runtime.sh)
 PythonHelper/.runtime/
 
 # Releases (docs/RELEASING.md): the exported app and what publish-release.sh makes

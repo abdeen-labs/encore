@@ -1,7 +1,7 @@
 #!/usr/bin/env swift
 // Renders the background of the release DMG's window into Config/dmg-background.tiff (1x and 2x in one file).
 //
-//     swift Scripts/render-dmg-background.swift            (run from the repo root)
+//     swift scripts/render-dmg-background.swift            (run from the repo root)
 //
 // The window is the stage after dark: a call to places in the display serif, and the next step (drag Encore to
 // Applications) as the one lit thing. Finder draws the two icons and their names on top; the names sit on

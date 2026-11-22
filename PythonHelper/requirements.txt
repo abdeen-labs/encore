@@ -1,3 +1,3 @@
-# Python packages for the Encore helper. Scripts/setup-python-runtime.sh installs the latest versions
+# Python packages for the Encore helper. scripts/setup-python-runtime.sh installs the latest versions
 # that satisfy these minimums. Keep this torch-free: the base mlx-audio install doesn't need it.
 mlx-audio>=0.6.7

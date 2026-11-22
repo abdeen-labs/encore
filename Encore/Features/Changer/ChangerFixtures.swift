@@ -19,7 +19,7 @@ enum ChangerFixtures {
         let cast: ProduceFixtureSeed.Cast? = state == "noVoices" || state == "firstRun" ? nil : await ProduceFixtureSeed.addVoices(deps)
         let model = deps.screenModel("Changer") { ChangerModel(deps: deps) }
         model.pythonOverride = state == "helper"
-            ? .needsSetup("The Python runtime isn't set up. In the Encore repository, run Scripts/setup-python-runtime.sh, then try again.")
+            ? .needsSetup("The Python runtime isn't set up. In the Encore repository, run scripts/setup-python-runtime.sh, then try again.")
             : .found(PythonRuntime(executable: URL(fileURLWithPath: "/usr/bin/true"), helperRoot: URL(fileURLWithPath: "/tmp"), origin: .bundled))
         await model.prepare()
         let vc = ModelChoice(modelID: "chatterbox-vc", variantID: "multilingual-v3")

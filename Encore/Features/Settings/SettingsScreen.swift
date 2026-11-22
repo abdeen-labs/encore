@@ -648,7 +648,7 @@ private struct PythonGroup: View {
             case .needsSetup(let message)?:
                 StatusBadge("Not set up", tone: .warning)
                 Text(message).textRole(.caption).fixedSize(horizontal: false, vertical: true)
-                ShellCommandRow(command: "Scripts/setup-python-runtime.sh")
+                ShellCommandRow(command: "scripts/setup-python-runtime.sh")
             case .missing(let message)?:
                 StatusBadge("Missing", tone: .danger)
                 Text(message).textRole(.caption).fixedSize(horizontal: false, vertical: true)

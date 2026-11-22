@@ -5,7 +5,7 @@
 # reads both back through updates.abdeen.industries, tags the release, and moves the Homebrew cask to it.
 # docs/RELEASING.md has the whole release.
 #
-#   Scripts/publish-release.sh
+#   scripts/publish-release.sh
 #
 # The appcast starts from the one the feed serves, so its history doesn't depend on this checkout. After a
 # failure, run it again: the DMG in dist/ is reused while it holds the same app, a DMG already uploaded is kept
@@ -89,7 +89,7 @@ spctl --assess --type execute "$app" || fail "Gatekeeper rejects the app"
 
 # The bundled Python helper starts from the signed app and reports its engines. No model loads.
 [[ -x "$app/Contents/Resources/python/bin/python3" ]] ||
-  fail "the app has no embedded Python runtime. Run Scripts/setup-python-runtime.sh, then archive again."
+  fail "the app has no embedded Python runtime. Run scripts/setup-python-runtime.sh, then archive again."
 hello="$(printf '{"id":1,"op":"hello"}\n{"id":2,"op":"shutdown"}\n' | env -i HOME="$HOME" HF_HUB_OFFLINE=1 \
   PYTHONPATH="$app/Contents/Resources/PythonHelper" PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1 \
   "$app/Contents/Resources/python/bin/python3" -s -B -m encore_helper 2>/dev/null | head -n 1)"
@@ -181,7 +181,7 @@ if [[ -f "$appcast" ]]; then
 fi
 
 # The DMG: the app and a link to Applications in a styled window (Config/dmg-settings.py, with the background from
-# Scripts/render-dmg-background.swift), LZMA-compressed (ULMO). dmgbuild writes the window's layout itself, without
+# scripts/render-dmg-background.swift), LZMA-compressed (ULMO). dmgbuild writes the window's layout itself, without
 # driving Finder; it lives in a venv under build/. A DMG from an earlier run is kept when it holds this same app,
 # so a run after a failure uploads the same file.
 mkdir -p "$dist"
@@ -190,7 +190,7 @@ if [[ ! -x "$dmgbuild_venv/bin/dmgbuild" ]]; then
   python="${PYTHON:-$(command -v python3.13 || command -v python3 || true)}"
   [[ -n "$python" ]] || fail "making the DMG needs Python 3 for dmgbuild. Set PYTHON to one."
   "$python" -m venv "$dmgbuild_venv" || fail "couldn't make a venv for dmgbuild at $dmgbuild_venv"
-  "$dmgbuild_venv/bin/python" -m pip install --quiet --upgrade dmgbuild || fail "couldn't install dmgbuild"
+  PIP_DISABLE_PIP_VERSION_CHECK=1 "$dmgbuild_venv/bin/python" -m pip install --quiet --upgrade dmgbuild || fail "couldn't install dmgbuild"
 fi
 if [[ -f "$dmg" ]]; then
   diskutil image attach --readOnly --nobrowse --mountPoint "$mount" "$dmg" >/dev/null
@@ -219,7 +219,7 @@ fi
 archives="$work/archives"
 mkdir "$archives"
 cp "$dmg" "$archives/"
-if "$root/Scripts/changelog.sh" "$version" >"$archives/Encore-$version.md" 2>/dev/null; then
+if "$root/scripts/changelog.sh" "$version" >"$archives/Encore-$version.md" 2>/dev/null; then
   echo "Release notes: CHANGELOG.md's $version."
 else
   rm -f "$archives/Encore-$version.md"

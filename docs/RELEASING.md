@@ -1,6 +1,6 @@
 # Releasing
 
-How a release of Encore is cut. Xcode builds, signs, and notarizes the app; `Scripts/publish-release.sh` checks,
+How a release of Encore is cut. Xcode builds, signs, and notarizes the app; `scripts/publish-release.sh` checks,
 packages, and publishes it.
 
 ## How updates reach people
@@ -21,7 +21,7 @@ packages, and publishes it.
 
 ## What's in the app
 
-- **The Python runtime.** The app target's Embed Python build phase (`Scripts/embed-python-runtime.sh`) copies
+- **The Python runtime.** The app target's Embed Python build phase (`scripts/embed-python-runtime.sh`) copies
   `PythonHelper/.runtime/python` and the helper into `Contents/Resources`, precompiles them, and signs every
   Mach-O file in them with the hardened runtime. When Xcode archives, it signs them with the team's Developer ID
   Application certificate and a secure timestamp: Xcode's export re-signs the app and its frameworks, but not code
@@ -36,7 +36,7 @@ The DMG opens a styled window: "Places, please." over Encore's dark ground, Enco
 and a lit arrow between them. [dmgbuild](https://dmgbuild.readthedocs.io) writes the window's layout from
 `Config/dmg-settings.py`, without driving Finder; `publish-release.sh` installs it in a venv under `build/` the first
 time, so a Python 3 must be on `PATH` (or in `PYTHON`). The background is `Config/dmg-background.tiff`, rendered by
-`swift Scripts/render-dmg-background.swift`. The two files share the window size and the icon positions; change
+`swift scripts/render-dmg-background.swift`. The two files share the window size and the icon positions; change
 them together, and render again after changing the script. Finder draws the names black in light mode and white in
 dark mode, so they sit on mid-tone capsules that read in both.
 
@@ -56,13 +56,13 @@ dark mode, so they sit on mid-tone capsules that read in both.
    and the `updates` service. The link is kept in the CLI's settings, not the repo. The script runs each upload
    through `railway run`, which gives it the bucket's credentials from the update host's service.
 4. **Push access to the tap** over SSH: `git@github.com:abdeen-labs/homebrew-tap.git`.
-5. **The Python runtime**: `Scripts/setup-python-runtime.sh`. It installs the latest packages that satisfy
+5. **The Python runtime**: `scripts/setup-python-runtime.sh`. It installs the latest packages that satisfy
    `PythonHelper/requirements.txt`; run it again before a release to ship newer ones, and test a build with them.
 
 ## Cutting a release
 
 1. **Release notes** go in `CHANGELOG.md` under `## [<version>] - <date>`, e.g. `## [1.0.1] - 2026-12-02`,
-   written for the people updating: they're what the update window shows. `Scripts/changelog.sh <version>` prints
+   written for the people updating: they're what the update window shows. `scripts/changelog.sh <version>` prints
    what will ship.
 2. **Version**: raise `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in the Encore target (General ▸
    Identity). The build number must be higher than every published one; Sparkle compares it.
@@ -71,7 +71,7 @@ dark mode, so they sit on mid-tone capsules that read in both.
    Allow.
 5. **Export**: in the Organizer, Distribute App ▸ Direct Distribution. Xcode notarizes and staples the app. Put the
    exported `Encore.app` at the checkout's root (it's ignored by git).
-6. **Publish**: `Scripts/publish-release.sh`. The first release runs with `FIRST_RELEASE=1`, since the feed has
+6. **Publish**: `scripts/publish-release.sh`. The first release runs with `FIRST_RELEASE=1`, since the feed has
    no appcast yet. `UPLOAD=0` stops after making `dist/Encore-<version>.dmg` and the signed `dist/appcast.xml`,
    to look at them first.
 7. **Check**: an installed older release finds the update with Check for Updates…, shows the notes, installs it,
@@ -95,7 +95,7 @@ through the update host, tags `v<version>`, and then sets the cask's version and
 
 ## When publishing stops partway
 
-Fix the cause and run `Scripts/publish-release.sh` again. The DMG in `dist/` is reused while it holds the same
+Fix the cause and run `scripts/publish-release.sh` again. The DMG in `dist/` is reused while it holds the same
 app, a DMG already uploaded is kept when it matches, the appcast's entry for the version is replaced, the tag is
 made when it's missing, and the cask is left alone when it's already at the version. A published DMG is never
 replaced: to ship a different build, raise the version and archive again.

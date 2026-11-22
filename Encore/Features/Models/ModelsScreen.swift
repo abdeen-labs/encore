@@ -135,7 +135,7 @@ struct ModelsScreen: View {
                 if needsSetup {
                     Button("Copy command", systemImage: "doc.on.doc") {
                         NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString("Scripts/setup-python-runtime.sh", forType: .string)
+                        NSPasteboard.general.setString("scripts/setup-python-runtime.sh", forType: .string)
                     }
                     .buttonStyle(.secondary).controlSize(.small)
                 }

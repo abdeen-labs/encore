@@ -2,7 +2,7 @@
 # Puts the Python runtime and encore_helper into Encore.app/Contents/Resources/{python,PythonHelper},
 # pruned, precompiled and (given an identity) signed with the hardened runtime.
 #
-#   Scripts/embed-python-runtime.sh <path/to/Encore.app> [<signing identity>]
+#   scripts/embed-python-runtime.sh <path/to/Encore.app> [<signing identity>]
 #
 # The app target's "Embed Python" build phase runs it with no arguments: it reads Xcode's environment and skips
 # Debug unless ENCORE_EMBED_PYTHON=1, since Debug builds run the repo-local runtime directly (PythonRuntime.locate
@@ -45,7 +45,7 @@ SRC_RUNTIME="$ROOT/PythonHelper/.runtime/python"
 SRC_HELPER="$ROOT/PythonHelper/encore_helper"
 
 if [[ ! -x "$SRC_RUNTIME/bin/python3" ]]; then
-    echo "error: The Python runtime isn't set up. Run Scripts/setup-python-runtime.sh, then build again."
+    echo "error: The Python runtime isn't set up. Run scripts/setup-python-runtime.sh, then build again."
     exit 1
 fi
 
@@ -79,5 +79,5 @@ rsync -a --delete --exclude='__pycache__/' --exclude='*.pyc' "$SRC_HELPER/" "$RE
 
 if [[ -n "$IDENTITY" ]]; then
     # Nested code is signed before the app itself (which the caller, or Xcode, signs afterwards).
-    "$ROOT/Scripts/sign-python-runtime.sh" "$RESOURCES/python" "$IDENTITY" $TIMESTAMP
+    "$ROOT/scripts/sign-python-runtime.sh" "$RESOURCES/python" "$IDENTITY" $TIMESTAMP
 fi

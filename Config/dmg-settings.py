@@ -1,8 +1,8 @@
-# The release DMG's window, for dmgbuild (https://dmgbuild.readthedocs.io). Scripts/publish-release.sh runs
+# The release DMG's window, for dmgbuild (https://dmgbuild.readthedocs.io). scripts/publish-release.sh runs
 #
 #     dmgbuild -s Config/dmg-settings.py -D app=<path/to/Encore.app> -D background=<tiff> Encore <out.dmg>
 #
-# The background comes from Scripts/render-dmg-background.swift, which draws the arrow and the name capsules
+# The background comes from scripts/render-dmg-background.swift, which draws the arrow and the name capsules
 # around the positions below: change both together.
 import os.path
 

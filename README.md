@@ -131,7 +131,7 @@ There is no download yet; Encore is built from source. You need an Apple Silicon
 3. Optional, for the voice changer, word-level timestamps and Chatterbox Multilingual: set up the Python helper once. It downloads a standalone Python 3.13 and `mlx-audio` into the git-ignored `PythonHelper/.runtime` (about 680 MB):
 
    ```bash
-   Scripts/setup-python-runtime.sh
+   scripts/setup-python-runtime.sh
    ```
 
 4. Optional, for MP3 export and MKV, WebM and Ogg input:
@@ -197,7 +197,7 @@ build/app/Build/Products/Debug/Encore.app/Contents/MacOS/Encore --snapshot /tmp/
 | `Packages/EncoreCore/Sources/EncoreMLX/` | The in-process MLX Swift engines. |
 | `Packages/EncoreCore/Sources/encore-cli/` | The developer CLI. |
 | `PythonHelper/` | The Python worker for models with no Swift port. |
-| `Scripts/` | Python runtime setup, embedding it in the app, and publishing a release ([docs/RELEASING.md](docs/RELEASING.md)). |
+| `scripts/` | Python runtime setup, embedding it in the app, and publishing a release ([docs/RELEASING.md](docs/RELEASING.md)). |
 | `docs/screenshots/` | The images in this README. |
 
 All generation goes through `EncoreService` (`Service/EncoreService.swift`). Its request and event types are `Codable`, so a local HTTP API can wrap it directly.

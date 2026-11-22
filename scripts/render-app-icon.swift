@@ -1,7 +1,7 @@
 #!/usr/bin/env swift
 // Renders Encore's app icon into Encore/Assets.xcassets/AppIcon.appiconset.
 //
-//     swift Scripts/render-app-icon.swift            (run from the repo root)
+//     swift scripts/render-app-icon.swift            (run from the repo root)
 //
 // The icon is a curtain call: velvet curtains drawn back, and a cast of five bars (a waveform)
 // silhouetted in the light. No letterforms.

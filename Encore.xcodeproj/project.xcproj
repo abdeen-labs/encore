@@ -41,7 +41,7 @@
           "name": "Embed Python",
           "run-on-every-build": true,
           "shell": "/bin/bash",
-          "script": "\"$SRCROOT/Scripts/embed-python-runtime.sh\"\n",
+          "script": "\"$SRCROOT/scripts/embed-python-runtime.sh\"\n",
         },
       ],
       "package-product-members": [

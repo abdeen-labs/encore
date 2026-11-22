@@ -58,7 +58,7 @@ import Testing
         #expect(vc.defaultParameters["n_timesteps"] == .int(10))
     }
 
-    /// Starts the real helper when the dev runtime exists (Scripts/setup-python-runtime.sh); skipped otherwise.
+    /// Starts the real helper when the dev runtime exists (scripts/setup-python-runtime.sh); skipped otherwise.
     @Test func handshakeReportsVoiceConversion() async throws {
         guard case .found = PythonRuntime.locate() else { return }
         let backend = PythonBackend()
@@ -85,7 +85,7 @@ import Testing
     }
 
     /// The static table answers for the helper before it runs, so it must say what the real handshake says.
-    /// Needs the dev runtime (ENCORE_PYTHON_HOME / Scripts/setup-python-runtime.sh); skipped otherwise.
+    /// Needs the dev runtime (ENCORE_PYTHON_HOME / scripts/setup-python-runtime.sh); skipped otherwise.
     @Test func staticEnginesMatchHandshake() async throws {
         guard case .found = PythonRuntime.locate() else { return }
         let backend = PythonBackend()

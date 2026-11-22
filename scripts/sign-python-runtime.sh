@@ -2,7 +2,7 @@
 # Signs every Mach-O file under a directory (the embedded Python runtime) with the hardened runtime:
 # libraries and extension modules first, executables last.
 #
-#   Scripts/sign-python-runtime.sh <dir> <identity> [--timestamp] [--entitlements <plist>]
+#   scripts/sign-python-runtime.sh <dir> <identity> [--timestamp] [--entitlements <plist>]
 #
 # The Python executable needs no entitlements as long as everything it loads is signed by the same
 # team (tested: MLX on the GPU, every helper job, under the hardened runtime with library validation).

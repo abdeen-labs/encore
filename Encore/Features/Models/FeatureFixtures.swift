@@ -101,7 +101,7 @@ struct FeatureFixture {
 
     static let account = HubAccount(name: "ada-l", fullName: "Ada Lovelace", tokenRole: "read", tokenName: "encore")
     static let gateRequest = GateRequest(modelID: "orpheus", variantID: "4bit", repo: "canopylabs/orpheus-3b-0.1-ft")
-    static let pythonSetupMessage = "The Python runtime isn't set up. In the Encore repository, run Scripts/setup-python-runtime.sh, then try again."
+    static let pythonSetupMessage = "The Python runtime isn't set up. In the Encore repository, run scripts/setup-python-runtime.sh, then try again."
     static let pythonFound = PythonRuntime.Lookup.found(PythonRuntime(executable: URL(fileURLWithPath: "/Applications/Encore.app/Contents/Resources/python/bin/python3"),
                                                                       helperRoot: URL(fileURLWithPath: "/Applications/Encore.app/Contents/Resources/PythonHelper"),
                                                                       origin: .bundled))
