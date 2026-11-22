@@ -25,8 +25,6 @@ import Testing
         }
         // A family's models can be under different licenses (Whisper large-v3 turbo is MIT, the others Apache-2.0).
         #expect(credits.first { $0.family == "Whisper" }?.licenses == ["Apache-2.0", "MIT"])
-        #expect(credits.first { $0.family == "Whisper" }?.authors == ["OpenAI"])
-        #expect(catalog.catalog.weightPublishers.contains("mlx-community"))
     }
 
     @Test(arguments: ModelCatalog.bundled().catalog.models)

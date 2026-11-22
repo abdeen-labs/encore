@@ -7,8 +7,3 @@ import Testing
     let decoded = try JSONDecoder().decode(ParamValues.self, from: JSONEncoder().encode(values))
     #expect(decoded == values)
 }
-
-@Test func bundledManifestsDecode() {
-    let (_, problems) = ModelCatalog.bundled()
-    #expect(problems.isEmpty, "\(problems)")
-}

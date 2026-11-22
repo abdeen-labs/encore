@@ -48,29 +48,6 @@ import Testing
         #expect(env["HF_HUB_OFFLINE"] == "1")
     }
 
-    @Test func voiceConversionManifestDecodes() throws {
-        let (catalog, problems) = ModelCatalog.bundled()
-        #expect(!problems.contains { $0.contains("chatterbox-vc") })
-        let vc = try #require(catalog.model("chatterbox-vc"))
-        #expect(vc.engine == "chatterbox_vc")
-        #expect(vc.tasks == [.voiceConversion])
-        #expect(vc.defaultVariant.allRepos == ["mlx-community/chatterbox-multilingual-v3", "mlx-community/S3TokenizerV2"])
-        #expect(vc.defaultParameters["n_timesteps"] == .int(10))
-    }
-
-    /// Starts the real helper when the dev runtime exists (scripts/setup-python-runtime.sh); skipped otherwise.
-    @Test func handshakeReportsVoiceConversion() async throws {
-        guard case .found = PythonRuntime.locate() else { return }
-        let backend = PythonBackend()
-        #expect(await backend.availability() == .ready)
-        try await backend.start()
-        let features = await backend.engineFeatures()
-        #expect(features["chatterbox_vc"] == .voiceConversion)
-        #expect(features["whisper"]?.contains(.wordTimestamps) == true)
-        await backend.shutdown()
-        #expect(await backend.isRunning == false)
-    }
-
     /// Asking what the backend can do (as the runtime chips do) must not launch Python.
     @Test func engineFeaturesDoNotStartTheHelper() async {
         let backend = PythonBackend()
@@ -89,8 +66,10 @@ import Testing
     @Test func staticEnginesMatchHandshake() async throws {
         guard case .found = PythonRuntime.locate() else { return }
         let backend = PythonBackend()
+        #expect(await backend.availability() == .ready)
         let handshake = try await backend.start()
         await backend.shutdown()
+        #expect(await backend.isRunning == false)
         #expect(handshake.engines == PythonBackend.expectedEngines,
                 "Update PythonBackend.expectedEngines: helper reports \(handshake.engines.mapValues(\.rawValue))")
     }

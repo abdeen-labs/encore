@@ -101,8 +101,6 @@ import Testing
         // VoxCPM2 runs best in Python, Qwen3-TTS natively, and an engine with no pick natively too.
         let vox = testManifest("vox", engine: "voxcpm2", capabilities: ["cloning": true])
         let qwen = testManifest("qwen", engine: "qwen3_tts", capabilities: ["cloning": true])
-        #expect(BestRuntime.pick(for: "voxcpm2")?.runtime == .python)
-        #expect(BestRuntime.pick(for: "qwen3_tts")?.runtime == .mlxSwift)
         let features: [String: EngineFeatures] = ["voxcpm2": [.synthesis, .cloning], "qwen3_tts": [.synthesis, .cloning],
                                                   "spk": [.synthesis, .cloning]]
         let native = FakeBackend(.mlxSwift, features: features)

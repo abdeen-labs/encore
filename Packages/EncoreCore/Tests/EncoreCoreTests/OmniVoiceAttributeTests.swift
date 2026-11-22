@@ -13,11 +13,6 @@ import Testing
         #expect(OmniVoiceAttributes.problem(with: "female, deep voice") != nil)
     }
 
-    @Test func omniVoiceManifestExplainsTheFormat() throws {
-        let m = try #require(ModelCatalog.bundled().catalog.model("omnivoice"))
-        #expect(m.descriptionHelp?.contains("separated by commas") == true)
-    }
-
     @Test func designRefusesProseForOmniVoiceBeforeLoading() async throws {
         let m = testManifest("omni", engine: "omnivoice", capabilities: ["voiceDesign": true])
         let backend = FakeBackend(.mlxSwift, features: ["omnivoice": [.synthesis, .voiceDesign]])

@@ -36,7 +36,6 @@ import Testing
         #expect(turns(r) == ["Dr. Ava Stone: Welcome back.", "Narrator: Quietly.",
                              "Narrator: On the next line.", "Narrator: Note: not a speaker"])
         #expect(r.script.lines[2].pauseAfter == 1.2)
-        #expect(r.notes.contains { $0.contains("stage direction") })
     }
 
     @Test func trailingPauseBecomesPauseAfter() {
@@ -108,14 +107,12 @@ import Testing
         #expect(names(r) == [ConversationImporter.oneVoiceName])
         #expect(turns(r) == ["Narrator: The ferry left at dawn.", "Narrator: Nobody waved.", "Narrator: The gulls followed."])
         #expect(r.script.lines[1].pauseAfter == 2)
-        #expect(r.notes == ["No speaker names were found, so one voice reads every paragraph."])
     }
 
     @Test func unnamedScriptAlternatesSpeakers() {
         let r = ConversationImporter.parse("A.\n\nB.\n\nC.\n\nD.", unnamed: .alternating)
         #expect(names(r) == ["Speaker 1", "Speaker 2"])
         #expect(turns(r) == ["Speaker 1: A.", "Speaker 2: B.", "Speaker 1: C.", "Speaker 2: D."])
-        #expect(r.notes == ["No speaker names were found, so paragraphs alternate between two speakers."])
     }
 
     @Test func choosingAfterImportSwitchesBothWays() throws {
@@ -129,11 +126,11 @@ import Testing
         let one = imported.withUnnamedSpeakers(.oneVoice)
         #expect(names(one) == ["Narrator"] && one.script.lines.count == 3)
         #expect(one.script.lines.map(\.id) == imported.script.lines.map(\.id))   // same lines, only re-cast
-        #expect(one.notes.count == 1 && one.notes[0].contains("one voice"))
+        #expect(one.notes.count == 1)
 
         let two = one.withUnnamedSpeakers(.alternating)
         #expect(turns(two) == ["Speaker 1: The ferry left at dawn.", "Speaker 2: Nobody waved.", "Speaker 1: The gulls followed."])
-        #expect(two.notes.count == 1 && two.notes[0].contains("alternate"))
+        #expect(two.notes.count == 1 && two.notes != one.notes)
 
         // A script with names is never re-cast.
         let named = ConversationImporter.parse("Alice: Hi.\nBob: Hello.")

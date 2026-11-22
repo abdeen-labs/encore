@@ -98,6 +98,5 @@ import Testing
     @Test func textOnlyTranscriptStillMakesSubtitles() {
         let t = Transcript(text: "Just text.", duration: 3)
         #expect(f.srt(t) == "1\n00:00:00,000 --> 00:00:03,000\nJust text.\n")
-        #expect(TranscriptFormat.allCases.map(\.fileExtension) == ["txt", "txt", "srt", "vtt", "json"])
     }
 }

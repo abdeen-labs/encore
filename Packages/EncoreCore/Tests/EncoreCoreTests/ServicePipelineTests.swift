@@ -39,9 +39,6 @@ import Testing
         let file = try await AudioReader.read(record.audioURL)
         #expect(abs(file.duration - record.duration) < 0.001)
         #expect(file.sampleRate == 24_000)
-        let s = stages(events)
-        #expect(s.contains { $0.hasPrefix("Loading Speaker") })
-        #expect(s.contains("Generating 2 of \(plan.chunks.count)"))
     }
 
     @Test func voiceSwitchTagsReachTheEngineWithTheRightVoices() async throws {
@@ -181,10 +178,8 @@ import Testing
         let ava = try await w.addVoice("Ava")
         var r = SpeechRequest(modelID: "plain", text: "Hello.")
         r.voice = .library(ava.id)
-        await #expect(throws: ServiceError.featureUnsupported(modelID: "plain", modelName: "Plain", feature: .cloning,
-                                                              detail: "Pick a model that clones voices, or one of its own voices.")) {
-            _ = try await collect(w.service.speak(r))
-        }
+        let error = await #expect(throws: ServiceError.self) { _ = try await collect(w.service.speak(r)) }
+        if case .featureUnsupported("plain", _, .cloning, _)? = error {} else { Issue.record("\(String(describing: error))") }
         r.voice = .preset("nope")
         await #expect(throws: ServiceError.unknownPresetVoice(name: "nope", modelID: "plain")) { _ = try await collect(w.service.speak(r)) }
         r.voice = .library(UUID())

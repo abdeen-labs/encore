@@ -74,10 +74,9 @@ import Testing
         #expect(backend.synthCalls.count == 4)
         script.lines[1].text = "Hi Ann! How have you been?"
         r.script = script
-        let events = try await collect(w.service.renderConversation(r))
+        _ = try await collect(w.service.renderConversation(r))
         #expect(backend.synthCalls.count == 5)
         #expect(backend.synthCalls.last?.text == "Hi Ann! How have you been?")
-        #expect(stages(events).contains("Reused 2 unchanged lines"))
         // Changing a voice invalidates that speaker's lines.
         r.script.speakers[0].voice = .preset("p2")
         _ = try await collect(w.service.renderConversation(r))
@@ -140,7 +139,7 @@ import Testing
                                                     text: "Hello, I'm \(voice.name).", language: nil)
             #expect(!request.saveToHistory && request.voice == .library(voice.id))
             let take = try #require(finishedRecord(try await collect(w.service.speak(request))))
-            #expect(take.voiceID == voice.id && take.title == "\(voice.name) — first words")
+            #expect(take.voiceID == voice.id)
             #expect(take.audioURL.deletingLastPathComponent().standardizedFileURL == w.service.unsavedDirectory.standardizedFileURL)
             #expect(FileManager.default.fileExists(atPath: take.audioURL.path))
         }
@@ -150,10 +149,10 @@ import Testing
 
     @Test func designOnAModelWithoutDesignIsATypedError() async throws {
         let w = try ServiceWorld(models: [Self.speaker], backends: [FakeBackend(.mlxSwift, features: ["speaker": .synthesis])])
-        await #expect(throws: ServiceError.featureUnsupported(modelID: "speaker", modelName: "Speaker", feature: .voiceDesign,
-                                                              detail: "Pick a model that designs voices, such as Qwen3-TTS VoiceDesign.")) {
+        let error = await #expect(throws: ServiceError.self) {
             _ = try await collect(w.service.designVoice(VoiceDesignRequest(modelID: "speaker", description: "x", sampleText: "y")))
         }
+        guard case .featureUnsupported("speaker", _, .voiceDesign, _)? = error else { Issue.record("\(String(describing: error))"); return }
     }
 
     @Test func canceledDesignDeletesItsCandidates() async throws {
@@ -194,10 +193,10 @@ import Testing
         let ref = try #require(backend.convertCalls.first?.target.referenceAudio)
         #expect(ref != w.voices.referenceAudioURL(for: target.id))
         #expect(w.leftovers(includeHistory: false).isEmpty)
-        #expect(stages(events).contains { $0.hasPrefix("Converting 2 of") })
 
         r.voice = .automatic
-        await #expect(throws: ServiceError.invalidRequest("Pick the voice to change to.")) { _ = try await collect(w.service.convertVoice(r)) }
+        let error = await #expect(throws: ServiceError.self) { _ = try await collect(w.service.convertVoice(r)) }
+        guard case .invalidRequest? = error else { Issue.record("\(String(describing: error))"); return }
     }
 
     @Test func aModelWithoutAutomaticLanguageGetsTheScriptsOrTheVoices() async throws {

@@ -194,7 +194,3 @@ func finishedRecord(_ events: [GenerationEvent]) -> GenerationRecord? {
     for e in events { if case .finished(let r) = e { return r } }
     return nil
 }
-
-func stages(_ events: [GenerationEvent]) -> [String] {
-    events.compactMap { if case .stage(let s) = $0 { s } else { nil } }
-}

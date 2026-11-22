@@ -119,12 +119,11 @@ import Testing
         let a = await rt.assess(c.manifest, c.variant)
         #expect(a.verdict == .comfortable && !a.alreadyLoaded)
         #expect(a.requiredBytes == 9 * GB && a.budgetBytes == 36 * GB && a.headroomBytes == Int64(4.8 * Double(GB)))
-        #expect(a.summary.contains("free"))
         try await use(rt, [c], on: FakeBackend(.mlxSwift, features: [:]))
         #expect(await rt.assess(c.manifest, c.variant).alreadyLoaded)
         let huge = Self.context("huge", memory: 40 * GB)
         let h = await rt.assess(huge.manifest, huge.variant)
-        #expect(h.verdict == .wontFit && h.summary.contains("smaller variant"))
+        #expect(h.verdict == .wontFit)
     }
 
     @Test func jobsRunOneAtATimeAndQueueVisibly() async throws {

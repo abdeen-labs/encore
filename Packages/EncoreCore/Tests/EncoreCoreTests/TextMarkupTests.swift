@@ -104,6 +104,12 @@ import Testing
         #expect(p.issues.first?.severity == .warning)
     }
 
+    @Test func wordTagForModelWithoutTagsBlamesTheModel() {
+        let p = ScriptParser().parse("Ha [laughter] ha")
+        #expect(p.tags.map(\.kind) == [.unrecognized])
+        #expect(p.issues.map(\.severity) == [.warning])
+    }
+
     @Test func rangesAndUTF16RangesPointAtTheSource() {
         let text = "😀 Héllo [pause 1s] wörld"
         let p = ScriptParser().parse(text)

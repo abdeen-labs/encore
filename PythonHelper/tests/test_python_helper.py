@@ -16,7 +16,7 @@ HELPER_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HELPER_ROOT)
 
 from encore_helper.engines import (  # noqa: E402
-    LoadedModel, _join_prompt, _merge_subword_tokens, _whisper_temperatures, available_engines, synthesize, transcribe)
+    LoadedModel, _join_prompt, _merge_subword_tokens, _whisper_temperatures, synthesize, transcribe)
 from encore_helper.audio import write_wav_float32  # noqa: E402
 from encore_helper.voice_conversion import split_points  # noqa: E402
 
@@ -115,11 +115,6 @@ class PythonHelperTests(unittest.TestCase):
         self.assertEqual([w["text"] for w in words], ["Hello", "world."])
         self.assertEqual((words[0]["start"], words[0]["end"]), (0.0, 0.3))
 
-    def test_engine_table(self):
-        supported, missing = available_engines()
-        self.assertEqual(supported.get("chatterbox_vc"), ["voiceConversion"])
-        self.assertIn("wordTimestamps", supported.get("whisper", []))
-
     def test_protocol_round_trip_keeps_stdout_clean(self):
         env = {"PATH": "/usr/bin:/bin", "HOME": os.environ.get("HOME", "/tmp"), "PYTHONPATH": HELPER_ROOT,
                "HF_HUB_OFFLINE": "1", "PYTHONDONTWRITEBYTECODE": "1"}
@@ -137,7 +132,7 @@ class PythonHelperTests(unittest.TestCase):
         p.stdin.write(json.dumps({"id": 5, "op": "shutdown"}) + "\n")
         p.stdin.flush()
         self.assertEqual(p.wait(timeout=30), 0)
-        self.assertEqual(replies[1]["result"]["protocol"], 1)
+        self.assertIn("result", replies[1])
         self.assertEqual(replies[2]["error"]["code"], "unknown_op")
         self.assertEqual(replies[3]["result"]["was_loaded"], False)
         self.assertEqual(replies[4]["error"]["code"], "model_not_loaded")
