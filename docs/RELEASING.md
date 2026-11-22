@@ -9,8 +9,10 @@ packages, and publishes it.
   `SUFeedURL`) once a day, after asking on the second launch, and on Encore ▸ Check for Updates…. Only Release
   builds check.
 - The update host answers `/encore/<file>` with the bucket's object `encore/<file>`. The bucket holds the appcast
-  and every release's DMG, `encore/Encore-<version>.dmg`. The same DMG is the download for new users:
-  `https://updates.abdeen.industries/encore/Encore-<version>.dmg`.
+  and every release's DMG, `encore/Encore-<version>.dmg`.
+- New users download from `https://encore.abdeen.dev/download`, which the README and the site link to. The site
+  ([abdeen-labs/encore.abdeen.dev](https://github.com/abdeen-labs/encore.abdeen.dev)) reads the appcast every
+  10 minutes and sends that link to the newest DMG it lists, so a release needs no link changed anywhere.
 - Sparkle's EdDSA key signs the appcast (`SURequireSignedFeed`) and each DMG, and Encore checks both against
   `SUPublicEDKey`, the DMG before unpacking it (`SUVerifyUpdateBeforeExtraction`). Once a release is out,
   `SUPublicEDKey` never changes: copies with it can't verify anything signed with another key.
@@ -67,18 +69,15 @@ dark mode, so they sit on mid-tone capsules that read in both.
    what will ship.
 2. **Version**: raise `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in the Encore target (General ▸
    Identity). The build number must be higher than every published one; Sparkle compares it.
-3. **Download link**: the README's "Download for Mac" names the DMG by version
-   (`https://updates.abdeen.industries/encore/Encore-<version>.dmg`); point it at the new one. It works once
-   step 7 has uploaded the DMG.
-4. **Commit and push** `main`.
-5. **Archive**: Product ▸ Archive. The first time, macOS asks to let `codesign` use the Developer ID key: Always
+3. **Commit and push** `main`.
+4. **Archive**: Product ▸ Archive. The first time, macOS asks to let `codesign` use the Developer ID key: Always
    Allow.
-6. **Export**: in the Organizer, Distribute App ▸ Direct Distribution. Xcode notarizes and staples the app. Put the
+5. **Export**: in the Organizer, Distribute App ▸ Direct Distribution. Xcode notarizes and staples the app. Put the
    exported `Encore.app` at the checkout's root (it's ignored by git).
-7. **Publish**: `scripts/publish-release.sh`. The first release runs with `FIRST_RELEASE=1`, since the feed has
+6. **Publish**: `scripts/publish-release.sh`. The first release runs with `FIRST_RELEASE=1`, since the feed has
    no appcast yet. `UPLOAD=0` stops after making `dist/Encore-<version>.dmg` and the signed `dist/appcast.xml`,
    to look at them first.
-8. **Check**: an installed older release finds the update with Check for Updates…, shows the notes, installs it,
+7. **Check**: an installed older release finds the update with Check for Updates…, shows the notes, installs it,
    and relaunches.
 
 ## What the script checks

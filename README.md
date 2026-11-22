@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://updates.abdeen.industries/encore/Encore-1.0.dmg"><b>Download for Mac</b></a>
+  <a href="https://encore.abdeen.dev/download"><b>Download for Mac</b></a>
   &nbsp;&middot;&nbsp;
-  <a href="https://abdeen.dev/encore">Website</a>
+  <a href="https://encore.abdeen.dev">Website</a>
   &nbsp;&middot;&nbsp;
   <a href="CHANGELOG.md">What's New</a>
 </p>
