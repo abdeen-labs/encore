@@ -73,7 +73,8 @@
         "ENABLE_USER_SCRIPT_SANDBOXING": "NO",
         "GENERATE_INFOPLIST_FILE": "YES",
         "INFOPLIST_FILE": "Config/Info.plist",
-        "INFOPLIST_KEY_LSApplicationCategoryType": "public.app-category.music",
+        "INFOPLIST_KEY_CFBundleDisplayName": "Encore",
+        "INFOPLIST_KEY_LSApplicationCategoryType": "public.app-category.developer-tools",
         "INFOPLIST_KEY_NSHumanReadableCopyright": "© 2026 Abdeen Industries",
         "INFOPLIST_KEY_NSMicrophoneUsageDescription": "Encore records your microphone to capture reference clips for voice cloning and audio to transcribe. Recordings stay on this Mac.",
         "LD_RUNPATH_SEARCH_PATHS": [
