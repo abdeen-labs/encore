@@ -4,9 +4,11 @@
 <dict>
 	<key>SUFeedURL</key>
 	<string>https://updates.abdeen.industries/encore/appcast.xml</string>
-	<key>SUVerifyUpdateBeforeExtraction</key>
-	<true/>
+	<key>SUPublicEDKey</key>
+	<string>n5QzYMQ09pIezUqyI5d9tV6UlL2jRIPvDjbawhXUlH8=</string>
 	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
 	<true/>
 </dict>
 </plist>
