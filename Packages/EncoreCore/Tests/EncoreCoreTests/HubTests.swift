@@ -402,7 +402,7 @@ func hubGlobMatchesPython(path: String, pattern: String, expected: Bool) {
 @Test func hubTokenStoreSaveAdoptClear() throws {
     let dir = tempDir()
     let file = dir.appendingPathComponent("hf/token")
-    let store = HubTokenStore(service: "dev.abdeen.Encore.huggingface.unit-test-\(UUID().uuidString)", tokenFile: file, readsEnvironment: false)
+    let store = HubTokenStore(service: "dev.abdeen.encore.huggingface.unit-test-\(UUID().uuidString)", tokenFile: file, readsEnvironment: false)
     defer { try? store.clear() }
     #expect(store.current()?.token == nil)
 
@@ -427,7 +427,7 @@ func hubGlobMatchesPython(path: String, pattern: String, expected: Bool) {
 /// A store on a throwaway Keychain service and a token file in a temp folder: never the user's real token.
 private func scratchTokenStore() -> (store: HubTokenStore, file: URL) {
     let file = tempDir().appendingPathComponent("hf/token")
-    let store = HubTokenStore(service: "dev.abdeen.Encore.huggingface.unit-test-\(UUID().uuidString)", tokenFile: file, readsEnvironment: false)
+    let store = HubTokenStore(service: "dev.abdeen.encore.huggingface.unit-test-\(UUID().uuidString)", tokenFile: file, readsEnvironment: false)
     return (store, file)
 }
 

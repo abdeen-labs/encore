@@ -82,7 +82,7 @@
           "@executable_path/../Frameworks",
         ],
         "MARKETING_VERSION": "1.0",
-        "PRODUCT_BUNDLE_IDENTIFIER": "dev.abdeen.Encore",
+        "PRODUCT_BUNDLE_IDENTIFIER": "dev.abdeen.encore",
         "PRODUCT_NAME": "$(TARGET_NAME)",
         "REGISTER_APP_GROUPS": "YES",
         "STRING_CATALOG_GENERATE_SYMBOLS": "YES",

@@ -93,7 +93,7 @@ private func manifest(_ id: String, _ variants: [(id: String, repo: String, comp
         cookies = dir.url.appendingPathComponent("HTTPStorages/dev.example.Encore.binarycookies")
         hfHome = dir.url.appendingPathComponent("hf")
         (defaults, suite) = ThrowawayDefaults.make("EncoreResetTests")
-        tokens = HubTokenStore(service: "dev.abdeen.Encore.huggingface.reset-test-\(UUID().uuidString)",
+        tokens = HubTokenStore(service: "dev.abdeen.encore.huggingface.reset-test-\(UUID().uuidString)",
                                tokenFile: hfHome.appendingPathComponent("token"), readsEnvironment: false)
         // A temp folder stands in for the Trash, so the test can see that the reset never uses it.
         history = try HistoryDatabase(directory: support.appendingPathComponent("History"),

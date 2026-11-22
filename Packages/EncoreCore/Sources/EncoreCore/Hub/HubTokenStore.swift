@@ -21,7 +21,7 @@ public enum HubTokenSource: String, Sendable, Hashable {
 /// (`save`) or chooses to use the shared token again (`clearEncoreOnlySignOut`); that choice is kept
 /// in the Keychain, so it survives relaunches.
 public struct HubTokenStore: Sendable {
-    public static let defaultService = "dev.abdeen.Encore.huggingface"
+    public static let defaultService = "dev.abdeen.encore.huggingface"
 
     public var service: String
     public var account: String

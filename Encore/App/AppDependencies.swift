@@ -54,7 +54,7 @@ import SwiftUI
 
         // Snapshots and isolated runs: a throwaway suite, removed (domain and plist) when the run exits.
         let (defaults, defaultsDomain) = isolated ? ThrowawayDefaults.make(isSnapshot ? "EncoreSnapshot" : "EncoreIsolated")
-                                                  : (UserDefaults.standard, Bundle.main.bundleIdentifier ?? "dev.abdeen.Encore")
+                                                  : (UserDefaults.standard, Bundle.main.bundleIdentifier ?? "dev.abdeen.encore")
         settings = AppSettings(defaults: defaults)
         drafts = isSnapshot ? nil : defaults
         clearsSystemStorage = !isolated
@@ -129,7 +129,7 @@ import SwiftUI
 
         static var live: Locations {
             let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-            let id = Bundle.main.bundleIdentifier ?? "dev.abdeen.Encore"
+            let id = Bundle.main.bundleIdentifier ?? "dev.abdeen.encore"
             return Locations(support: EncorePaths.applicationSupport, history: EncorePaths.history,
                              voices: EncorePaths.voices, scratch: nil, hubCache: EncorePaths.huggingFaceHub,
                              caches: [library.appendingPathComponent("Caches/\(id)"),
