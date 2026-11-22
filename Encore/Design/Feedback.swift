@@ -5,16 +5,16 @@ import UniformTypeIdentifiers
 
 /// How an `EmptyState` is staged.
 enum EmptyStateStyle: Sendable, Hashable {
-    /// A symbol in a cone and pool of light, a display-serif title. For a screen's main empty state only
-    /// (the spotlight is the one full-screen decoration).
+    /// A symbol on a tilted sticker with sprinkles around it, a round display title. For a screen's main
+    /// empty state only (the sticker is the one full-screen decoration).
     case spotlight
-    /// No cone or pool: a smaller symbol in secondary text, a `section` title, tighter padding. For panels
+    /// No sticker: a smaller symbol in secondary text, a `section` title, tighter padding. For panels
     /// and secondary empties.
     case plain
 }
 
-/// An empty stage: a symbol, a title, a line of copy and optional actions. `.spotlight` (the default) stands
-/// the symbol in a pool of light; `.plain` is the quiet version for panels.
+/// An empty screen: a symbol, a title, a line of copy and optional actions. `.spotlight` (the default) puts
+/// the symbol on a sticker; `.plain` is the quiet version for panels.
 ///
 ///     EmptyState(symbol: "waveform", title: "No takes yet", message: "Write a line and press Perform.")
 ///     EmptyState(symbol: "person.wave.2", title: "No voices", message: "…") {
@@ -77,24 +77,8 @@ struct EmptyState<Actions: View>: View {
 
     private var spotlightBody: some View {
         VStack(spacing: Theme.Space.l) {
-            ZStack {
-                // The spot: a cone from above landing in a soft pool.
-                SpotCone()
-                    .fill(LinearGradient(colors: [Color.tungsten.opacity(0.0), Color.tungsten.opacity(0.08)],
-                                         startPoint: .top, endPoint: .bottom))
-                    .frame(width: 150, height: 120)
-                    .mask(LinearGradient(stops: [.init(color: .white, location: 0), .init(color: .white, location: 0.7),
-                                                 .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom))
-                    .offset(y: -30)
-                Ellipse()
-                    .fill(RadialGradient(colors: [Color.tungsten.opacity(0.22), .clear], center: .center, startRadius: 0, endRadius: 70))
-                    .frame(width: 150, height: 34)
-                    .offset(y: 30)
-                Image(systemName: symbol)
-                    .font(.system(size: 30, weight: .light))
-                    .foregroundStyle(LinearGradient(colors: [Color(hex: 0xFFE2B0), .tungsten], startPoint: .top, endPoint: .bottom))
-            }
-            .frame(height: 96)
+            EmptyStateSticker(symbol: symbol)
+            .frame(height: 112)
             VStack(spacing: Theme.Space.s) {
                 Text(title).textRole(.title).multilineTextAlignment(.center)
                 if let message {
@@ -118,21 +102,48 @@ extension EmptyState where Actions == EmptyView {
     }
 }
 
-private struct SpotCone: Shape {
-    func path(in rect: CGRect) -> Path {
-        Path { p in
-            p.move(to: CGPoint(x: rect.midX - rect.width * 0.08, y: rect.minY))
-            p.addLine(to: CGPoint(x: rect.midX + rect.width * 0.08, y: rect.minY))
-            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-            p.closeSubpath()
+/// The empty-state sticker: a soft peach tile, tilted, with the symbol on it and a few sprinkles around.
+private struct EmptyStateSticker: View {
+    let symbol: String
+
+    /// Sprinkles: offset from the center, size, color, rotation.
+    private static let sprinkles: [(CGPoint, CGSize, Color, Double)] = [
+        (CGPoint(x: -64, y: -30), CGSize(width: 12, height: 5), .honey, -30),
+        (CGPoint(x: 66, y: -38), CGSize(width: 8, height: 8), .lilac, 0),
+        (CGPoint(x: 72, y: 22), CGSize(width: 13, height: 5), .matcha, 40),
+        (CGPoint(x: -70, y: 30), CGSize(width: 7, height: 7), .cherry, 0),
+        (CGPoint(x: -36, y: -54), CGSize(width: 5, height: 5), .tangerine, 0),
+        (CGPoint(x: 40, y: 50), CGSize(width: 10, height: 4), .lilac, -20),
+    ]
+
+    var body: some View {
+        ZStack {
+            ForEach(Self.sprinkles.indices, id: \.self) { i in
+                let (point, size, color, angle) = Self.sprinkles[i]
+                Capsule().fill(color.opacity(0.8))
+                    .frame(width: size.width, height: size.height)
+                    .rotationEffect(.degrees(angle))
+                    .offset(x: point.x, y: point.y)
+            }
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(LinearGradient(colors: [Color.peachLight, Color.peach], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(.white, lineWidth: 4))
+                .frame(width: 92, height: 92)
+                .shadow(color: Color.shadow.opacity(0.14), radius: 14, y: 8)
+                .overlay {
+                    Image(systemName: symbol)
+                        .font(.system(size: 36, weight: .semibold))
+                        .foregroundStyle(Color.tangerineInk)
+                }
+                .rotationEffect(.degrees(-6))
         }
+        .accessibilityHidden(true)
     }
 }
 
 // MARK: - Banner
 
-/// An inline message that lives in the layout (not floating). Tone sets the lamp color.
+/// An inline message that lives in the layout (not floating). Tone sets the tint.
 ///
 ///     Banner(.warning, title: "Model not downloaded", message: "Download Soprano to perform.") {
 ///         Button("Download") { … }.buttonStyle(.secondary)
@@ -157,10 +168,9 @@ struct Banner<Actions: View>: View {
     var body: some View {
         HStack(alignment: .top, spacing: Theme.Space.m) {
             Image(systemName: tone.symbol)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(tone.textColor)
-                .frame(width: 18)
-                .padding(.top, 1)
+                .frame(width: 20)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).textRole(.headline)
                 if let message { Text(message).textRole(.caption).fixedSize(horizontal: false, vertical: true) }
@@ -178,12 +188,9 @@ struct Banner<Actions: View>: View {
         .padding(.vertical, Theme.Space.m)
         .background {
             let shape = RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
-            shape.fill(Color.surface)
-                .overlay(shape.fill(LinearGradient(colors: [tone.color.opacity(0.13), tone.color.opacity(0.03)], startPoint: .leading, endPoint: .trailing)))
-                .overlay(shape.strokeBorder(tone.color.opacity(0.28), lineWidth: 1))
-                .overlay(alignment: .leading) {
-                    Capsule().fill(tone.color).frame(width: 3).padding(.vertical, 9).padding(.leading, 5)
-                }
+            shape.fill(tone == .neutral ? Color.surfaceSunken : Color.surface)
+                .overlay(shape.fill(tone == .neutral ? Color.clear : tone.color.opacity(0.12)))
+                .overlay(shape.strokeBorder(tone == .neutral ? Color.hairline : tone.color.opacity(0.32), lineWidth: 1))
         }
         .accessibilityElement(children: .contain)
     }
@@ -238,15 +245,16 @@ struct ToastView: View {
     var body: some View {
         HStack(spacing: Theme.Space.s) {
             Image(systemName: toast.symbol ?? toast.tone.symbol)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(toast.tone.textColor)
-            Text(toast.message).textRole(.label, color: .textPrimary)
+            Text(toast.message).textRole(.headline, color: .textPrimary)
         }
-        .padding(.horizontal, Theme.Space.l)
-        .frame(height: 36)
+        .padding(.leading, Theme.Space.m)
+        .padding(.trailing, Theme.Space.l)
+        .frame(height: 40)
         .background {
             Capsule().fill(Color.surfaceRaised)
-                .overlay(Capsule().strokeBorder(Color.hairlineStrong, lineWidth: 1))
+                .overlay(Capsule().inset(by: 0.5).stroke(Color.hairline, lineWidth: 1))
         }
         .elevation()
         .accessibilityElement(children: .combine)
@@ -272,7 +280,7 @@ extension View {
 // MARK: - Sheet container
 
 /// The body of a modal sheet: display title, close button, content, and a footer of actions
-/// separated by a ticket perforation. Present with `.stageSheet`.
+/// under a squiggle. Present with `.stageSheet`.
 ///
 ///     .stageSheet(isPresented: $showExport) {
 ///         SheetContainer(title: "Export take", subtitle: "Choose a format") {
@@ -319,7 +327,7 @@ struct SheetContainer<Content: View, Actions: View>: View {
                 .padding(.horizontal, Theme.Space.xl)
                 .padding(.bottom, Theme.Space.l)
 
-            PerforatedDivider(bleed: 0)
+            SquiggleDivider()
                 .padding(.horizontal, Theme.Space.xl)
             HStack(spacing: Theme.Space.s) {
                 Spacer()
@@ -334,20 +342,20 @@ struct SheetContainer<Content: View, Actions: View>: View {
 }
 
 extension View {
-    /// Presents a modal sheet with Encore's surface and dark appearance.
+    /// Presents a modal sheet with Encore's surface and light appearance.
     func stageSheet<Content: View>(isPresented: Binding<Bool>, @ViewBuilder content: @escaping () -> Content) -> some View {
         sheet(isPresented: isPresented) {
             content()
                 .presentationBackground(Color.surface)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
         }
     }
 }
 
 // MARK: - Drop zone
 
-/// A perforated well that accepts dropped files of the given types, and opens a file
-/// picker when clicked. Lights up tungsten while a drag hovers over it.
+/// A dashed well that accepts dropped files of the given types, and opens a file
+/// picker when clicked. Turns tangerine while a drag hovers over it.
 ///
 ///     DropZone(title: "Drop a reference clip", message: "WAV, MP3 or M4A · 5–30 seconds",
 ///              allowedTypes: [.audio]) { urls in clip = urls.first }
@@ -388,10 +396,11 @@ struct DropZone: View {
             VStack(spacing: Theme.Space.s) {
                 Image(systemName: symbol)
                     .font(.system(size: 24, weight: .light))
-                    .foregroundStyle(lit ? Color.tungsten : (isHovered ? .textSecondary : .textTertiary))
-                    .scaleEffect(lit ? 1.12 : 1)
-                Text(lit ? "Release to add" : title)
-                    .textRole(.headline, color: lit ? .tungsten : .textPrimary)
+                    .foregroundStyle(lit ? Color.tangerineInk : (isHovered ? .textSecondary : .textTertiary))
+                    .scaleEffect(lit ? 1.18 : (isHovered ? 1.06 : 1))
+                    .rotationEffect(.degrees(lit ? -8 : 0))
+                Text(lit ? "Let go to add it" : title)
+                    .textRole(.headline, color: lit ? .tangerineInk : .textPrimary)
                 if let message { Text(message).textRole(.caption).multilineTextAlignment(.center) }
                 Text("or click to browse").textRole(.caption, color: .textTertiary)
                     .padding(.top, 2)
@@ -399,9 +408,9 @@ struct DropZone: View {
             .padding(Theme.Space.xl)
             .frame(maxWidth: .infinity, minHeight: minHeight)
             .background {
-                shape.fill(lit ? Color.tungsten.opacity(0.07) : Color.surfaceSunken.opacity(0.6))
-                    .overlay(shape.strokeBorder(lit ? Color.tungsten : (isHovered ? Color.hairlineStrong : Color.textTertiary.opacity(0.45)),
-                                                style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [0.1, 7])))
+                shape.fill(lit ? Color.tangerine.opacity(0.1) : Color.surfaceSunken.opacity(isHovered ? 1 : 0.7))
+                    .overlay(shape.strokeBorder(lit ? Color.tangerine : (isHovered ? Color.textTertiary.opacity(0.6) : Color.textTertiary.opacity(0.4)),
+                                                style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [6, 6])))
             }
             .contentShape(shape)
         }
@@ -416,7 +425,8 @@ struct DropZone: View {
         .fileImporter(isPresented: $isImporting, allowedContentTypes: allowedTypes, allowsMultipleSelection: allowsMultiple) { result in
             if case .success(let urls) = result, !urls.isEmpty { onDrop(urls) }
         }
-        .stageAnimation(Theme.Motion.quick, value: isTargeted)
+        .stageAnimation(Theme.Motion.standard, value: isTargeted)
+        .stageAnimation(Theme.Motion.quick, value: isHovered)
         .accessibilityLabel(title)
         .accessibilityHint("Drop a file here or activate to choose one")
     }

@@ -28,7 +28,7 @@ struct RecordingDisplay: Equatable {
     }
 }
 
-/// The recording surface: live level history, elapsed time against the 5–15 s target, a velvet record/stop
+/// The recording surface: live level history, elapsed time against the 5–15 s target, a cherry record/stop
 /// button, and a clear path to System Settings when microphone access was denied.
 ///
 ///     RecordingPanel(state: RecordingDisplay(recorder), onRecord: { … }, onStop: { … })
@@ -101,10 +101,10 @@ struct RecordingPanel: View {
         HStack(alignment: .top, spacing: Theme.Space.l) {
             Image(systemName: "mic.slash")
                 .font(.system(size: 22, weight: .light))
-                .foregroundStyle(.velvetText)
+                .foregroundStyle(.cherryInk)
                 .frame(width: 44, height: 44)
-                .background(Circle().fill(Color.velvet.opacity(0.1)))
-                .overlay(Circle().strokeBorder(Color.velvet.opacity(0.3), lineWidth: 1))
+                .background(Circle().fill(Color.cherry.opacity(0.1)))
+                .overlay(Circle().strokeBorder(Color.cherry.opacity(0.3), lineWidth: 1))
             VStack(alignment: .leading, spacing: Theme.Space.s) {
                 Text("Microphone access is off").textRole(.section)
                 Text("Encore needs the microphone to record a reference clip. Turn on Encore under Privacy & Security › Microphone, then come back. You can also drop in any audio file instead.")
@@ -169,7 +169,7 @@ private struct LevelHistory: View {
                 let v = CGFloat(shown[shown.startIndex + i - offset])
                 let h = max(2, v * (size.height - 6))
                 let age = CGFloat(count - i) / CGFloat(count)
-                let color: Color = live ? (v > 0.92 ? .footlight : .velvet) : .textTertiary
+                let color: Color = live ? (v > 0.92 ? .honey : .cherry) : .textTertiary
                 ctx.fill(Path(roundedRect: CGRect(x: x, y: mid - h / 2, width: barWidth, height: h), cornerRadius: 1.5),
                          with: .color(color.opacity(live ? 1 - Double(age) * 0.55 : 0.6)))
             }
@@ -191,10 +191,10 @@ private struct TargetTimeline: View {
             let inTarget = target.contains(elapsed)
             ZStack(alignment: .topLeading) {
                 Capsule().fill(Color.surfaceSunken).frame(height: 4).offset(y: 3)
-                Capsule().fill(Color.mint.opacity(0.22))
+                Capsule().fill(Color.matcha.opacity(0.22))
                     .frame(width: x(target.upperBound) - x(target.lowerBound), height: 4)
                     .offset(x: x(target.lowerBound), y: 3)
-                Capsule().fill(isRecording ? (inTarget ? Color.mint : .velvet) : .textTertiary)
+                Capsule().fill(isRecording ? (inTarget ? Color.matcha : .cherry) : .textTertiary)
                     .frame(width: max(4, x(min(elapsed, maxT))), height: 4)
                     .offset(y: 3)
                 ForEach([target.lowerBound, target.upperBound], id: \.self) { t in
@@ -212,11 +212,11 @@ private struct LevelReadout: View {
     let level: Float
     var body: some View {
         Text(level > -100 ? String(format: "%.0f dBFS", level) : "— dBFS")
-            .textRole(.monoSmall, color: level > -3 ? .footlight : .textSecondary)
+            .textRole(.monoSmall, color: level > -3 ? .honeyInk : .textSecondary)
     }
 }
 
-/// Big velvet record / stop button.
+/// Big cherry record / stop button.
 private struct RecordButton: View {
     let isRecording: Bool
     let action: () -> Void
@@ -225,16 +225,16 @@ private struct RecordButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                Circle().fill(Color.velvet.opacity(0.12))
-                Circle().strokeBorder(Color.velvet.opacity(isHovered ? 0.8 : 0.5), lineWidth: 1.5)
+                Circle().fill(Color.cherry.opacity(0.12))
+                Circle().strokeBorder(Color.cherry.opacity(isHovered ? 0.8 : 0.5), lineWidth: 1.5)
                 if isRecording {
-                    RoundedRectangle(cornerRadius: 3).fill(Color.velvet).frame(width: 15, height: 15)
+                    RoundedRectangle(cornerRadius: 3).fill(Color.cherry).frame(width: 15, height: 15)
                 } else {
-                    Circle().fill(Color.velvet).frame(width: 22, height: 22)
+                    Circle().fill(Color.cherry).frame(width: 22, height: 22)
                 }
             }
             .frame(width: 46, height: 46)
-            .glow(.velvet, radius: 12, intensity: isRecording ? 0.6 : 0)
+            .glow(.cherry, radius: 12, intensity: isRecording ? 0.6 : 0)
             .contentShape(Circle())
         }
         .buttonStyle(.plain)

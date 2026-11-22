@@ -240,7 +240,7 @@ struct ParameterLabel: View {
                             .frame(width: 240, alignment: .leading)
                             .padding(Theme.Space.m)
                             .background(Color.surfaceRaised)
-                            .preferredColorScheme(.dark)
+                            .preferredColorScheme(.light)
                     }
             }
         }
@@ -285,7 +285,7 @@ struct SeedControl<Label: View>: View {
             }
             .frame(height: Theme.ControlHeight.regular)
             .surface(.sunken, radius: Theme.Radius.s)
-            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s).strokeBorder(Color.tungsten.opacity(editing ? 0.7 : 0), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s).strokeBorder(Color.tangerine.opacity(editing ? 0.7 : 0), lineWidth: 1))
         }
         .onAppear { draft = seed.map(String.init) ?? "" }
         .onChange(of: seed) { _, s in if !editing { draft = s.map(String.init) ?? "" } }

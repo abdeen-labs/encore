@@ -220,7 +220,7 @@ struct VoicesStage: View {
     private var bulkBar: some View {
         let ids = Array(model.selection)
         return HStack(spacing: Theme.Space.m) {
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.tungsten)
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.tangerineInk)
             Text(ids.count == 1 ? "1 voice selected" : "\(ids.count) voices selected").textRole(.headline)
             Spacer(minLength: Theme.Space.s)
             Button("Export…", systemImage: "square.and.arrow.up") { model.exportWithPanel(ids) }
@@ -266,8 +266,8 @@ struct VoicesStage: View {
 
     private var empty: some View {
         VStack(spacing: Theme.Space.l) {
-            EmptyState(symbol: "person.wave.2", title: "No one in the company yet",
-                       message: "Clone one from a recording or design one from a description.") {
+            EmptyState(symbol: "person.wave.2", title: "No voices yet",
+                       message: "Let's make your first one: clone it from a recording, or describe it and design it.") {
                 Button("Clone a voice", systemImage: "mic") { deps.router.go(.clone) }.buttonStyle(.primary).controlSize(.large)
                 Button("Design a voice", systemImage: "wand.and.stars") { deps.router.go(.design) }.buttonStyle(.secondary).controlSize(.large)
             }
@@ -283,7 +283,7 @@ struct VoicesStage: View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
         return ZStack {
             shape.fill(Color.backdrop.opacity(0.78))
-            shape.strokeBorder(Color.tungsten.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, dash: [6, 6]))
+            shape.strokeBorder(Color.tangerine.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, dash: [6, 6]))
             VStack(spacing: Theme.Space.s) {
                 Image(systemName: "person.wave.2").font(.system(size: 28, weight: .light)).foregroundStyle(Color.textSecondary)
                 Text("Drop to add to the company").textRole(.title)
@@ -369,8 +369,8 @@ struct ImportConsentSheet: View {
                 .padding(Theme.Space.m)
                 .background {
                     let shape = RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
-                    shape.fill(pending.consent ? Color.mint.opacity(0.06) : Color.surfaceSunken)
-                        .overlay(shape.strokeBorder(pending.consent ? Color.mint.opacity(0.25) : Color.hairline, lineWidth: 1))
+                    shape.fill(pending.consent ? Color.matcha.opacity(0.06) : Color.surfaceSunken)
+                        .overlay(shape.strokeBorder(pending.consent ? Color.matcha.opacity(0.25) : Color.hairline, lineWidth: 1))
                 }
                 .stageAnimation(Theme.Motion.standard, value: pending.consent)
             if !pending.refused.isEmpty {

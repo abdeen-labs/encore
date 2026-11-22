@@ -432,7 +432,7 @@ private struct AuditionCard: View {
             }
             if let e = model.saveError {
                 Text("The voice wasn't saved. \(e)")
-                    .textRole(.caption, color: .velvetText)
+                    .textRole(.caption, color: .cherryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: Theme.Space.s) {

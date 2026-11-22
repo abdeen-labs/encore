@@ -73,7 +73,7 @@ struct PresetsMenu: View {
             .padding(.horizontal, 9)
             .frame(height: Theme.ControlHeight.small)
             .background(Capsule().fill(Color.textPrimary.opacity(isHovered ? 0.06 : 0)))
-            .overlay(Capsule().strokeBorder(isHovered ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
+            .overlay(Capsule().inset(by: 0.5).stroke(isHovered ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
             .contentShape(Capsule())
         }
         .menuStyle(.button)

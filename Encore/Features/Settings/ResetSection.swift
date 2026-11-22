@@ -175,7 +175,7 @@ private struct TypedConfirmation: View {
 
     var body: some View {
         HStack(spacing: Theme.Space.m) {
-            Text("To confirm, type \(Text(word).font(TextRole.mono.font).foregroundStyle(Color.velvetText))")
+            Text("To confirm, type \(Text(word).font(TextRole.mono.font).foregroundStyle(Color.cherryInk))")
                 .textRole(.body, color: .textSecondary)
                 .fixedSize()
             StageTextField(word, text: $text, symbol: matches ? "checkmark" : "keyboard", onSubmit: onSubmit)
@@ -194,7 +194,7 @@ private struct LossList<Rows: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(heading).textRole(.eyebrow, color: .velvetText)
+                Text(heading).textRole(.eyebrow, color: .cherryInk)
                 Spacer()
                 if let total { Text(total).textRole(.monoSmall, color: .textSecondary) }
             }
@@ -251,7 +251,7 @@ private struct KeepRow: View {
     let text: Text
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.mint).frame(width: 16)
+            Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.matchaInk).frame(width: 16)
             text.textRole(.caption).fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -312,7 +312,7 @@ struct ResetAppDataSheet: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Stays on this Mac").textRole(.eyebrow, color: .mint)
+                    Text("Stays on this Mac").textRole(.eyebrow, color: .matchaInk)
                     KeepRow(text: Text("Downloaded models (delete those separately) and files you exported."))
                     KeepRow(text: Text("The shared token file \(Text(tokenPath).font(TextRole.monoSmall.font)), so Encore signs in with it again. Sign out (above) removes it."))
                 }

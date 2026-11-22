@@ -82,8 +82,8 @@ struct StudioStage: View {
             Color.clear
         } else if model.needsFirstModel {
             VStack(spacing: 0) {
-                FirstModelStage(symbol: "theatermasks", title: "The stage is dark",
-                                message: "Encore performs with models that run on this Mac. Download one to start: Soprano is small and quick, the others can clone a voice.",
+                FirstModelStage(symbol: "theatermasks", title: "Well, hello there",
+                                message: "Encore talks with models that run right here on your Mac. Grab one to get going: Soprano is tiny and quick, the others can clone a voice.",
                                 starterIDs: ["soprano", "qwen3-tts-base", "chatterbox-turbo"])
                 if model.takesTotal > 0 {
                     Button("Earlier takes in History") { router.go(.history) }
@@ -314,7 +314,7 @@ private struct EditorWell: View {
     }
 
     private func rank(_ s: ScriptIssue.Severity) -> Int { s == .error ? 2 : (s == .warning ? 1 : 0) }
-    private func color(_ s: ScriptIssue.Severity) -> Color { s == .error ? .velvetText : (s == .warning ? .footlight : .textTertiary) }
+    private func color(_ s: ScriptIssue.Severity) -> Color { s == .error ? .cherryInk : (s == .warning ? .honeyInk : .textTertiary) }
 }
 
 // MARK: - Wings
@@ -397,7 +397,7 @@ private struct TakesPanel: View {
             }
             if model.takes.isEmpty {
                 EmptyState(symbol: "waveform", title: "No takes yet",
-                           message: "Each performance lands here, newest first, and stays in History.", style: .plain)
+                           message: "Each performance pops up here, newest first, and stays in History.", style: .plain)
                 Spacer(minLength: 0)
             } else {
                 // The newest take of this session opens up to show its waveform.
@@ -447,7 +447,7 @@ private struct StudioFixtureChrome: ViewModifier {
             .overlay {
                 if state == "pronunciations" {
                     ZStack {
-                        Color.black.opacity(0.55)
+                        Color.shadow.opacity(0.22)
                         PronunciationEditor()
                             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.l, style: .continuous))
                             .elevation()

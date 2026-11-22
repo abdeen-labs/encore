@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Encore/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="128" alt="Encore's icon: stage curtains drawn back on five bars of light">
+  <img src="Encore/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="128" alt="Encore's icon: a tangerine speech bubble with a cream waveform inside, on a cream tile">
 </p>
 
 <h1 align="center">Encore</h1>
@@ -230,6 +230,8 @@ Add a JSON manifest to `Packages/EncoreCore/Sources/EncoreCore/Resources/Manifes
 ## Credits
 
 Encore is built with [MLX Swift](https://github.com/ml-explore/mlx-swift), mlx-audio and its Swift port, Hugging Face's Swift libraries and [GRDB](https://github.com/groue/GRDB.swift). The voices come from the people behind Chatterbox (Resemble AI), OmniVoice (k2-fsa), Orpheus (Canopy Labs), Parakeet (NVIDIA), Qwen3-TTS (Alibaba Cloud), Soprano (Eugene Kwek), VoxCPM (OpenBMB), Whisper (OpenAI) and Zonos (Zyphra), with weights converted by the mlx-community on Hugging Face.
+
+Encore is set in [Allo](https://github.com/joshpuckett/allo) by Josh Puckett, a friendly typeface built from [Inter](https://github.com/rsms/inter), under the SIL Open Font License 1.1 (bundled as `Encore/Resources/Fonts/Allo-OFL.txt`).
 
 ## License
 

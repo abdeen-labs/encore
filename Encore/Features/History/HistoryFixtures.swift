@@ -66,7 +66,7 @@ enum HistoryFixtures {
                 await m.waitForResults()
             }))
         }
-        // The rail's activity lamp, over a populated History.
+        // The rail's activity card, over a populated History.
         for (name, size) in [("Rail-Idle", nil), ("Rail-Running", nil), ("Rail-Queued", nil), ("Rail-Running-Min", min), ("Rail-Queued-Min", min)] as [(String, CGSize?)] {
             out.append(FeatureFixture(name: name, section: .history, size: size, prepare: { deps in
                 if name != "Rail-Idle" { jobs(deps, queued: name.hasPrefix("Rail-Queued")) }

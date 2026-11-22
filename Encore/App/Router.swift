@@ -34,16 +34,16 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable, Sendable {
     /// One-line description, used as the default screen subtitle.
     var subtitle: String {
         switch self {
-        case .studio: "Text to speech. Write the lines, cast a voice, perform."
-        case .clone: "Make a voice from a short recording."
-        case .voices: "Your company of voices."
+        case .studio: "Text to speech. Write it, cast it, hear it."
+        case .clone: "Turn a short recording into a voice."
+        case .voices: "Your little company of voices."
         case .design: "Describe a voice and audition it into being."
-        case .changer: "Speech to speech. Same performance, different voice."
-        case .conversations: "Multi-speaker scripts, cast and staged."
+        case .changer: "Same words, same timing, a whole new voice."
+        case .conversations: "Scripts with a cast. Everyone gets a line."
         case .transcribe: "Speech to text, with timings."
-        case .history: "Every take you have generated."
-        case .models: "Download and manage on-device models."
-        case .settings: "Preferences for Encore."
+        case .history: "Everything you've made, right where you left it."
+        case .models: "The voices behind the voices, all on this Mac."
+        case .settings: "Make Encore yours."
         }
     }
 

@@ -107,7 +107,7 @@ struct ConversationsStage: View {
         if !model.shelf.hasScanned {
             Color.clear
         } else if model.needsFirstModel {
-            FirstModelStage(symbol: "bubble.left.and.bubble.right", title: "No one to cast yet",
+            FirstModelStage(symbol: "bubble.left.and.bubble.right", title: "Who's talking?",
                             message: "Conversations are performed by the same models as the Studio. Zonos3 Mini has dozens of voices to cast from; Qwen3-TTS and Chatterbox can speak in your own.",
                             starterIDs: ["zonos3-mini", "qwen3-tts-base", "chatterbox-turbo"])
         } else {
@@ -423,7 +423,7 @@ private struct LineRow: View {
             if isEditing {
                 shape.fill(tint.opacity(0.06)).overlay(shape.strokeBorder(tint.opacity(0.35), lineWidth: 1))
             } else if state == .rendering {
-                shape.fill(Color.tungsten.opacity(0.06))
+                shape.fill(Color.tangerine.opacity(0.06))
             } else if hovered {
                 shape.fill(Color.textPrimary.opacity(0.03))
             }
@@ -514,7 +514,7 @@ private struct LineRow: View {
         Button("Delete line", role: .destructive) { withStageAnimation { model.deleteLine(line.id) } }
     }
 
-    /// The text with its tags marked as in the editor: voice cues in gel, other tags as quiet markup, and a tag the
+    /// The text with its tags marked as in the editor: voice cues in lilac, other tags as quiet markup, and a tag the
     /// model won't understand underlined.
     private var attributedText: AttributedString {
         let text = line.text
@@ -629,7 +629,7 @@ private struct PauseGap: View {
                     .padding(.horizontal, 7)
                     .frame(height: 17)
                     .background(Capsule().fill(Color.surfaceRaised.opacity(differs ? 1 : 0)))
-                    .overlay(Capsule().strokeBorder(Color.hairline, lineWidth: 1))
+                    .overlay(Capsule().inset(by: 0.5).stroke(Color.hairline, lineWidth: 1))
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -701,7 +701,7 @@ private struct StagingColumn: View {
                 .padding(.top, -Theme.Space.xs)
                 if !model.sharedVoices.isEmpty {
                     HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "info.circle").font(.system(size: 10.5)).foregroundStyle(Color.footlight)
+                        Image(systemName: "info.circle").font(.system(size: 10.5)).foregroundStyle(Color.honeyInk)
                         Text(model.sharedVoices.map { $0.joined(separator: " and ") }.joined(separator: "; ") + " share a voice, so they'll sound alike.")
                             .textRole(.caption).fixedSize(horizontal: false, vertical: true)
                     }

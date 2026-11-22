@@ -1,8 +1,8 @@
 import EncoreCore
 import SwiftUI
 
-/// The custom navigation rail: grouped sections, the lit selection, and (while anything runs) the
-/// activity lamp at its foot.
+/// The custom navigation rail: grouped sections, the selected pill, and (while anything runs) the
+/// activity card at its foot.
 struct SidebarRail: View {
     @Environment(Router.self) private var router
     @Environment(RuntimeStatus.self) private var status
@@ -35,8 +35,8 @@ struct SidebarRail: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(group.rawValue)
                             .textRole(.eyebrow)
-                            .padding(.leading, 22)
-                            .padding(.bottom, 6)
+                            .padding(.leading, 24)
+                            .padding(.bottom, 4)
                         ForEach(AppSection.allCases.filter { $0.group == group }) { section in
                             RailItem(title: section.title, symbol: section.symbol,
                                      shortcut: section.shortcutNumber.map { "⌘\($0)" } ?? "⌘,",
@@ -88,14 +88,21 @@ private struct RailItem: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 11) {
+            HStack(spacing: 10) {
                 Image(systemName: symbol)
-                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
-                    .frame(width: 18)
-                    .foregroundStyle(isSelected ? Color.tungsten : (isHovered ? .textPrimary : .textTertiary))
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(isSelected ? Color.onTangerine : (isHovered ? .textPrimary : .textSecondary))
+                    .background {
+                        if isSelected {
+                            Circle().fill(LinearGradient(colors: [Color.tangerineLight, .tangerine], startPoint: .top, endPoint: .bottom))
+                        }
+                    }
+                    .rotationEffect(.degrees(isSelected ? -8 : 0))
+                    .scaleEffect(isHovered && !isSelected ? 1.1 : 1)
                 Text(title)
                     .textRole(isSelected ? .headline : .body,
-                              color: isSelected ? Color(hex: 0xFFE3B8) : (isHovered ? .textPrimary : .textSecondary))
+                              color: isSelected || isHovered ? .textPrimary : .textSecondary)
                 Spacer(minLength: 0)
                 // Both live in the row's fixed height, so neither shifts the rail.
                 if showsKey {
@@ -105,27 +112,22 @@ private struct RailItem: View {
                         .transition(.opacity)
                 }
             }
-            .padding(.leading, 22)
-            .padding(.trailing, 14)
-            .frame(height: 30)
-            .background(alignment: .leading) {
+            .padding(.leading, 8)
+            .padding(.trailing, 12)
+            .frame(height: 34)
+            .background {
                 if isSelected {
-                    ZStack(alignment: .leading) {
-                        // The beam: light spilling in from the left edge.
-                        LinearGradient(colors: [Color.tungsten.opacity(0.16), Color.tungsten.opacity(0.04), .clear],
-                                       startPoint: .leading, endPoint: .trailing)
-                        // The lamp itself.
-                        UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: 2, topTrailingRadius: 2)
-                            .fill(Color.tungsten)
-                            .frame(width: 3)
-                            .padding(.vertical, 6)
-                            .glow(.tungsten, radius: 8, intensity: 0.9)
-                    }
-                    .matchedGeometryEffect(id: "spot", in: spotlight)
+                    // The selected pill: white, floating on the cream.
+                    Capsule()
+                        .fill(Color.surfaceRaised)
+                        .overlay(Capsule().inset(by: 0.5).stroke(Color.hairline, lineWidth: 1))
+                        .lift()
+                        .matchedGeometryEffect(id: "spot", in: spotlight)
                 } else if isHovered {
-                    Color.textPrimary.opacity(0.03)
+                    Capsule().fill(Color.textPrimary.opacity(0.05))
                 }
             }
+            .padding(.horizontal, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

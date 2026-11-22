@@ -22,25 +22,29 @@ enum SurfaceLevel: Sendable {
 }
 
 extension View {
-    /// Paints a themed surface behind the view: fill, hairline border, a faint top sheen.
+    /// Paints a themed surface behind the view: fill and hairline border. Cards and raised surfaces float on a
+    /// soft cocoa shadow; sunken wells get a faint inner shade along the top edge.
     ///
     ///     VStack { … }.padding(16).surface()
     ///     HStack { … }.surface(.sunken, radius: Theme.Radius.s)
     func surface(_ level: SurfaceLevel = .card, radius: CGFloat = Theme.Radius.l) -> some View {
         background {
             let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-            shape
-                .fill(level.fill)
-                .overlay {
-                    if level != .sunken {
-                        // Light falls from above: the top edge catches it.
-                        shape.fill(LinearGradient(colors: [.white.opacity(0.025), .clear],
-                                                  startPoint: .top, endPoint: .init(x: 0.5, y: 0.35)))
-                    } else {
-                        shape.strokeBorder(.black.opacity(0.5), lineWidth: 1).blur(radius: 1.5).clipShape(shape)
+            if level == .sunken {
+                shape
+                    .fill(level.fill)
+                    .overlay {
+                        // Pressed into the cream: a little shade under the top edge.
+                        shape.fill(LinearGradient(colors: [Color.shadow.opacity(0.06), .clear],
+                                                  startPoint: .top, endPoint: .init(x: 0.5, y: 0.12)))
                     }
-                }
-                .overlay(shape.strokeBorder(Color.hairline, lineWidth: 1))
+                    .overlay(shape.strokeBorder(Color.hairline, lineWidth: 1))
+            } else {
+                shape
+                    .fill(level.fill)
+                    .overlay(shape.strokeBorder(Color.hairline, lineWidth: 1))
+                    .lift()
+            }
         }
     }
 }
@@ -124,57 +128,41 @@ struct Hairline: View {
     }
 }
 
-// MARK: - Perforated divider
+// MARK: - Squiggle divider
 
-/// A ticket-stub tear line: a dotted rule with half-moon notches cut into both ends.
+/// A hand-drawn wavy rule, the one playful line in the app.
 ///
 /// Only for the line above the action row of a sheet (`SheetContainer` draws it there). Everywhere else,
 /// separate things with `Hairline()` or space.
 ///
-///     PerforatedDivider()
-///     PerforatedDivider(bleed: 16)   // notches bite the edges of a container with 16pt padding
-struct PerforatedDivider: View {
-    var bleed: CGFloat = 0
-    /// Color that fills the notches; match the ground the card sits on.
-    var notchFill: Color = .stage
-
-    private let radius: CGFloat = 9
+///     SquiggleDivider()
+struct SquiggleDivider: View {
+    var color: Color = .hairlineStrong
 
     var body: some View {
-        ZStack {
-            HLine()
-                .stroke(Color.hairlineStrong, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [0.1, 6]))
-                .frame(height: 1.5)
-                .padding(.horizontal, bleed > 0 ? radius + 6 : 0)
-            if bleed > 0 {
-                HStack {
-                    Notch(opensTo: .trailing).fill(notchFill)
-                        .overlay(Notch(opensTo: .trailing, open: true).stroke(Color.hairline, lineWidth: 1))
-                        .frame(width: radius, height: radius * 2)
-                    Spacer()
-                    Notch(opensTo: .leading).fill(notchFill)
-                        .overlay(Notch(opensTo: .leading, open: true).stroke(Color.hairline, lineWidth: 1))
-                        .frame(width: radius, height: radius * 2)
-                }
-            }
-        }
-        .frame(height: radius * 2)
-        .padding(.horizontal, -bleed)
-        .accessibilityHidden(true)
+        Squiggle(wavelength: 14, amplitude: 2.2)
+            .stroke(color, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+            .frame(height: 8)
+            .accessibilityHidden(true)
     }
 
-    /// A half-disc whose flat side sits on the card edge.
-    private struct Notch: Shape {
-        var opensTo: HorizontalEdge
-        var open = false
+    private struct Squiggle: Shape {
+        var wavelength: CGFloat
+        var amplitude: CGFloat
         func path(in rect: CGRect) -> Path {
-            let left = opensTo == .trailing
-            let center = CGPoint(x: left ? rect.minX : rect.maxX, y: rect.midY)
-            var p = Path()
-            p.addArc(center: center, radius: rect.height / 2,
-                     startAngle: .degrees(-90), endAngle: .degrees(90), clockwise: !left)
-            if !open { p.closeSubpath() }
-            return p
+            Path { p in
+                let mid = rect.midY
+                p.move(to: CGPoint(x: rect.minX, y: mid))
+                var x = rect.minX
+                var up = true
+                while x < rect.maxX {
+                    let next = min(x + wavelength / 2, rect.maxX)
+                    p.addQuadCurve(to: CGPoint(x: next, y: mid),
+                                   control: CGPoint(x: (x + next) / 2, y: mid + (up ? -amplitude * 2 : amplitude * 2)))
+                    up.toggle()
+                    x = next
+                }
+            }
         }
     }
 }
@@ -291,16 +279,16 @@ struct AdvancedDisclosure<Content: View>: View {
 
 // MARK: - Stage backdrop
 
-/// The window ground: warm ink with a faint film grain, nothing else (the stage panel's warm wash is the one
-/// ambient light). Cheap: one tiled 128px noise image.
+/// The window ground: cream with a faint paper grain, nothing else (the stage panel's blush is the one
+/// ambient color). Cheap: one tiled 128px noise image.
 struct StageBackdrop: View {
     var body: some View {
         ZStack {
             Color.backdrop
             Image(nsImage: Grain.image)
                 .resizable(resizingMode: .tile)
-                .opacity(0.035)
-                .blendMode(.screen)
+                .opacity(0.03)
+                .blendMode(.multiply)
         }
         .ignoresSafeArea()
         .accessibilityHidden(true)

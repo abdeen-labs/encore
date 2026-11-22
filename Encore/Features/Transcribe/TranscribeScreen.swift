@@ -69,7 +69,7 @@ struct TranscribeStage: View {
         if !model.shelf.hasScanned {
             Color.clear
         } else if model.needsFirstModel {
-            FirstModelStage(symbol: "captions.bubble", title: "Nothing to listen with yet",
+            FirstModelStage(symbol: "captions.bubble", title: "Lend Encore an ear",
                             message: "Transcription runs on this Mac. Download a model to start: Whisper knows about a hundred languages, Parakeet is fast for European ones.",
                             starterIDs: ["whisper-large-v3-turbo", "parakeet-tdt-v3", "whisper-tiny"])
         } else {
@@ -328,7 +328,7 @@ private struct TranscriptView: View {
 
     /// Segment marks under the waveform: neutral, with only the playing one lit.
     private func cues(_ t: Transcript, active: Int?) -> [TrackCue] {
-        t.segments.enumerated().map { i, s in TrackCue(id: i, start: s.start, end: s.end, tint: i == active ? .tungsten : .textSecondary) }
+        t.segments.enumerated().map { i, s in TrackCue(id: i, start: s.start, end: s.end, tint: i == active ? .tangerine : .textSecondary) }
     }
 
     private func toolbar(_ t: Transcript) -> some View {
@@ -445,7 +445,7 @@ private struct SegmentRow: View {
         Button(action: onTap) {
             HStack(alignment: .firstTextBaseline, spacing: Theme.Space.m) {
                 Text(TranscriptFormatterClock.string(segment.start, hours: hours))
-                    .textRole(.monoSmall, color: isActive ? .tungsten : (hovered ? .textSecondary : .textTertiary))
+                    .textRole(.monoSmall, color: isActive ? .tangerineInk : (hovered ? .textSecondary : .textTertiary))
                     .frame(width: hours ? 62 : 44, alignment: .leading)
                 // The words carry their own colors (AttributedString runs win over the role's color).
                 Text(attributed)
@@ -460,9 +460,9 @@ private struct SegmentRow: View {
             .padding(.vertical, 7)
             .background {
                 if isActive {
-                    Rectangle().fill(Color.tungsten.opacity(0.07))
+                    Rectangle().fill(Color.tangerine.opacity(0.07))
                         .overlay(alignment: .leading) {
-                            Capsule().fill(Color.tungsten).frame(width: 2.5).padding(.vertical, 5)
+                            Capsule().fill(Color.tangerine).frame(width: 2.5).padding(.vertical, 5)
                         }
                 } else if hovered {
                     Rectangle().fill(Color.textPrimary.opacity(0.03))
@@ -488,8 +488,8 @@ private struct SegmentRow: View {
         for (i, w) in words.enumerated() {
             var piece = AttributedString((i == 0 ? "" : " ") + w.text.trimmingCharacters(in: .whitespaces))
             if time >= w.start && time < w.end + 0.05 {
-                piece.foregroundColor = .tungsten
-                piece.backgroundColor = Color.tungsten.opacity(0.14)
+                piece.foregroundColor = .tangerineInk
+                piece.backgroundColor = Color.tangerine.opacity(0.14)
             } else {
                 piece.foregroundColor = time >= w.end ? Color.textPrimary : Color.textSecondary
             }

@@ -69,7 +69,7 @@ struct TakeRow: View {
                     .transition(.opacity)
             }
             if let message = track.loadError {
-                Text(message).textRole(.caption, color: .velvetText).lineLimit(1)
+                Text(message).textRole(.caption, color: .cherryInk).lineLimit(1)
             }
         }
         .padding(.vertical, Theme.Space.s)

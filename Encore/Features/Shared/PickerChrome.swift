@@ -122,7 +122,7 @@ private struct PickerPanelModifier<Panel: View>: ViewModifier {
             content.popover(isPresented: $isPresented, arrowEdge: .bottom) {
                 panelBody
                     .background(Color.surfaceRaised)
-                    .preferredColorScheme(.dark)
+                    .preferredColorScheme(.light)
             }
         }
     }
@@ -153,7 +153,7 @@ struct PickerRow<Content: View>: View {
                 shape.fill(Color.textPrimary.opacity(isSelected ? 0.06 : (isHovered && isEnabled ? 0.04 : 0)))
                     .overlay(alignment: .leading) {
                         if isSelected {
-                            Capsule().fill(Color.tungsten).frame(width: 2.5).padding(.vertical, 6)
+                            Capsule().fill(Color.tangerine).frame(width: 2.5).padding(.vertical, 6)
                         }
                     }
             }

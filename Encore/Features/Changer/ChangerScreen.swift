@@ -160,7 +160,7 @@ private struct SourcePanel: View {
         guard let pieces = source.pieces, pieces.count > 1 || model.runner.isRunning else { return [] }
         let active = model.activePiece
         return pieces.map { p in
-            let tint: Color = active.map { p.index < $0 ? .mint : (p.index == $0 ? .tungsten : .textTertiary) } ?? .textSecondary
+            let tint: Color = active.map { p.index < $0 ? .matchaInk : (p.index == $0 ? .tangerineInk : .textTertiary) } ?? .textSecondary
             return TrackCue(id: p.index, start: p.start, end: p.end, tint: tint)
         }
     }
@@ -177,7 +177,7 @@ private struct SourcePanel: View {
     @ViewBuilder private func piecesNote(_ source: ChangerModel.Source) -> some View {
         if let problem = source.problem {
             HStack(spacing: 6) {
-                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 10)).foregroundStyle(Color.footlight)
+                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 10)).foregroundStyle(Color.honeyInk)
                 Text(problem).textRole(.caption, color: .textSecondary).lineLimit(2)
                 Spacer(minLength: 0)
             }
@@ -371,7 +371,7 @@ private struct ComparisonCard: View {
             }
             HStack {
                 Text(Timecode.string(scrub ?? originalScrub ?? track.currentTime))
-                    .textRole(.monoSmall, color: track.isPlaying ? .tungsten : (track.hasPosition ? .textSecondary : .textTertiary))
+                    .textRole(.monoSmall, color: track.isPlaying ? .tangerineInk : (track.hasPosition ? .textSecondary : .textTertiary))
                 Spacer()
                 Text(Timecode.string(max(result.track.duration, result.record.duration))).textRole(.monoSmall, color: .textTertiary)
             }
@@ -385,7 +385,7 @@ private struct ComparisonCard: View {
     /// One side of the comparison. Its playhead mirrors whichever side is playing; clicking it switches to it there.
     /// Labels stay neutral; only the side that is playing is lit.
     private func lane(label: String, track: PlaybackTrack, height: CGFloat, on: Bool, scrub: Binding<TimeInterval?>) -> some View {
-        let tint: Color = on ? (track.isPlaying ? .tungsten : .textPrimary) : .textSecondary
+        let tint: Color = on ? (track.isPlaying ? .tangerineInk : .textPrimary) : .textSecondary
         return HStack(alignment: .center, spacing: Theme.Space.s) {
             Text(label).textRole(.eyebrow, color: on ? .textPrimary : .textTertiary)
                 .lineLimit(1).fixedSize()

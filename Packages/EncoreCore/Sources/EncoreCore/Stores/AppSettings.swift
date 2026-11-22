@@ -24,6 +24,12 @@ public final class AppSettings {
         }
     }
 
+    /// The app's Dock icon. `bubble` is the bundle's own icon; the others are alternates the app sets at launch.
+    public enum AppIcon: String, Codable, Sendable, CaseIterable, Identifiable {
+        case bubble, candy
+        public var id: String { rawValue }
+    }
+
     public enum Feature: String, Codable, Sendable, CaseIterable {
         case speech, cloning, voiceDesign, conversation, voiceChange, transcription
     }
@@ -39,6 +45,7 @@ public final class AppSettings {
         public var preferredRuntimes: [String: RuntimePreference] = [:]
         /// Feature → last model id used for it.
         public var lastUsedModels: [Feature: String] = [:]
+        public var appIcon: AppIcon = .bubble
 
         public init() {}
 
@@ -54,6 +61,7 @@ public final class AppSettings {
             preferredRuntimes = runtimes.compactMapValues(RuntimePreference.init(rawValue:))
             let last = (try? c.decodeIfPresent([String: String].self, forKey: .lastUsedModels)) ?? [:]
             lastUsedModels = Dictionary(uniqueKeysWithValues: last.compactMap { k, v in Feature(rawValue: k).map { ($0, v) } })
+            appIcon = (try? c.decodeIfPresent(AppIcon.self, forKey: .appIcon)) ?? d.appIcon
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -64,10 +72,11 @@ public final class AppSettings {
             try c.encode(postProcessing, forKey: .postProcessing)
             try c.encode(preferredRuntimes.mapValues(\.rawValue), forKey: .preferredRuntimes)
             try c.encode(Dictionary(uniqueKeysWithValues: lastUsedModels.map { ($0.key.rawValue, $0.value) }), forKey: .lastUsedModels)
+            try c.encode(appIcon, forKey: .appIcon)
         }
 
         enum CodingKeys: String, CodingKey {
-            case idleUnloadMinutes, defaultExportFormat, ffmpegPath, postProcessing, preferredRuntimes, lastUsedModels
+            case idleUnloadMinutes, defaultExportFormat, ffmpegPath, postProcessing, preferredRuntimes, lastUsedModels, appIcon
         }
 
         public static let defaults = Values()
@@ -83,6 +92,7 @@ public final class AppSettings {
     public var postProcessing: PostProcessingOptions { didSet { save() } }
     public var preferredRuntimes: [String: RuntimePreference] { didSet { save() } }
     public var lastUsedModels: [Feature: String] { didSet { save() } }
+    public var appIcon: AppIcon { didSet { save() } }
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored public nonisolated let key: String
@@ -101,6 +111,7 @@ public final class AppSettings {
         postProcessing = v.postProcessing
         preferredRuntimes = v.preferredRuntimes
         lastUsedModels = v.lastUsedModels
+        appIcon = v.appIcon
         current.withLock { $0 = v }
         mirrorFFmpegPath()
     }
@@ -121,6 +132,7 @@ public final class AppSettings {
         v.postProcessing = postProcessing
         v.preferredRuntimes = preferredRuntimes.filter { $0.value != .automatic }
         v.lastUsedModels = lastUsedModels
+        v.appIcon = appIcon
         return v
     }
 
@@ -134,6 +146,7 @@ public final class AppSettings {
         let d = Values.defaults
         idleUnloadMinutes = d.idleUnloadMinutes; defaultExportFormat = d.defaultExportFormat; ffmpegPath = d.ffmpegPath
         postProcessing = d.postProcessing; preferredRuntimes = d.preferredRuntimes; lastUsedModels = d.lastUsedModels
+        appIcon = d.appIcon
     }
 
     private func save() {

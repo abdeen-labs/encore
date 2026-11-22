@@ -398,8 +398,8 @@ enum HistoryHighlight {
         a.foregroundColor = base
         for r in ranges(in: text, terms: terms) {
             guard let lo = AttributedString.Index(r.lowerBound, within: a), let hi = AttributedString.Index(r.upperBound, within: a) else { continue }
-            a[lo..<hi].foregroundColor = .tungsten
-            a[lo..<hi].backgroundColor = Color.tungsten.opacity(0.16)
+            a[lo..<hi].foregroundColor = .tangerineInk
+            a[lo..<hi].backgroundColor = Color.tangerine.opacity(0.16)
         }
         return a
     }

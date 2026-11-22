@@ -14,6 +14,22 @@ the update.
      "## [x.y] - YYYY-MM-DD" heading just below, so the entries fall under it; then repoint the [Unreleased] link
      and add a link for the new version at the bottom. -->
 
+## [1.2] - 2026-11-22
+
+A whole new look: cream, cocoa and tangerine, set in the round, friendly Allo typeface, with an app icon you can pick.
+
+### Added
+
+- An App icon picker in Settings: keep the bubble, or put the candy-bar icon in your Dock. It stays there after
+  Encore quits.
+
+### Changed
+
+- A whole new look: Encore is now cream and cocoa with a tangerine accent, set in the rounded Allo typeface.
+  Buttons are soft capsules you can press, cards float, empty screens have a sticker instead of a spotlight, and
+  there's a new speech-bubble app icon.
+- Friendlier words on the screens' taglines and empty states.
+
 ## [1.1] - 2026-11-22
 
 VoxCPM2 keeps a cloned voice's accent, and each model now runs where it runs best.
@@ -55,6 +71,7 @@ The first release of Encore: local voice AI for Apple Silicon Macs. Everything r
 - Choose from sixteen speech, transcription and voice-changer models, downloaded as you need them.
 - Encore checks for updates and installs them for you.
 
-[Unreleased]: https://github.com/abdeen-labs/encore/compare/v1.1...HEAD
+[Unreleased]: https://github.com/abdeen-labs/encore/compare/v1.2...HEAD
+[1.2]: https://github.com/abdeen-labs/encore/compare/v1.1...v1.2
 [1.1]: https://github.com/abdeen-labs/encore/compare/v1.0...v1.1
 [1.0]: https://github.com/abdeen-labs/encore/tree/v1.0

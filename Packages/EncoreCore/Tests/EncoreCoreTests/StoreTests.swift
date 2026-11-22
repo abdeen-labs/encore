@@ -346,6 +346,7 @@ func observes<T>(_ read: () -> T, after change: () throws -> Void) rethrows -> B
         s.setRuntimePreference(.python, for: "chatterbox")
         s.setRuntimePreference(.automatic, for: "zonos3-mini")
         s.noteModelUsed("zonos3-mini", for: .speech)
+        s.appIcon = .candy
         let snapshot = await Task.detached { s.snapshot() }.value
         #expect(snapshot.defaultExportFormat == .m4a && snapshot.postProcessing.targetLUFS == -14)
         #expect(snapshot.runtimePreference(for: "chatterbox") == .python)
@@ -355,6 +356,7 @@ func observes<T>(_ read: () -> T, after change: () throws -> Void) rethrows -> B
         #expect(restored.values == s.values)
         #expect(restored.idleUnloadMinutes == 0)
         #expect(restored.lastUsedModels[.speech] == "zonos3-mini")
+        #expect(restored.appIcon == .candy)
         s.idleUnloadMinutes = -5
         #expect(s.idleUnloadMinutes == 0)
         s.resetToDefaults()
@@ -363,13 +365,14 @@ func observes<T>(_ read: () -> T, after change: () throws -> Void) rethrows -> B
 
     @Test func tolerantOfOldOrForeignData() throws {
         let defaults = freshDefaults()
-        let json = #"{"idleUnloadMinutes": 3, "defaultExportFormat": "ogg", "preferredRuntimes": {"a": "python", "b": "cuda"}, "lastUsedModels": {"speech": "x", "karaoke": "y"}, "futureKey": true}"#
+        let json = #"{"idleUnloadMinutes": 3, "defaultExportFormat": "ogg", "preferredRuntimes": {"a": "python", "b": "cuda"}, "lastUsedModels": {"speech": "x", "karaoke": "y"}, "appIcon": "singer", "futureKey": true}"#
         defaults.set(Data(json.utf8), forKey: "EncoreSettings")
         let s = AppSettings(defaults: defaults)
         #expect(s.idleUnloadMinutes == 3)
         #expect(s.defaultExportFormat == .wav)
         #expect(s.preferredRuntimes == ["a": .python])
         #expect(s.lastUsedModels == [.speech: "x"])
+        #expect(s.appIcon == .bubble)
     }
 
     @Test func observation() {

@@ -98,7 +98,7 @@ struct KeycapBadge: View {
             .background {
                 RoundedRectangle(cornerRadius: Theme.Radius.xs, style: .continuous)
                     .fill(Color.surfaceRaised)
-                    .shadow(color: .black.opacity(0.5), radius: 0, y: 1)
+                    .shadow(color: Color.shadow.opacity(0.22), radius: 0, y: 1.5)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: Theme.Radius.xs, style: .continuous)

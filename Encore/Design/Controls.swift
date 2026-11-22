@@ -2,8 +2,8 @@ import SwiftUI
 
 // MARK: - Slider
 
-/// A fader-style slider: sunken track, tungsten fill, a mixing-desk cap for a thumb, and a
-/// monospaced value readout. Optional default-value tick; double-click resets to it.
+/// A soft slider: a chunky sunken track, a tangerine fill, a round white thumb, and a
+/// tabular value readout. Optional default-value tick; double-click resets to it.
 /// Arrow keys step the value when focused.
 ///
 ///     StageSlider("Speed", value: $speed, in: 0.5...2, step: 0.05, defaultValue: 1) { String(format: "%.2f×", $0) }
@@ -84,7 +84,7 @@ struct StageSlider: View {
                 if let title { Text(title).textRole(.label, color: .textSecondary) }
                 Spacer(minLength: Theme.Space.s)
                 Text(format(value.wrappedValue))
-                    .textRole(.mono, color: isDragging ? .tungsten : (isAtDefault ? .textSecondary : .textPrimary))
+                    .textRole(.mono, color: isDragging ? .tangerineInk : (isAtDefault ? .textSecondary : .textPrimary))
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .onTapGesture(count: 2, perform: reset)
@@ -107,37 +107,32 @@ struct StageSlider: View {
 
     private var track: some View {
         GeometryReader { geo in
-            let capWidth: CGFloat = 11
+            let capWidth: CGFloat = 18
             let usable = max(geo.size.width - capWidth, 1)
             let x = usable * fraction
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.surfaceSunken)
-                    .overlay(Capsule().strokeBorder(Color.hairline, lineWidth: 1))
-                    .frame(height: 5)
+                    .overlay(Capsule().inset(by: 0.5).stroke(Color.hairline, lineWidth: 1))
+                    .frame(height: 8)
                 Capsule()
-                    .fill(LinearGradient(colors: [.tungstenDeep, .tungsten], startPoint: .leading, endPoint: .trailing))
-                    .frame(width: x + capWidth / 2, height: 5)
+                    .fill(LinearGradient(colors: [Color.tangerineLight, .tangerine], startPoint: .leading, endPoint: .trailing))
+                    .frame(width: x + capWidth / 2, height: 8)
                 if let defaultValue, range.upperBound > range.lowerBound {
                     let f = (defaultValue - range.lowerBound) / (range.upperBound - range.lowerBound)
-                    Rectangle()
-                        .fill(Color.textTertiary)
-                        .frame(width: 1, height: 11)
-                        .offset(x: usable * f + capWidth / 2 - 0.5)
+                    Circle()
+                        .fill(Color.textTertiary.opacity(0.7))
+                        .frame(width: 4, height: 4)
+                        .offset(x: usable * f + capWidth / 2 - 2, y: 9)
                 }
-                // Fader cap.
-                RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-                    .fill(LinearGradient(colors: [Color(hex: 0xFBF5EC), Color(hex: 0xCFC5B8)], startPoint: .top, endPoint: .bottom))
-                    .overlay(Rectangle().fill(Color.backdrop.opacity(0.55)).frame(width: 7, height: 1.5))
-                    .frame(width: capWidth, height: 18)
-                    .shadow(color: .black.opacity(0.6), radius: 2, y: 1)
-                    .scaleEffect(isDragging ? 1.08 : (isHovered ? 1.04 : 1))
+                // Thumb: a soft white button.
+                Circle()
+                    .fill(Color.surfaceRaised)
+                    .overlay(Circle().strokeBorder(isDragging || isFocused ? Color.tangerine : Color.hairlineStrong,
+                                                   lineWidth: isDragging || isFocused ? 2.5 : 1))
+                    .frame(width: capWidth, height: capWidth)
+                    .shadow(color: Color.shadow.opacity(0.22), radius: 2.5, y: 1.5)
+                    .scaleEffect(isDragging ? 1.18 : (isHovered ? 1.08 : 1))
                     .offset(x: x)
-                    .overlay {
-                        if isFocused {
-                            RoundedRectangle(cornerRadius: 4).strokeBorder(Color.tungsten, lineWidth: 1.5)
-                                .frame(width: capWidth + 5, height: 23).offset(x: x)
-                        }
-                    }
             }
             .frame(height: geo.size.height)
             .contentShape(Rectangle())
@@ -165,7 +160,7 @@ struct StageSlider: View {
 
 // MARK: - Toggle
 
-/// A slim pilot-light switch. The label sits on the left; the switch lights tungsten when on.
+/// A round, bouncy switch. The label sits on the left; the switch turns tangerine when on.
 ///
 ///     Toggle("Stream audio", isOn: $stream).toggleStyle(.stage)
 struct StageToggleStyle: ToggleStyle {
@@ -190,15 +185,15 @@ private struct StageToggleBody: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 ZStack(alignment: on ? .trailing : .leading) {
                     Capsule()
-                        .fill(on ? AnyShapeStyle(LinearGradient(colors: [.tungstenDeep, .tungsten], startPoint: .leading, endPoint: .trailing))
-                                 : AnyShapeStyle(Color.surfaceSunken))
-                        .overlay(Capsule().strokeBorder(on ? Color.white.opacity(0.15) : (isHovered ? .hairlineStrong : .hairline), lineWidth: 1))
+                        .fill(on ? AnyShapeStyle(Color.tangerine) : AnyShapeStyle(Color.textPrimary.opacity(0.13)))
+                        .overlay(Capsule().inset(by: 0.5).stroke(on ? Color.tangerineDeep.opacity(0.35) : (isHovered ? .hairlineStrong : .hairline), lineWidth: 1))
                     Circle()
-                        .fill(on ? Color(hex: 0xFFF6E8) : Color(hex: 0x8A8077))
-                        .shadow(color: .black.opacity(0.45), radius: 1.5, y: 1)
+                        .fill(Color.white)
+                        .shadow(color: Color.shadow.opacity(0.25), radius: 1.5, y: 1)
                         .padding(2.5)
+                        .scaleEffect(isHovered ? 1.05 : 1)
                 }
-                .frame(width: 32, height: 18)
+                .frame(width: 36, height: 21)
             }
             .contentShape(Rectangle())
         }
@@ -288,8 +283,8 @@ struct NumberField: View {
                     .disabled(value.wrappedValue >= range.upperBound)
             }
             .frame(height: Theme.ControlHeight.regular)
-            .surface(.sunken, radius: Theme.Radius.s)
-            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s).strokeBorder(Color.tungsten.opacity(isEditing ? 0.7 : 0), lineWidth: 1))
+            .surface(.sunken, radius: Theme.ControlHeight.regular / 2)
+            .overlay(Capsule().inset(by: 1).stroke(Color.tangerine.opacity(isEditing ? 0.8 : 0), lineWidth: 2))
         }
         .opacity(isEnabled ? 1 : 0.4)
         .onAppear { draft = format(value.wrappedValue) }
@@ -308,7 +303,7 @@ struct NumberField: View {
 
 // MARK: - Segmented control
 
-/// A row of mutually exclusive options on a sunken rail with a sliding raised thumb.
+/// A row of mutually exclusive options in a sunken capsule with a sliding white thumb.
 ///
 ///     SegmentedControl(selection: $mode, options: Mode.allCases) { $0.title }
 ///     SegmentedControl(selection: $fmt, options: ["WAV", "MP3", "FLAC"]) { $0 }
@@ -339,15 +334,7 @@ struct SegmentedControl<Option: Hashable>: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text(title(option))
-                            .textRole(.label, color: selected ? .textPrimary : .textSecondary)
-                            // The lamp sits under the title (not the count), at the segment's foot.
-                            .overlay {
-                                if selected {
-                                    Capsule().fill(Color.tungsten).frame(width: 14, height: 2)
-                                        .offset(y: (Theme.ControlHeight.of(controlSize) - 6) / 2 - 3)
-                                        .matchedGeometryEffect(id: "lamp", in: thumb)
-                                }
-                            }
+                            .textRole(selected ? .headline : .label, color: selected ? .textPrimary : .textSecondary)
                         if let n = count?(option) {
                             CountBadge(n)
                         }
@@ -357,10 +344,10 @@ struct SegmentedControl<Option: Hashable>: View {
                         .frame(height: Theme.ControlHeight.of(controlSize) - 6)
                         .background {
                             if selected {
-                                RoundedRectangle(cornerRadius: Theme.Radius.s - 2, style: .continuous)
+                                Capsule()
                                     .fill(Color.surfaceRaised)
-                                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s - 2).strokeBorder(Color.hairlineStrong, lineWidth: 1))
-                                    .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+                                    .overlay(Capsule().inset(by: 0.5).stroke(Color.hairline, lineWidth: 1))
+                                    .shadow(color: Color.shadow.opacity(0.14), radius: 3, y: 1.5)
                                     .matchedGeometryEffect(id: "thumb", in: thumb)
                             }
                         }
@@ -372,7 +359,7 @@ struct SegmentedControl<Option: Hashable>: View {
         }
         .padding(3)
         .fixedSize(horizontal: true, vertical: false)
-        .surface(.sunken, radius: Theme.Radius.s + 1)
+        .surface(.sunken, radius: Theme.ControlHeight.of(controlSize) / 2)
         .opacity(isEnabled ? 1 : 0.4)
     }
 }
@@ -422,14 +409,15 @@ struct MenuPicker<Option: Hashable>: View {
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(isHovered ? Color.textSecondary : .textTertiary)
                 }
-                .padding(.horizontal, 11)
+                .padding(.horizontal, 14)
                 .frame(height: Theme.ControlHeight.regular)
                 .frame(minWidth: 140)
                 .background {
-                    RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
+                    Capsule()
                         .fill(Color.surfaceRaised)
-                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
-                            .strokeBorder(isHovered ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
+                        .overlay(Capsule().inset(by: 0.5)
+                            .stroke(isHovered ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
+                        .shadow(color: Color.shadow.opacity(0.08), radius: 2, y: 1)
                 }
                 .contentShape(Rectangle())
             }

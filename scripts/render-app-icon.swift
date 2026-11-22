@@ -1,20 +1,21 @@
 #!/usr/bin/env swift
-// Renders Encore's app icon into Encore/Assets.xcassets/AppIcon.appiconset.
+// Renders Encore's app icons.
 //
 //     swift scripts/render-app-icon.swift            (run from the repo root)
 //
-// The icon is a curtain call: velvet curtains drawn back, and a cast of five bars (a waveform)
-// silhouetted in the light. No letterforms.
+// The app icon (Encore/Assets.xcassets/AppIcon.appiconset) is a chatty speech bubble: a tangerine bubble with a
+// cream waveform inside, tilted, with a few sprinkles, on a cream tile with a peach blush. The alternate icon
+// (AppIconCandy.appiconset, picked in Settings). DockIconBubble and DockIconCandy are the same two as plain images. is a cast of five candy bars. Both are drawn like the app's buttons:
+// a soft key on a darker lip. No letterforms.
 
 import AppKit
 
 let repo = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-let outDir = repo.appendingPathComponent("Encore/Assets.xcassets/AppIcon.appiconset")
-let space = CGColorSpace(name: CGColorSpace.sRGB)!
+let assets = repo.appendingPathComponent("Encore/Assets.xcassets")
 
+let space = CGColorSpace(name: CGColorSpace.sRGB)!
 func rgb(_ hex: UInt32, _ a: CGFloat = 1) -> CGColor {
-    CGColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
-            blue: CGFloat(hex & 0xFF) / 255, alpha: a)
+    CGColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: a)
 }
 func gradient(_ stops: [(CGFloat, CGColor)]) -> CGGradient {
     CGGradient(colorsSpace: space, colors: stops.map(\.1) as CFArray, locations: stops.map(\.0))!
@@ -24,146 +25,104 @@ let bodyPath = CGPath(roundedRect: body, cornerWidth: 185, cornerHeight: 185, tr
 
 func begin(_ ctx: CGContext) {
     ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 28, color: rgb(0x000000, 0.5))
-    ctx.addPath(bodyPath); ctx.setFillColor(rgb(0x0E0C0B)); ctx.fillPath()
+    ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 28, color: rgb(0x4A3022, 0.35))
+    ctx.addPath(bodyPath); ctx.setFillColor(rgb(0xF6EBDA)); ctx.fillPath()
     ctx.restoreGState()
     ctx.saveGState()
     ctx.addPath(bodyPath); ctx.clip()
+    ctx.drawLinearGradient(gradient([(0, rgb(0xFFF9F0)), (1, rgb(0xF2E3CC))]),
+                           start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
+    // Peach blush in the top-right corner.
+    ctx.drawRadialGradient(gradient([(0, rgb(0xFFCBA6, 0.55)), (1, rgb(0xFFCBA6, 0))]),
+                           startCenter: CGPoint(x: 880, y: 900), startRadius: 0, endCenter: CGPoint(x: 880, y: 900), endRadius: 520, options: [])
 }
 func end(_ ctx: CGContext) {
     ctx.restoreGState()
     ctx.addPath(CGPath(roundedRect: body.insetBy(dx: 1.5, dy: 1.5), cornerWidth: 184, cornerHeight: 184, transform: nil))
-    ctx.setStrokeColor(rgb(0xF4EDE4, 0.10)); ctx.setLineWidth(3); ctx.strokePath()
-}
-func ground(_ ctx: CGContext) {
-    ctx.drawLinearGradient(gradient([(0, rgb(0x221B16)), (1, rgb(0x0B0908))]),
-                           start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
+    ctx.setStrokeColor(rgb(0x4A3022, 0.10)); ctx.setLineWidth(3); ctx.strokePath()
 }
 
-// MARK: Shared pieces
-
-/// Warm light pouring from behind, brightest at `center`.
-func backlight(_ ctx: CGContext, center: CGPoint, radius: CGFloat) {
-    ctx.drawRadialGradient(gradient([(0, rgb(0xFFF3D6)), (0.22, rgb(0xFFD589)), (0.5, rgb(0xF2A03A)), (0.78, rgb(0x8A4312)), (1, rgb(0x2A1408))]),
-                           startCenter: center, startRadius: 0, endCenter: center, endRadius: radius,
-                           options: [.drawsAfterEndLocation])
-}
-
-/// Stage boards across the bottom with a pool of light.
-func boards(_ ctx: CGContext, top: CGFloat, poolAlpha: CGFloat = 0.75) {
+/// Fills `path` as a soft key: a darker lip underneath, then the face with a top-lit gradient.
+func softKey(_ ctx: CGContext, _ path: CGPath, top: UInt32, bottom: UInt32, lip: UInt32, lipDepth: CGFloat = 22) {
     ctx.saveGState()
-    ctx.clip(to: CGRect(x: 100, y: 100, width: 824, height: top - 100))
-    ctx.drawLinearGradient(gradient([(0, rgb(0x5A3413)), (1, rgb(0x170D07))]),
-                           start: CGPoint(x: 0, y: top), end: CGPoint(x: 0, y: 100), options: [])
-    ctx.translateBy(x: 512, y: top - 6); ctx.scaleBy(x: 1, y: 0.26)
-    ctx.drawRadialGradient(gradient([(0, rgb(0xFFE3A6, poolAlpha)), (1, rgb(0xFFB648, 0))]),
-                           startCenter: .zero, startRadius: 0, endCenter: .zero, endRadius: 400, options: [])
+    ctx.setShadow(offset: CGSize(width: 0, height: -lipDepth - 10), blur: 30, color: rgb(0x4A3022, 0.22))
+    ctx.translateBy(x: 0, y: -lipDepth); ctx.addPath(path); ctx.setFillColor(rgb(lip)); ctx.fillPath()
     ctx.restoreGState()
-    ctx.setStrokeColor(rgb(0xFFDFA0, 0.35)); ctx.setLineWidth(3)
-    ctx.move(to: CGPoint(x: 100, y: top)); ctx.addLine(to: CGPoint(x: 924, y: top)); ctx.strokePath()
-}
-
-/// One tied-back velvet curtain on the left; call inside a mirrored transform for the right.
-func tiedCurtain(_ ctx: CGContext, innerTop: CGFloat = 500, tie: CGPoint = CGPoint(x: 232, y: 452), foot: CGFloat = 292) {
-    let shape = CGMutablePath()
-    shape.move(to: CGPoint(x: 90, y: 934))
-    shape.addLine(to: CGPoint(x: innerTop, y: 934))
-    shape.addCurve(to: tie, control1: CGPoint(x: innerTop - 20, y: 720), control2: CGPoint(x: tie.x + 120, y: tie.y + 90))
-    shape.addCurve(to: CGPoint(x: foot, y: 90), control1: CGPoint(x: tie.x + 40, y: tie.y - 120), control2: CGPoint(x: foot - 10, y: 240))
-    shape.addLine(to: CGPoint(x: 90, y: 90))
-    shape.closeSubpath()
-
-    ctx.saveGState()
-    ctx.addPath(shape); ctx.clip()
-    ctx.drawLinearGradient(gradient([(0, rgb(0x4A0912)), (0.55, rgb(0x9E1A2C)), (1, rgb(0xC9253B))]),
-                           start: CGPoint(x: 100, y: 0), end: CGPoint(x: innerTop, y: 0), options: [])
-    // Folds: fan from the rod down into the tie-back, then hang below it.
-    let folds = 7
-    for i in 0..<folds {
-        let t = CGFloat(i) / CGFloat(folds - 1)
-        let topX = 118 + t * (innerTop - 150)
-        let fold = CGMutablePath()
-        fold.move(to: CGPoint(x: topX, y: 934))
-        fold.addCurve(to: CGPoint(x: tie.x - 70 + t * 62, y: tie.y + 8),
-                      control1: CGPoint(x: topX - 4, y: 760), control2: CGPoint(x: tie.x - 60 + t * 150, y: tie.y + 130))
-        fold.addCurve(to: CGPoint(x: 112 + t * (foot - 130), y: 90),
-                      control1: CGPoint(x: tie.x - 70 + t * 80, y: tie.y - 130), control2: CGPoint(x: 112 + t * (foot - 130), y: 250))
-        ctx.addPath(fold)
-        ctx.setStrokeColor(i % 2 == 0 ? rgb(0x2E050B, 0.55) : rgb(0xE8445A, 0.30))
-        ctx.setLineWidth(i % 2 == 0 ? 16 : 9); ctx.setLineCap(.round); ctx.strokePath()
-    }
-    // Shade toward the outer edge and the floor.
-    ctx.drawLinearGradient(gradient([(0, rgb(0x000000, 0.45)), (1, rgb(0x000000, 0))]),
-                           start: CGPoint(x: 100, y: 0), end: CGPoint(x: 300, y: 0), options: [])
-    ctx.drawLinearGradient(gradient([(0, rgb(0x000000, 0)), (1, rgb(0x000000, 0.5))]),
-                           start: CGPoint(x: 0, y: 420), end: CGPoint(x: 0, y: 100), options: [])
-    ctx.restoreGState()
-    // Lit inner edge.
-    let edge = CGMutablePath()
-    edge.move(to: CGPoint(x: innerTop, y: 934))
-    edge.addCurve(to: tie, control1: CGPoint(x: innerTop - 20, y: 720), control2: CGPoint(x: tie.x + 120, y: tie.y + 90))
-    edge.addCurve(to: CGPoint(x: foot, y: 90), control1: CGPoint(x: tie.x + 40, y: tie.y - 120), control2: CGPoint(x: foot - 10, y: 240))
-    ctx.addPath(edge); ctx.setStrokeColor(rgb(0xFF8C7A, 0.55)); ctx.setLineWidth(5); ctx.strokePath()
-    // Gold tie-back.
-    ctx.saveGState()
-    ctx.translateBy(x: tie.x - 34, y: tie.y + 2); ctx.rotate(by: -0.42)
-    let band = CGPath(roundedRect: CGRect(x: -62, y: -15, width: 124, height: 30), cornerWidth: 15, cornerHeight: 15, transform: nil)
-    ctx.setShadow(offset: CGSize(width: 0, height: -4), blur: 10, color: rgb(0x000000, 0.5))
-    ctx.addPath(band); ctx.clip()
-    ctx.drawLinearGradient(gradient([(0, rgb(0xFFE2A0)), (0.5, rgb(0xE0A048)), (1, rgb(0x8C5A18))]),
-                           start: CGPoint(x: 0, y: 15), end: CGPoint(x: 0, y: -15), options: [])
-    ctx.restoreGState()
-}
-func bothCurtains(_ ctx: CGContext, innerTop: CGFloat = 500, tie: CGPoint = CGPoint(x: 232, y: 452), foot: CGFloat = 292) {
-    tiedCurtain(ctx, innerTop: innerTop, tie: tie, foot: foot)
-    ctx.saveGState()
-    ctx.translateBy(x: 1024, y: 0); ctx.scaleBy(x: -1, y: 1)
-    tiedCurtain(ctx, innerTop: innerTop, tie: tie, foot: foot)
+    let box = path.boundingBox
+    ctx.saveGState(); ctx.addPath(path); ctx.clip()
+    ctx.drawLinearGradient(gradient([(0, rgb(top)), (1, rgb(bottom))]),
+                           start: CGPoint(x: 0, y: box.maxY), end: CGPoint(x: 0, y: box.minY), options: [])
     ctx.restoreGState()
 }
 
-/// A row of rounded bars standing on a baseline, like a cast taking a bow.
-func cast(_ ctx: CGContext, heights: [CGFloat], width: CGFloat, gap: CGFloat, baseline: CGFloat,
-          fill: (CGRect) -> Void) {
+func sprinkle(_ ctx: CGContext, _ c: CGPoint, _ size: CGSize, _ color: UInt32, _ angle: CGFloat) {
+    ctx.saveGState()
+    ctx.translateBy(x: c.x, y: c.y); ctx.rotate(by: angle * .pi / 180)
+    let r = CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height)
+    ctx.addPath(CGPath(roundedRect: r, cornerWidth: min(size.width, size.height) / 2, cornerHeight: min(size.width, size.height) / 2, transform: nil))
+    ctx.setFillColor(rgb(color)); ctx.fillPath()
+    ctx.restoreGState()
+}
+
+func bars(_ ctx: CGContext, heights: [CGFloat], width: CGFloat, gap: CGFloat, center: CGPoint, color: (Int) -> UInt32) {
     let total = CGFloat(heights.count) * width + CGFloat(heights.count - 1) * gap
-    var x = 512 - total / 2
-    for h in heights {
-        fill(CGRect(x: x, y: baseline, width: width, height: h))
+    var x = center.x - total / 2
+    for (i, h) in heights.enumerated() {
+        let r = CGRect(x: x, y: center.y - h / 2, width: width, height: h)
+        ctx.addPath(CGPath(roundedRect: r, cornerWidth: width / 2, cornerHeight: width / 2, transform: nil))
+        ctx.setFillColor(rgb(color(i))); ctx.fillPath()
         x += width + gap
     }
 }
 
-// MARK: The icon
+// MARK: The icons
 
-/// Curtain call: the cast (a waveform of standing bars) silhouetted in the light.
-func curtainCall(_ ctx: CGContext) {
-    begin(ctx); ground(ctx)
-    backlight(ctx, center: CGPoint(x: 512, y: 540), radius: 580)
-    boards(ctx, top: 300)
-    // Long shadows toward the viewer.
-    cast(ctx, heights: [150, 250, 360, 250, 150], width: 50, gap: 30, baseline: 300) { r in
-        let shadow = CGMutablePath()
-        shadow.move(to: CGPoint(x: r.minX, y: r.minY)); shadow.addLine(to: CGPoint(x: r.maxX, y: r.minY))
-        let spread = (r.midX - 512) * 0.55
-        shadow.addLine(to: CGPoint(x: r.maxX + spread + 18, y: 100)); shadow.addLine(to: CGPoint(x: r.minX + spread - 18, y: 100))
-        shadow.closeSubpath()
-        ctx.saveGState(); ctx.addPath(shadow); ctx.clip()
-        ctx.drawLinearGradient(gradient([(0, rgb(0x120803, 0.75)), (1, rgb(0x120803, 0.15))]),
-                               start: CGPoint(x: 0, y: 300), end: CGPoint(x: 0, y: 100), options: [])
-        ctx.restoreGState()
+/// The app icon: a chunky tangerine speech bubble with a cream waveform, tilted, with sprinkles.
+func bubble(_ ctx: CGContext) {
+    begin(ctx)
+    ctx.saveGState()
+    ctx.translateBy(x: 512, y: 530); ctx.rotate(by: 7 * .pi / 180); ctx.translateBy(x: -512, y: -530)
+    let shape = CGMutablePath()
+    shape.addRoundedRect(in: CGRect(x: 232, y: 340, width: 560, height: 420), cornerWidth: 190, cornerHeight: 190)
+    let tail = CGMutablePath()
+    tail.move(to: CGPoint(x: 330, y: 400))
+    tail.addCurve(to: CGPoint(x: 268, y: 250), control1: CGPoint(x: 320, y: 330), control2: CGPoint(x: 300, y: 280))
+    tail.addCurve(to: CGPoint(x: 460, y: 352), control1: CGPoint(x: 360, y: 262), control2: CGPoint(x: 420, y: 300))
+    tail.closeSubpath()
+    let whole = shape.union(tail)
+    softKey(ctx, whole, top: 0xFF9A5C, bottom: 0xFF7A2F, lip: 0xE2560F)
+    bars(ctx, heights: [100, 190, 270, 190, 100], width: 46, gap: 32, center: CGPoint(x: 512, y: 550)) { _ in 0xFFF6EA }
+    ctx.restoreGState()
+    sprinkle(ctx, CGPoint(x: 230, y: 790), CGSize(width: 70, height: 26), 0xF6B93B, -30)
+    sprinkle(ctx, CGPoint(x: 820, y: 800), CGSize(width: 40, height: 40), 0xA284F2, 0)
+    sprinkle(ctx, CGPoint(x: 830, y: 300), CGSize(width: 72, height: 26), 0x56B37A, 35)
+    sprinkle(ctx, CGPoint(x: 700, y: 210), CGSize(width: 32, height: 32), 0xEC4F5A, 0)
+    end(ctx)
+}
+
+/// The alternate icon: a cast of five candy bars taking a bow, each a soft key.
+func candyBow(_ ctx: CGContext) {
+    begin(ctx)
+    let heights: [CGFloat] = [250, 400, 540, 400, 250]
+    let colors: [(UInt32, UInt32, UInt32)] = [
+        (0xFFD06A, 0xF6B93B, 0xD39418), (0xFF9A5C, 0xFF7A2F, 0xE2560F), (0xFF7F88, 0xEC4F5A, 0xC23441),
+        (0xBBA4F7, 0xA284F2, 0x7E5FD6), (0x7CCB98, 0x56B37A, 0x3C9160),
+    ]
+    let width: CGFloat = 104, gap: CGFloat = 34
+    let total = 5 * width + 4 * gap
+    var x = 512 - total / 2
+    for (i, h) in heights.enumerated() {
+        let r = CGRect(x: x, y: 512 - h / 2 + 10, width: width, height: h)
+        let p = CGPath(roundedRect: r, cornerWidth: width / 2, cornerHeight: width / 2, transform: nil)
+        softKey(ctx, p, top: colors[i].0, bottom: colors[i].1, lip: colors[i].2, lipDepth: 18)
+        x += width + gap
     }
-    cast(ctx, heights: [150, 250, 360, 250, 150], width: 50, gap: 30, baseline: 300) { r in
-        let bar = CGPath(roundedRect: r, cornerWidth: 25, cornerHeight: 25, transform: nil)
-        ctx.addPath(bar); ctx.setFillColor(rgb(0x1A0C05)); ctx.fillPath()
-        ctx.addPath(bar); ctx.setStrokeColor(rgb(0xFFE7B8, 0.5)); ctx.setLineWidth(3); ctx.strokePath()
-    }
-    bothCurtains(ctx, innerTop: 470, tie: CGPoint(x: 214, y: 470), foot: 262)
     end(ctx)
 }
 
 // MARK: Output
 
-func render(pixels: Int) -> Data {
+func render(_ draw: (CGContext) -> Void, pixels: Int) -> Data {
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
                                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
                                bytesPerRow: 0, bitsPerPixel: 0)!
@@ -172,21 +131,43 @@ func render(pixels: Int) -> Data {
     NSGraphicsContext.current = gc
     gc.cgContext.interpolationQuality = .high
     gc.cgContext.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
-    curtainCall(gc.cgContext)
+    draw(gc.cgContext)
     NSGraphicsContext.restoreGraphicsState()
     return rep.representation(using: .png, properties: [:])!
 }
 
-var images: [[String: String]] = []
-for points in [16, 32, 128, 256, 512] {
-    for scale in [1, 2] {
-        let px = points * scale
-        let name = "icon_\(points)x\(points)\(scale == 2 ? "@2x" : "").png"
-        try! render(pixels: px).write(to: outDir.appendingPathComponent(name))
-        images.append(["idiom": "mac", "scale": "\(scale)x", "size": "\(points)x\(points)", "filename": name])
-    }
+func writeContents(_ contents: [String: Any], to dir: URL) {
+    let json = try! JSONSerialization.data(withJSONObject: contents, options: [.prettyPrinted, .sortedKeys])
+    try! json.write(to: dir.appendingPathComponent("Contents.json"))
 }
-let contents: [String: Any] = ["images": images, "info": ["author": "xcode", "version": 1]]
-let json = try! JSONSerialization.data(withJSONObject: contents, options: [.prettyPrinted, .sortedKeys])
-try! json.write(to: outDir.appendingPathComponent("Contents.json"))
-print("wrote the app icon")
+
+// The app icons, every size macOS asks for: the main one and the alternate (listed in the target's
+// ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES).
+for (setName, draw) in [("AppIcon", bubble), ("AppIconCandy", candyBow)] as [(String, (CGContext) -> Void)] {
+    let dir = assets.appendingPathComponent("\(setName).appiconset")
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    var images: [[String: String]] = []
+    for points in [16, 32, 128, 256, 512] {
+        for scale in [1, 2] {
+            let px = points * scale
+            let name = "icon_\(points)x\(points)\(scale == 2 ? "@2x" : "").png"
+            try! render(draw, pixels: px).write(to: dir.appendingPathComponent(name))
+            images.append(["idiom": "mac", "scale": "\(scale)x", "size": "\(points)x\(points)", "filename": name])
+        }
+    }
+    writeContents(["images": images, "info": ["author": "xcode", "version": 1]], to: dir)
+}
+
+// Both icons again as plain images: the app sets the chosen one as its Dock icon and shows them in Settings, and
+// the Dock tile plug-in draws them while Encore is closed. (Reading the bundle's icon back goes through the system
+// icon cache, which can lag behind a new build.)
+for (setName, draw) in [("DockIconBubble", bubble), ("DockIconCandy", candyBow)] as [(String, (CGContext) -> Void)] {
+    let dir = assets.appendingPathComponent("\(setName).imageset")
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    try! render(draw, pixels: 512).write(to: dir.appendingPathComponent("icon_512.png"))
+    try! render(draw, pixels: 1024).write(to: dir.appendingPathComponent("icon_1024.png"))
+    writeContents(["images": [["idiom": "universal", "scale": "1x", "filename": "icon_512.png"],
+                              ["idiom": "universal", "scale": "2x", "filename": "icon_1024.png"]],
+                   "info": ["author": "xcode", "version": 1]], to: dir)
+}
+print("wrote the app icons")

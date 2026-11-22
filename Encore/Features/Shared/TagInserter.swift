@@ -45,7 +45,7 @@ struct TagInserter: View {
                     }
                     Divider()
                     Button("Back to the main voice") { insert("[voice: default]") }
-                } label: { InserterLabel(title: "Voice", symbol: "person.2", symbolColor: .gel) }
+                } label: { InserterLabel(title: "Voice", symbol: "person.2", symbolColor: .lilacInk) }
                     .inserterMenu()
                     .help("Switch voice from here on: [voice: Name]")
             }
@@ -109,7 +109,7 @@ private struct InserterLabel: View {
         .padding(.horizontal, 9)
         .frame(height: 24)
         .background(Capsule().fill(Color.textPrimary.opacity(isHovered ? 0.06 : 0)))
-        .overlay(Capsule().strokeBorder(isHovered ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
+        .overlay(Capsule().inset(by: 0.5).stroke(isHovered ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
         .contentShape(Capsule())
         .onHover { isHovered = $0 }
         .stageAnimation(Theme.Motion.quick, value: isHovered)

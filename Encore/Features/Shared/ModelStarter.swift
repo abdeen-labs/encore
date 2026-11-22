@@ -5,7 +5,7 @@ import SwiftUI
 /// starter models that download right here.
 ///
 ///     if model.needsFirstModel {
-///         FirstModelStage(symbol: "theatermasks", title: "The stage is dark",
+///         FirstModelStage(symbol: "theatermasks", title: "Well, hello there",
 ///                         message: "Encore performs with models that run on this Mac. Download one to start.",
 ///                         starterIDs: ["soprano", "qwen3-tts-base", "chatterbox-turbo"])
 ///     }

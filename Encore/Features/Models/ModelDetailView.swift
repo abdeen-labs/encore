@@ -306,8 +306,8 @@ private struct VariantRow: View {
         let friendly = variant.friendlyName(in: manifest)
         HStack(spacing: Theme.Space.m) {
             Circle()
-                .strokeBorder(isSelected ? Color.tungsten : Color.hairlineStrong, lineWidth: 1.5)
-                .background(Circle().fill(isSelected ? Color.tungsten : .clear).padding(4))
+                .strokeBorder(isSelected ? Color.tangerine : Color.hairlineStrong, lineWidth: 1.5)
+                .background(Circle().fill(isSelected ? Color.tangerine : .clear).padding(4))
                 .frame(width: 14, height: 14)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {

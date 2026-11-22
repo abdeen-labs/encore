@@ -12,7 +12,7 @@ struct PeaksWaveform: View {
     var played: TimeInterval?
     /// Bars inside this range are lit (and others dimmed).
     var highlight: ClosedRange<TimeInterval>?
-    var tint: Color = .tungsten
+    var tint: Color = .tangerine
     var gain: Float = 1
     var barWidth: CGFloat = 2
     var gap: CGFloat = 1.5

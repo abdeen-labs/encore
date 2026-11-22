@@ -268,21 +268,21 @@ private struct TranscriptSection: View {
             .transition(.opacity)
         case .ready(_, let name):
             if model.hasTranscript {
-                statusLine("checkmark.circle.fill", .mint, "Transcribed on this Mac.")
+                statusLine("checkmark.circle.fill", .matcha, "Transcribed on this Mac.")
                     .help("Transcribed by \(name)")
             } else {
                 noTranscript
             }
         case .stale:
             HStack(spacing: Theme.Space.s) {
-                statusLine("exclamationmark.triangle.fill", .footlight, "The selection moved after you edited this.")
+                statusLine("exclamationmark.triangle.fill", .honey, "The selection moved after you edited this.")
                 Spacer(minLength: 0)
                 Button("Transcribe again", systemImage: "arrow.clockwise", action: model.retranscribe)
                     .buttonStyle(.secondary).controlSize(.small)
             }
         case .noModel:
             HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
-                statusLine("exclamationmark.triangle.fill", .footlight, "No transcription model on this Mac. Type it, or get one to fill it in.")
+                statusLine("exclamationmark.triangle.fill", .honey, "No transcription model on this Mac. Type it, or get one to fill it in.")
                 Spacer(minLength: 0)
                 Button("Open Models") { router.go(.models) }
                     .buttonStyle(.ghost).controlSize(.small).fixedSize()
@@ -302,7 +302,7 @@ private struct TranscriptSection: View {
     }
 
     private var noTranscript: some View {
-        statusLine("exclamationmark.triangle.fill", .footlight, "No transcript yet: models that read along will clone less closely.")
+        statusLine("exclamationmark.triangle.fill", .honey, "No transcript yet: models that read along will clone less closely.")
     }
 
     private func statusLine(_ symbol: String, _ color: Color, _ text: String) -> some View {

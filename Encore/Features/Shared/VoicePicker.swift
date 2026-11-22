@@ -223,7 +223,7 @@ struct VoicePickerPanel: View {
             ? "\(manifest.name) can't clone, so your voices can't be used with it. Download a cloning model (e.g. \(cloners.prefix(2).map(\.name).joined(separator: " or "))) in Models."
             : "\(manifest.name) can't clone, so your voices can't be used with it. Switch to \(ready.prefix(2).joined(separator: " or ")) to cast them."
         return HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "info.circle").font(.system(size: 11)).foregroundStyle(Color.footlight)
+            Image(systemName: "info.circle").font(.system(size: 11)).foregroundStyle(Color.honeyInk)
             Text(text).textRole(.caption).fixedSize(horizontal: false, vertical: true)
             if ready.isEmpty {
                 Spacer(minLength: 0)

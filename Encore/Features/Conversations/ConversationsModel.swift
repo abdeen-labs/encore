@@ -733,9 +733,9 @@ final class ConversationsModel {
     #endif
 }
 
-/// Speaker colors: distinct on the dark stage, none of them the warning orange or the error red.
+/// Speaker colors: deep candy shades, readable as text on the cream stage, none of them the warning honey or the error cherry.
 enum CastPalette {
-    static let hexes: [UInt32] = [0xFFB648, 0x7FD1C7, 0xE58FB0, 0x8FB8F0, 0xC9A7FF, 0xD9C26A, 0x9BD18A, 0xB7C3D9]
+    static let hexes: [UInt32] = [0xB8440A, 0x177A73, 0xB2386F, 0x2D63BB, 0x7A4FD0, 0x667510, 0x2A7D3C, 0x55657E]
     static var count: Int { hexes.count }
     static func color(_ i: Int) -> Color { Color(hex: hexes[((i % count) + count) % count]) }
 }

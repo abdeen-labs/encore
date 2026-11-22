@@ -212,7 +212,7 @@ struct DownloadControl: View {
             VStack(alignment: .trailing, spacing: 4) {
                 Button("Retry", systemImage: "arrow.clockwise") { downloads.retry(manifest, variant) }
                     .buttonStyle(.secondary)
-                Text(error.localizedDescription).textRole(.caption, color: .velvetText)
+                Text(error.localizedDescription).textRole(.caption, color: .cherryInk)
                     .lineLimit(compact ? 2 : 4)
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: compact ? 200 : 320, alignment: .trailing)

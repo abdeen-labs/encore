@@ -3,8 +3,8 @@
 //
 //     swift scripts/render-dmg-background.swift            (run from the repo root)
 //
-// The window is the stage after dark: a call to places in the display serif, and the next step (drag Encore to
-// Applications) as the one lit thing. Finder draws the two icons and their names on top; the names sit on
+// The window is the app's cream: a call to places in round Allo, a peach blush, and the next step (drag Encore
+// to Applications) as the one tangerine thing. Finder draws the two icons and their names on top; the names sit on
 // mid-tone capsules so they read in both appearances (Finder draws them black in light mode, white in dark).
 // The positions here and in Config/dmg-settings.py go together: change both.
 
@@ -25,13 +25,22 @@ func color(_ hex: UInt32, _ alpha: CGFloat = 1) -> NSColor {
     NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
             blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
 }
-func font(_ names: [String], _ size: CGFloat, fallback: NSFont) -> NSFont {
-    names.lazy.compactMap { NSFont(name: $0, size: size) }.first ?? fallback
+/// Allo (bundled with the app, SIL OFL 1.1) at a weight and roundness; the system font if it can't be loaded.
+func allo(_ size: CGFloat, weight: CGFloat, roundness: CGFloat) -> NSFont {
+    let url = repo.appendingPathComponent("Encore/Resources/Fonts/AlloVariable.ttf")
+    CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+    func tag(_ s: String) -> UInt32 { s.utf8.reduce(0) { ($0 << 8) | UInt32($1) } }
+    let descriptor = CTFontDescriptorCreateWithAttributes([
+        kCTFontNameAttribute: "AlloVariable-Regular",
+        kCTFontVariationAttribute: [tag("wght"): weight, tag("opsz"): min(max(size, 9), 32), tag("ROND"): roundness] as [UInt32: CGFloat],
+    ] as CFDictionary)
+    let font = CTFontCreateWithFontDescriptor(descriptor, size, nil) as NSFont
+    return font.fontName.hasPrefix("Allo") ? font : .systemFont(ofSize: size, weight: .bold)
 }
 
-let backdrop: UInt32 = 0x0E0C0B, stage: UInt32 = 0x1A1612
-let textPrimary: UInt32 = 0xF4EDE4, textSecondary: UInt32 = 0xA99E92, textTertiary: UInt32 = 0x8F857A
-let tungsten: UInt32 = 0xFFB648
+let backdrop: UInt32 = 0xF3E9D9, stage: UInt32 = 0xFCF7EF, peach: UInt32 = 0xFFCBA6
+let textPrimary: UInt32 = 0x2B1D14, textSecondary: UInt32 = 0x6B5546, textTertiary: UInt32 = 0x7D6757
+let tangerine: UInt32 = 0xFF7A2F
 // About 4.5:1 against both black and white text: Finder's label color depends on the appearance.
 let capsule: UInt32 = 0x7D736A
 
@@ -51,27 +60,28 @@ func draw(scale: CGFloat) -> NSBitmapImageRep {
     let flipped = NSGraphicsContext(cgContext: cg, flipped: true)
     NSGraphicsContext.current = flipped
 
-    // Ground: the backdrop, a breath warmer toward the top, where the light comes from.
-    let ground = NSGradient(colors: [color(stage), color(backdrop)], atLocations: [0, 0.75],
+    // Ground: milk at the top fading to cream, with a peach blush in the top-right corner.
+    let ground = NSGradient(colors: [color(stage), color(backdrop)], atLocations: [0, 0.8],
                             colorSpace: .sRGB)!
-    ground.draw(in: CGRect(origin: .zero, size: size), angle: 90)
+    ground.draw(in: CGRect(origin: .zero, size: size), angle: -90)
+    let blush = NSGradient(colors: [color(peach, 0.55), color(peach, 0)], atLocations: [0, 1], colorSpace: .sRGB)!
+    blush.draw(fromCenter: CGPoint(x: size.width, y: 0), radius: 0, toCenter: CGPoint(x: size.width, y: 0), radius: 380,
+               options: [])
 
-    // The kicker: the name and what it is, plain, in mono capitals.
-    let mono = NSFont.monospacedSystemFont(ofSize: 10.5, weight: .medium)
+    // The kicker: the name and what it is, plain.
     let kicker = NSMutableAttributedString()
-    kicker.append(NSAttributedString(string: "ENCORE  ·", attributes: [
-        .font: mono, .foregroundColor: color(textSecondary), .kern: 2.2]))
-    kicker.append(NSAttributedString(string: "  LOCAL VOICE AI FOR THE MAC", attributes: [
-        .font: mono, .foregroundColor: color(textTertiary), .kern: 2.2]))
-    kicker.draw(at: CGPoint(x: 48, y: 38))
+    kicker.append(NSAttributedString(string: "Encore  ·", attributes: [
+        .font: allo(13, weight: 700, roundness: 50), .foregroundColor: color(textSecondary)]))
+    kicker.append(NSAttributedString(string: "  Local voice AI for the Mac", attributes: [
+        .font: allo(13, weight: 500, roundness: 50), .foregroundColor: color(textTertiary)]))
+    kicker.draw(at: CGPoint(x: 48, y: 40))
 
-    // The call, in the display serif.
-    let display = font(["BodoniSvtyTwoITCTT-Book", "Didot"], 84, fallback: .systemFont(ofSize: 84))
+    // The call, in round Allo.
     NSAttributedString(string: "Places, please.", attributes: [
-        .font: display, .foregroundColor: color(textPrimary), .kern: -1.6,
-    ]).draw(at: CGPoint(x: 42, y: 50))
+        .font: allo(64, weight: 800, roundness: 100), .foregroundColor: color(textPrimary), .kern: -1.4,
+    ]).draw(at: CGPoint(x: 44, y: 62))
 
-    // The next step, lit: an arrow from Encore to Applications.
+    // The next step, in tangerine: an arrow from Encore to Applications.
     let arrowY = appCenter.y
     let start = appCenter.x + iconSize / 2 + 34, end = applicationsCenter.x - iconSize / 2 - 34
     let arrow = NSBezierPath()
@@ -80,10 +90,10 @@ func draw(scale: CGFloat) -> NSBitmapImageRep {
     arrow.move(to: CGPoint(x: end - 11, y: arrowY - 10))
     arrow.line(to: CGPoint(x: end, y: arrowY))
     arrow.line(to: CGPoint(x: end - 11, y: arrowY + 10))
-    arrow.lineWidth = 2.5
+    arrow.lineWidth = 4
     arrow.lineCapStyle = .round
     arrow.lineJoinStyle = .round
-    color(tungsten).setStroke()
+    color(tangerine).setStroke()
     arrow.stroke()
 
     // Capsules under the names.

@@ -1,7 +1,7 @@
 import EncoreCore
 import SwiftUI
 
-/// The rail's activity lamp: while anything in the app is running or waiting for the GPU (`RuntimeStatus.jobs`),
+/// The rail's activity card: while anything in the app is running or waiting for the GPU (`RuntimeStatus.jobs`),
 /// a small card at the foot of the rail says what, on which model, the stage, progress and how many wait behind
 /// it. Idle, it isn't there at all. Clicking it lists every job, each with a way back to the screen it came from.
 struct RailActivity: View {
@@ -24,7 +24,7 @@ struct RailActivity: View {
                     showsJobs = false
                     router.go(section)
                 }
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
             }
             .help("\(job.title) · \(status.jobs.count == 1 ? "1 job" : "\(status.jobs.count) jobs"): click for details")
             .accessibilityElement(children: .combine)
@@ -44,7 +44,7 @@ struct RailActivity: View {
                         .frame(width: 11)
                 }
                 Text(JobKindStyle.verb(job.kind, running: running))
-                    .textRole(.eyebrow, color: running ? .tungsten : .textSecondary)
+                    .textRole(.eyebrow, color: running ? .tangerineInk : .textSecondary)
                     .lineLimit(1)
                 Spacer(minLength: 2)
                 if let p = job.progress, running {
@@ -57,20 +57,22 @@ struct RailActivity: View {
             Text([job.modelName, job.stage].compactMap { $0 }.joined(separator: " · "))
                 .textRole(.caption, color: .textTertiary).lineLimit(1)
             HStack(spacing: 6) {
-                ProgressBar(value: running ? job.progress : nil, tone: running ? .accent : .neutral, height: 2.5)
+                ProgressBar(value: running ? job.progress : nil, tone: running ? .accent : .neutral, height: 4)
                 if queued > 0 {
                     Text("+\(queued) queued").textRole(.monoSmall, color: .textSecondary).fixedSize()
                 }
             }
             .frame(height: 11)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background {
             let shape = RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
-            shape.fill(Color.surfaceSunken)
-                .overlay(shape.strokeBorder(isHovered || showsJobs ? Color.tungsten.opacity(0.4) : Color.hairline, lineWidth: 1))
+            shape.fill(Color.surfaceRaised)
+                .overlay(shape.strokeBorder(isHovered || showsJobs ? Color.tangerine.opacity(0.5) : Color.hairline, lineWidth: 1))
+                .lift()
         }
+        .scaleEffect(isHovered ? 1.02 : 1)
         .contentShape(Rectangle())
         .stageAnimation(Theme.Motion.quick, value: isHovered)
     }

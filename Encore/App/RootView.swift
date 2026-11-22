@@ -1,11 +1,13 @@
 import EncoreCore
 import SwiftUI
 
-/// The window layout: the rail on the ink, the current screen on a lit "stage" panel, and, once something has
+/// The window layout: the rail on the cream, the current screen on a milk "stage" panel, and, once something has
 /// played, the player dock in the pit underneath it. With nothing played the stage runs down to an 8pt margin.
 struct RootView: View {
     @Environment(Router.self) private var router
     @Environment(ToastCenter.self) private var toasts
+    @Environment(AppSettings.self) private var settings
+    @Environment(\.isSnapshotting) private var isSnapshotting
 
     var body: some View {
         let hasDock = NowPlaying.shared.player != nil
@@ -27,8 +29,10 @@ struct RootView: View {
             .stageAnimation(Theme.Motion.standard, value: NowPlaying.shared.player?.id)
         }
         .background(StageBackdrop())
-        .preferredColorScheme(.dark)
-        .tint(.tungsten)
+        .preferredColorScheme(.light)
+        .tint(.tangerine)
+        .onAppear { if !isSnapshotting { AppIconSwitcher.apply(settings.appIcon) } }
+        .onChange(of: settings.appIcon) { _, icon in if !isSnapshotting { AppIconSwitcher.apply(icon) } }
     }
 
     @ViewBuilder private var currentScreen: some View {
@@ -64,7 +68,7 @@ struct SectionScreen: View {
     }
 }
 
-/// The proscenium: a rounded, faintly lit panel the screens play on.
+/// The stage: a rounded milk panel the screens sit on, with a peach blush in its top corner.
 struct StagePanel<Content: View>: View {
     @ViewBuilder var content: Content
 
@@ -75,12 +79,13 @@ struct StagePanel<Content: View>: View {
             .background {
                 shape.fill(Color.stage)
                     .overlay {
-                        // House lights: a warm wash from above, falling off quickly.
-                        shape.fill(RadialGradient(colors: [Color(hex: 0xFFB648, opacity: 0.07), .clear],
-                                                  center: .init(x: 0.5, y: -0.05), startRadius: 0, endRadius: 520))
+                        // Blush: a soft peach glow tucked into the top-right corner.
+                        shape.fill(RadialGradient(colors: [Color.peach.opacity(0.32), Color.peachLight.opacity(0.0)],
+                                                  center: .init(x: 1.0, y: -0.04), startRadius: 0, endRadius: 560))
                     }
             }
             .clipShape(shape)
             .overlay(shape.strokeBorder(Color.hairline, lineWidth: 1))
+            .background(shape.fill(Color.stage).lift())
     }
 }

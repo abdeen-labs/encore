@@ -73,7 +73,7 @@ struct TagEditor: View {
                 }
                 HStack(spacing: 5) {
                     Image(systemName: "tag").font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(focused ? Color.tungsten : .textTertiary)
+                        .foregroundStyle(focused ? Color.tangerineInk : .textTertiary)
                     TextField(placeholder, text: $draft, prompt: Text(placeholder).foregroundStyle(Color.textTertiary))
                         .textFieldStyle(.plain)
                         .textRole(.label)
@@ -86,7 +86,7 @@ struct TagEditor: View {
                 .frame(height: 22)
                 .background {
                     Capsule().fill(Color.surfaceSunken)
-                        .overlay(Capsule().strokeBorder(focused ? Color.tungsten.opacity(0.6) : Color.hairline,
+                        .overlay(Capsule().strokeBorder(focused ? Color.tangerine.opacity(0.6) : Color.hairline,
                                                         style: StrokeStyle(lineWidth: 1, dash: focused ? [] : [2, 2])))
                 }
                 .onTapGesture { focused = true }
@@ -150,7 +150,7 @@ struct FlowRow: Layout {
 
 // MARK: - Consent
 
-/// The permission tick: a neutral box that turns mint once ticked, with the statement beside it.
+/// The permission tick: a neutral box that turns matcha once ticked, with the statement beside it.
 struct ConsentCheck: View {
     @Binding var isOn: Bool
     var statement: String
@@ -171,11 +171,11 @@ struct ConsentCheck: View {
             HStack(alignment: .top, spacing: Theme.Space.m) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(isOn ? Color.mint.opacity(0.16) : Color.surfaceSunken)
+                        .fill(isOn ? Color.matcha.opacity(0.16) : Color.surfaceSunken)
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .strokeBorder(isOn ? Color.mint : (isHovered ? Color.textSecondary : Color.textTertiary.opacity(0.8)), lineWidth: 1.5)
+                        .strokeBorder(isOn ? Color.matcha : (isHovered ? Color.textSecondary : Color.textTertiary.opacity(0.8)), lineWidth: 1.5)
                     if isOn {
-                        Image(systemName: "checkmark").font(.system(size: 11, weight: .heavy)).foregroundStyle(Color.mint)
+                        Image(systemName: "checkmark").font(.system(size: 11, weight: .heavy)).foregroundStyle(Color.matchaInk)
                             .transition(.scale.combined(with: .opacity))
                     }
                 }

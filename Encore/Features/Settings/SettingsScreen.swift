@@ -24,6 +24,7 @@ struct SettingsScreen: View {
                 HuggingFaceSection()
                 MemorySection()
                 OutputSection(ffmpegFound: model.ffmpeg != nil || !model.ffmpegChecked)
+                AppIconSection()
                 PronunciationsSection()
                 StorageSection(model: model)
                 AdvancedSection(model: model)
@@ -254,7 +255,7 @@ private struct HuggingFaceSection: View {
                 if saveFailed {
                     Text(account.status == .invalidToken ? "That token was rejected. Nothing was saved."
                                                          : "Couldn't check that token. Nothing was saved.")
-                        .textRole(.caption, color: .velvetText)
+                        .textRole(.caption, color: .cherryInk)
                 }
                 Spacer()
                 LinkButton(title: "Create a token", url: Self.tokensURL)
@@ -363,7 +364,7 @@ private struct TokenField: View {
         .frame(height: Theme.ControlHeight.regular)
         .surface(.sunken, radius: Theme.Radius.s)
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s, style: .continuous)
-            .strokeBorder(focused ? Color.tungsten.opacity(0.75) : .clear, lineWidth: 1))
+            .strokeBorder(focused ? Color.tangerine.opacity(0.75) : .clear, lineWidth: 1))
         .onTapGesture { focused = true }
     }
 }
@@ -460,6 +461,62 @@ private struct OutputSection: View {
                             defaultValue: 0.6) { String(format: "%.2f s", $0) }
             }
         }
+    }
+}
+
+// MARK: - App icon
+
+/// Picks the Dock icon: the bubble (the app's own icon) or the candy bars.
+private struct AppIconSection: View {
+    @Environment(AppSettings.self) private var settings
+
+    var body: some View {
+        SettingsSection(title: "App icon", subtitle: "Your pick stays in the Dock, even after Encore quits. Finder keeps the bubble.") {
+            HStack(spacing: Theme.Space.m) {
+                ForEach(AppSettings.AppIcon.allCases) { icon in
+                    AppIconTile(icon: icon, isSelected: settings.appIcon == icon) {
+                        withStageAnimation(Theme.Motion.standard) { settings.appIcon = icon }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct AppIconTile: View {
+    let icon: AppSettings.AppIcon
+    let isSelected: Bool
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: Theme.Space.s) {
+                Image(nsImage: AppIconSwitcher.image(for: icon))
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 72, height: 72)
+                    .rotationEffect(.degrees(isHovered && !isSelected ? -4 : 0))
+                    .scaleEffect(isHovered && !isSelected ? 1.05 : 1)
+                Text(AppIconSwitcher.name(icon))
+                    .textRole(isSelected ? .headline : .label, color: isSelected ? .textPrimary : .textSecondary)
+            }
+            .padding(.horizontal, Theme.Space.m)
+            .padding(.top, Theme.Space.s)
+            .padding(.bottom, Theme.Space.m)
+            .background {
+                let shape = RoundedRectangle(cornerRadius: Theme.Radius.l, style: .continuous)
+                shape.fill(isSelected ? Color.surfaceRaised : (isHovered ? Color.textPrimary.opacity(0.04) : .clear))
+                    .overlay(shape.inset(by: isSelected ? 1 : 0.5)
+                        .stroke(isSelected ? Color.tangerine : Color.hairline, lineWidth: isSelected ? 2 : 1))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .stageAnimation(Theme.Motion.quick, value: isHovered)
+        .accessibilityLabel("\(AppIconSwitcher.name(icon)) icon")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

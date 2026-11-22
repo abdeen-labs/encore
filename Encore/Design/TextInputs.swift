@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shared chrome for text inputs: a sunken well that lights a tungsten hairline on focus.
+/// Shared chrome for text inputs: a sunken well that gets a soft tangerine ring on focus.
 private struct InputWell: ViewModifier {
     var isFocused: Bool
     var isHovered: Bool
@@ -11,7 +11,13 @@ private struct InputWell: ViewModifier {
             .surface(.sunken, radius: radius)
             .overlay {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(isFocused ? Color.tungsten.opacity(0.75) : (isHovered ? .hairlineStrong : .clear), lineWidth: 1)
+                    .strokeBorder(isFocused ? Color.tangerine.opacity(0.85) : (isHovered ? .hairlineStrong : .clear), lineWidth: isFocused ? 2 : 1)
+            }
+            .background {
+                // A soft halo outside the ring while focused.
+                RoundedRectangle(cornerRadius: radius + 3, style: .continuous)
+                    .fill(Color.tangerine.opacity(isFocused ? 0.16 : 0))
+                    .padding(-3)
             }
             .stageAnimation(Theme.Motion.quick, value: isFocused)
     }
@@ -48,7 +54,7 @@ struct StageTextField: View {
             HStack(spacing: Theme.Space.s) {
                 if let symbol {
                     Image(systemName: symbol).font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(isFocused ? Color.tungsten : .textTertiary)
+                        .foregroundStyle(isFocused ? Color.tangerineInk : .textTertiary)
                 }
                 TextField(placeholder, text: $text, prompt: Text(placeholder).foregroundStyle(Color.textTertiary))
                     .textFieldStyle(.plain)
@@ -57,7 +63,7 @@ struct StageTextField: View {
                     .focused($isFocused)
                     .onSubmit { onSubmit?() }
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .frame(height: Theme.ControlHeight.regular)
             .modifier(InputWell(isFocused: isFocused, isHovered: isHovered))
             .onHover { isHovered = $0 }
@@ -82,7 +88,7 @@ struct SearchField: View {
         HStack(spacing: 7) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(isFocused ? Color.tungsten : .textTertiary)
+                .foregroundStyle(isFocused ? Color.tangerineInk : .textTertiary)
             TextField(prompt, text: $text, prompt: Text(prompt).foregroundStyle(Color.textTertiary))
                 .textFieldStyle(.plain)
                 .font(TextRole.body.font)
@@ -98,7 +104,7 @@ struct SearchField: View {
                     .transition(.opacity)
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
         .frame(height: Theme.ControlHeight.regular)
         .modifier(InputWell(isFocused: isFocused, isHovered: isHovered, radius: Theme.ControlHeight.regular / 2))
         .onHover { isHovered = $0 }
@@ -144,7 +150,7 @@ struct ScriptEditor: View {
                     .contentMargins(.horizontal, 12, for: .scrollContent)
                     .contentMargins(.vertical, 12, for: .scrollContent)
                     .focused($isFocused)
-                    .tint(.tungsten)
+                    .tint(.tangerine)
                 if text.isEmpty {
                     Text(placeholder)
                         .textRole(.script, color: .textTertiary)

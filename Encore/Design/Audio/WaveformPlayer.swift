@@ -124,10 +124,10 @@ struct WaveformPlayer: View {
             }
             HStack {
                 Text(Timecode.string(scrubTime ?? track.currentTime))
-                    .textRole(.monoSmall, color: track.isPlaying ? .tungsten : (track.hasPosition ? .textSecondary : .textTertiary))
+                    .textRole(.monoSmall, color: track.isPlaying ? .tangerineInk : (track.hasPosition ? .textSecondary : .textTertiary))
                 Spacer()
                 if let message = track.loadError ?? track.loader.errorMessage {
-                    Text(message).textRole(.caption, color: .velvetText).lineLimit(1)
+                    Text(message).textRole(.caption, color: .cherryInk).lineLimit(1)
                     Spacer()
                 }
                 Text(track.duration > 0 ? Timecode.string(track.duration) : "–:––").textRole(.monoSmall, color: .textTertiary)
@@ -145,7 +145,7 @@ struct WaveformPlayer: View {
                 .onDrag { AudioExportActions.dragProvider(for: track.source, suggestedName: track.title) }
             let shown = track.hasPosition || scrubTime != nil
             Text(Timecode.string(shown ? (scrubTime ?? track.currentTime) : track.duration, tenths: false))
-                .textRole(.monoSmall, color: track.isPlaying ? .tungsten : (shown ? .textPrimary : .textSecondary))
+                .textRole(.monoSmall, color: track.isPlaying ? .tangerineInk : (shown ? .textPrimary : .textSecondary))
                 .frame(minWidth: 38, alignment: .trailing)
             if let accessory { accessory }
             AudioExportMenu(source: track.source, suggestedName: track.title, symbol: "ellipsis")
@@ -163,7 +163,7 @@ struct WaveformPlayer: View {
             let shown = track.hasPosition || track.isPlaying
             let total = track.duration > 0 ? Timecode.string(track.duration, tenths: false) : "–:––"
             Text(verbatim: shown ? "\(Timecode.string(track.currentTime, tenths: false)) / \(total)" : total)
-                .textRole(.monoSmall, color: track.isPlaying ? .tungsten : (shown ? .textPrimary : .textSecondary))
+                .textRole(.monoSmall, color: track.isPlaying ? .tangerineInk : (shown ? .textPrimary : .textSecondary))
                 .monospacedDigit()
                 .lineLimit(1)
                 .fixedSize()

@@ -205,7 +205,7 @@ struct ComponentGallery: View {
     private var typeSamples: some View {
         Card {
             Text("Marquee — Encore").textRole(.marquee)
-            Text("Title — The stage is set").textRole(.title)
+            Text("Title — Well, hello there").textRole(.title)
             Text("Heading — Captain").textRole(.heading)
             Text("Section — Variants").textRole(.section)
             Text("Headline — Captain, take three").textRole(.headline)
@@ -228,20 +228,40 @@ struct ComponentGallery: View {
     }
 
     private var swatches: some View {
-        let colors: [(String, Color)] = [
-            ("backdrop", .backdrop), ("rail", .rail), ("surface", .surface), ("raised", .surfaceRaised),
-            ("sunken", .surfaceSunken), ("text", .textPrimary), ("text 2", .textSecondary), ("text 3", .textTertiary),
-            ("tungsten", .tungsten), ("velvet", .velvet), ("velvet text", .velvetText), ("mint", .mint),
-            ("footlight", .footlight), ("gel", .gel),
+        let grounds: [(String, Color)] = [
+            ("cream", .backdrop), ("stage", .stage), ("surface", .surface), ("raised", .surfaceRaised),
+            ("sunken", .surfaceSunken), ("cocoa", .textPrimary), ("text 2", .textSecondary), ("text 3", .textTertiary),
         ]
-        return HStack(spacing: Theme.Space.s) {
-            ForEach(colors, id: \.0) { name, color in
-                VStack(alignment: .leading, spacing: 6) {
-                    RoundedRectangle(cornerRadius: Theme.Radius.s)
-                        .fill(color)
-                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.s).strokeBorder(Color.hairline))
-                        .frame(height: 38)
-                    Text(name).textRole(.monoSmall, color: .textTertiary).lineLimit(1)
+        let flavors: [(String, Color, Color)] = [
+            ("tangerine", .tangerine, .tangerineInk), ("peach", .peach, .tangerineInk), ("matcha", .matcha, .matchaInk),
+            ("honey", .honey, .honeyInk), ("cherry", .cherry, .cherryInk), ("lilac", .lilac, .lilacInk),
+        ]
+        return VStack(alignment: .leading, spacing: Theme.Space.m) {
+            HStack(spacing: Theme.Space.s) {
+                ForEach(grounds, id: \.0) { name, color in
+                    VStack(alignment: .leading, spacing: 6) {
+                        RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
+                            .fill(color)
+                            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous).strokeBorder(Color.hairline))
+                            .frame(height: 40)
+                        Text(name).textRole(.monoSmall, color: .textTertiary).lineLimit(1)
+                    }
+                }
+            }
+            HStack(spacing: Theme.Space.s) {
+                ForEach(flavors, id: \.0) { name, fill, ink in
+                    VStack(alignment: .leading, spacing: 6) {
+                        RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
+                            .fill(fill)
+                            .frame(height: 40)
+                            .overlay(alignment: .bottomLeading) {
+                                Text("Aa").textRole(.headline, color: ink)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.surface))
+                                    .padding(5)
+                            }
+                        Text(name).textRole(.monoSmall, color: ink).lineLimit(1)
+                    }
                 }
             }
         }

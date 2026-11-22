@@ -2,7 +2,7 @@ import EncoreCore
 import SwiftUI
 
 /// One voice as a card: the name in the display face, one caption line (origin icon, origin, language, length),
-/// up to three tags, and the reference clip on a compact player. A tungsten border while it is open in the
+/// up to three tags, and the reference clip on a compact player. A tangerine border while it is open in the
 /// inspector or checked for a batch action.
 struct VoiceCard: View {
     let voice: Voice
@@ -32,7 +32,7 @@ struct VoiceCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { shape.fill(Color.surface) }
         .overlay {
-            shape.strokeBorder(isFocused || isSelected ? Color.tungsten.opacity(isFocused ? 0.85 : 0.55)
+            shape.strokeBorder(isFocused || isSelected ? Color.tangerine.opacity(isFocused ? 0.85 : 0.55)
                                : (isHovered ? Color.hairlineStrong : Color.hairline), lineWidth: isFocused ? 1.5 : 1)
         }
         .overlay(alignment: .topTrailing) { check.padding(Theme.Space.xs) }
@@ -94,10 +94,10 @@ struct VoiceCard: View {
     private var check: some View {
         Button(action: onToggle) {
             ZStack {
-                Circle().fill(isSelected ? Color.tungsten : Color.surfaceSunken.opacity(0.9))
-                Circle().strokeBorder(isSelected ? Color.tungsten : Color.textTertiary.opacity(0.7), lineWidth: 1.2)
+                Circle().fill(isSelected ? Color.tangerine : Color.surfaceSunken.opacity(0.9))
+                Circle().strokeBorder(isSelected ? Color.tangerine : Color.textTertiary.opacity(0.7), lineWidth: 1.2)
                 if isSelected {
-                    Image(systemName: "checkmark").font(.system(size: 8.5, weight: .heavy)).foregroundStyle(Color.onTungsten)
+                    Image(systemName: "checkmark").font(.system(size: 8.5, weight: .heavy)).foregroundStyle(Color.onTangerine)
                 }
             }
             .frame(width: 18, height: 18)

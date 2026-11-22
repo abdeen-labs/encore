@@ -133,7 +133,7 @@ struct TrackCue: Identifiable, Hashable {
     var id: Int
     var start: TimeInterval
     var end: TimeInterval
-    var tint: Color = .tungsten
+    var tint: Color = .tangerine
 }
 
 /// A track's waveform with playhead and click/drag scrubbing. `WaveformPlayer` draws its waveform with this;
@@ -141,7 +141,7 @@ struct TrackCue: Identifiable, Hashable {
 struct TrackWaveform: View {
     let track: PlaybackTrack
     var height: CGFloat = 54
-    var tint: Color = .tungsten
+    var tint: Color = .tangerine
     var barWidth: CGFloat = 2.5
     var gap: CGFloat = 1.5
     /// Show the playhead even before anything has played (e.g. the lane that follows another).

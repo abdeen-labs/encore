@@ -85,7 +85,7 @@ struct PlayerDockBar: View {
                 if isIdle {
                     Hairline().frame(maxHeight: .infinity)
                 } else {
-                    PeaksWaveform(peaks: peaks, played: shownTime, tint: .tungsten, gain: gain,
+                    PeaksWaveform(peaks: peaks, played: shownTime, tint: .tangerine, gain: gain,
                                   barWidth: 1.5, gap: 1.5, duration: duration > 0 ? duration : nil)
                     Playhead().offset(x: min(geo.size.width - 1.5, geo.size.width * shownTime / d))
                 }

@@ -339,13 +339,13 @@ private struct HistoryRow: View {
         .frame(minHeight: 48)
         .background {
             let shape = RoundedRectangle(cornerRadius: Theme.Radius.m, style: .continuous)
-            shape.fill(isFocused || isSelected ? Color.tungsten.opacity(0.07) : Color.textPrimary.opacity(isHovered ? 0.03 : 0))
+            shape.fill(isFocused || isSelected ? Color.tangerine.opacity(0.07) : Color.textPrimary.opacity(isHovered ? 0.03 : 0))
                 .overlay(alignment: .leading) {
                     if isFocused {
-                        Capsule().fill(Color.tungsten).frame(width: 2.5).padding(.vertical, 8)
+                        Capsule().fill(Color.tangerine).frame(width: 2.5).padding(.vertical, 8)
                     }
                 }
-                .overlay(shape.strokeBorder(isSelected ? Color.tungsten.opacity(0.35) : .clear, lineWidth: 1))
+                .overlay(shape.strokeBorder(isSelected ? Color.tangerine.opacity(0.35) : .clear, lineWidth: 1))
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -364,7 +364,7 @@ private struct HistoryRow: View {
     private var checkmark: some View {
         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
             .font(.system(size: 14, weight: .regular))
-            .foregroundStyle(isSelected ? Color.tungsten : Color.textTertiary)
+            .foregroundStyle(isSelected ? Color.tangerineInk : Color.textTertiary)
             .frame(width: 14)
     }
 
@@ -675,7 +675,7 @@ private struct HistoryEmptyStage: View {
 
     var body: some View {
         VStack {
-            EmptyState(symbol: "clock.arrow.circlepath", title: "Nothing in the archive yet",
+            EmptyState(symbol: "clock.arrow.circlepath", title: "Your takes will live here",
                        message: "Every take, conversation, voice change, kept design and transcript lands here, newest first, and stays on this Mac.") {
                 Button("Perform in the Studio", systemImage: "text.bubble") { router.go(.studio) }
                     .buttonStyle(.primary)

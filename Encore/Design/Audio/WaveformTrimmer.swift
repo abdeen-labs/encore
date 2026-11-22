@@ -75,7 +75,7 @@ struct WaveformTrimmer: View {
         if length > target.upperBound + 0.05 { return .tooLong }
         return .good
     }
-    private var tone: Color { verdict == .good ? .mint : .footlight }
+    private var tone: Color { verdict == .good ? .matcha : .honey }
     /// The file is already a usable length on its own: offer to take all of it.
     private var offersWholeFile: Bool {
         guard let wholeFileRange, duration > 0 else { return false }
@@ -152,7 +152,7 @@ struct WaveformTrimmer: View {
             Spacer(minLength: Theme.Space.l)
             VStack(alignment: .trailing, spacing: 4) {
                 Text(Timecode.seconds(length))
-                    .textRole(.readout, color: tone)
+                    .textRole(.readout, color: verdict == .good ? Color.matchaInk : .honeyInk)
                     .contentTransition(.numericText())
                 StatusBadge(badgeText, tone: verdict == .good ? .success : .warning)
             }
@@ -185,7 +185,7 @@ struct WaveformTrimmer: View {
         case .tooLong: "Drag the handles in to keep the best \(lo) to \(hi) seconds."
         case .recordingTooShort: "Under \(lo) seconds. It may work, but \(lo) to \(hi) seconds clones better."
         }
-        return Text(text).textRole(.caption, color: verdict == .good ? .textSecondary : .footlight.opacity(0.9))
+        return Text(text).textRole(.caption, color: verdict == .good ? .textSecondary : .honeyInk)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -293,7 +293,7 @@ struct WaveformTrimmer: View {
                 .overlay {
                     VStack(spacing: 2.5) {
                         ForEach(0..<3, id: \.self) { _ in
-                            Capsule().fill(Color.onTungsten.opacity(0.55)).frame(width: 4, height: 1.2)
+                            Capsule().fill(Color.onTangerine.opacity(0.55)).frame(width: 4, height: 1.2)
                         }
                     }
                 }

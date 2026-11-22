@@ -47,8 +47,8 @@ import SwiftUI
 }
 
 /// The script editor with live tag highlighting in two styles: pause and expressive tags as quiet markup (mono,
-/// secondary text, a faint raised background), voice cues (`[voice: Name]`) in gel. Anything tag-shaped the model
-/// won't understand keeps the footlight underline, and the planner's issues are underlined too.
+/// secondary text, a faint raised background), voice cues (`[voice: Name]`) in lilac. Anything tag-shaped the model
+/// won't understand keeps the honey underline, and the planner's issues are underlined too.
 /// Highlighting comes from a `ParsedScript` the caller already has (e.g. `ScriptPlan.parsed`), so the editor
 /// shows exactly what will be performed.
 ///
@@ -83,7 +83,7 @@ struct TaggedScriptEditor: View {
 }
 
 /// How tags look in a script. Two styles: markup (pause, expressive and unrecognized tags: secondary text on a
-/// faint raised background) and voice cues (gel). An unrecognized tag adds `problemColor` as an underline.
+/// faint raised background) and voice cues (lilac). An unrecognized tag adds `problemColor` as an underline.
 ///
 ///     a[r].foregroundColor = ScriptTagStyle.color(tag.kind)
 ///     a[r].backgroundColor = ScriptTagStyle.background(tag.kind)
@@ -91,7 +91,7 @@ enum ScriptTagStyle {
     /// The tag's text color.
     static func color(_ kind: ScriptTagKind) -> Color {
         switch kind {
-        case .voice: .gel
+        case .voice: .lilacInk
         case .pause, .expressive, .unrecognized: .textSecondary
         }
     }
@@ -99,13 +99,13 @@ enum ScriptTagStyle {
     /// The faint fill behind the tag.
     static func background(_ kind: ScriptTagKind) -> Color {
         switch kind {
-        case .voice: Color.gel.opacity(0.11)
+        case .voice: Color.lilac.opacity(0.11)
         case .pause, .expressive, .unrecognized: .surfaceRaised
         }
     }
 
     /// The underline under a tag the model won't understand.
-    static var problemColor: Color { .footlight }
+    static var problemColor: Color { .honeyInk }
 }
 
 private struct ScriptTextViewRepresentable: NSViewRepresentable {
@@ -147,8 +147,8 @@ private struct ScriptTextViewRepresentable: NSViewRepresentable {
         tv.isAutomaticSpellingCorrectionEnabled = false
         tv.isContinuousSpellCheckingEnabled = true
         tv.drawsBackground = false
-        tv.insertionPointColor = NSColor(Color.tungsten)
-        tv.selectedTextAttributes = [.backgroundColor: NSColor(Color.tungsten.opacity(0.28))]
+        tv.insertionPointColor = NSColor(Color.tangerine)
+        tv.selectedTextAttributes = [.backgroundColor: NSColor(Color.tangerine.opacity(0.28))]
         tv.typingAttributes = context.coordinator.baseAttributes(fontSize)
         tv.delegate = context.coordinator
         tv.string = text
@@ -202,7 +202,7 @@ private struct ScriptTextViewRepresentable: NSViewRepresentable {
                 storage.addAttributes(attrs, range: tag.utf16Range)
             }
             for issue in parsed.issues where issue.severity != .info && NSMaxRange(issue.utf16Range) <= length {
-                let color = NSColor(issue.severity == .error ? Color.velvetText : Color.footlight)
+                let color = NSColor(issue.severity == .error ? Color.cherryInk : Color.honeyInk)
                 storage.addAttributes([.underlineStyle: NSUnderlineStyle.thick.rawValue, .underlineColor: color,
                                        .toolTip: issue.message], range: issue.utf16Range)
             }
@@ -227,7 +227,7 @@ private struct ScriptTextViewRepresentable: NSViewRepresentable {
             let paragraph = NSMutableParagraphStyle()
             paragraph.lineSpacing = 6
             paragraph.paragraphSpacing = 2
-            let font = NSFont(name: "AvenirNext-Regular", size: size) ?? .systemFont(ofSize: size)
+            let font = NSFont.allo(size)
             return [.font: font, .foregroundColor: NSColor(Color.textPrimary), .paragraphStyle: paragraph]
         }
 

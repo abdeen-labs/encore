@@ -5,7 +5,7 @@ import SwiftUI
 /// A small tag. Static, selectable (bind `isSelected`) or removable (pass `onRemove`).
 ///
 /// Neutral chips are quiet. `.accent` draws exactly like neutral (amber is not a category color); warning,
-/// danger and success keep a tint. A selected chip (bound `isSelected`) is lit tungsten: it says where you are.
+/// danger and success keep a tint. A selected chip (bound `isSelected`) turns peach: it says where you are.
 ///
 ///     Chip("English")
 ///     Chip("Warm", isSelected: $warm)
@@ -33,19 +33,19 @@ struct Chip: View {
     private var shownTone: Tone { tone == .accent ? .neutral : tone }
 
     private var foreground: Color {
-        if selected { return .tungsten }
+        if selected { return .tangerineInk }
         return shownTone == .neutral ? .textSecondary : shownTone.textColor
     }
 
     private var fillColor: Color {
-        if selected { return Color.tungsten.opacity(0.14) }
-        return shownTone == .neutral ? .surfaceRaised : shownTone.color.opacity(0.1)
+        if selected { return .peachLight }
+        return shownTone == .neutral ? .surfaceRaised : shownTone.color.opacity(0.14)
     }
 
     private var borderColor: Color {
-        if selected { return Color.tungsten.opacity(0.55) }
+        if selected { return Color.tangerine.opacity(0.6) }
         if isHovered && isSelected != nil { return .hairlineStrong }
-        return shownTone == .neutral ? .clear : shownTone.color.opacity(0.25)
+        return shownTone == .neutral ? .hairline : shownTone.color.opacity(0.35)
     }
 
     var body: some View {
@@ -62,16 +62,18 @@ struct Chip: View {
             }
         }
         .foregroundStyle(foreground)
-        .padding(.leading, 9)
-        .padding(.trailing, onRemove == nil ? 9 : 7)
-        .frame(height: 22)
+        .padding(.leading, 10)
+        .padding(.trailing, onRemove == nil ? 10 : 8)
+        .frame(height: 24)
         .background {
             Capsule()
                 .fill(fillColor)
-                .overlay(Capsule().strokeBorder(borderColor, lineWidth: 1))
+                .overlay(Capsule().inset(by: 0.5).stroke(borderColor, lineWidth: 1))
         }
         .onHover { isHovered = $0 }
+        .scaleEffect(isHovered && isSelected != nil ? 1.04 : 1)
         .stageAnimation(Theme.Motion.quick, value: selected)
+        .stageAnimation(Theme.Motion.quick, value: isHovered)
 
         if let isSelected {
             Button { isSelected.wrappedValue.toggle() } label: { content.contentShape(Capsule()) }
@@ -85,8 +87,8 @@ struct Chip: View {
 
 // MARK: - Status badge
 
-/// A quiet status: a 6pt dot and the text, in sentence case exactly as written, in the tone's text color.
-/// No capsule, no glow. `pulsing` breathes the dot (e.g. while recording or loading); it holds still under
+/// A quiet status: a 7pt dot and the text, in sentence case exactly as written, in the tone's text color.
+/// No capsule. `pulsing` breathes the dot (e.g. while recording or loading); it holds still under
 /// Reduce Motion.
 ///
 ///     StatusBadge("Ready", tone: .success)
@@ -110,7 +112,7 @@ struct StatusBadge: View {
         HStack(spacing: 6) {
             Circle()
                 .fill(tone.color)
-                .frame(width: 6, height: 6)
+                .frame(width: 7, height: 7)
                 .opacity(pulsing && phase ? 0.35 : 1)
             Text(title)
                 .textRole(.label, color: tone.textColor)
@@ -133,12 +135,12 @@ struct StatusBadge: View {
 struct ProgressBar: View {
     var value: Double?
     var tone: Tone = .accent
-    var height: CGFloat = 4
+    var height: CGFloat = 6
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isSnapshotting) private var isSnapshotting
 
-    init(value: Double?, tone: Tone = .accent, height: CGFloat = 4) {
+    init(value: Double?, tone: Tone = .accent, height: CGFloat = 6) {
         self.value = value
         self.tone = tone
         self.height = height
@@ -149,10 +151,10 @@ struct ProgressBar: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.surfaceSunken)
-                    .overlay(Capsule().strokeBorder(Color.hairline, lineWidth: 0.5))
+                    .overlay(Capsule().inset(by: 0.25).stroke(Color.hairline, lineWidth: 0.5))
                 if let value {
                     Capsule()
-                        .fill(LinearGradient(colors: [color.opacity(0.7), color], startPoint: .leading, endPoint: .trailing))
+                        .fill(LinearGradient(colors: [color.opacity(0.75), color], startPoint: .leading, endPoint: .trailing))
                         .frame(width: max(height, geo.size.width * min(max(value, 0), 1)))
                         .stageAnimation(Theme.Motion.standard, value: value)
                 } else if reduceMotion || isSnapshotting {
@@ -180,7 +182,7 @@ struct ProgressBar: View {
 
 // MARK: - Activity indicator
 
-/// An indeterminate "working" indicator drawn as a small bouncing level meter.
+/// An indeterminate "working" indicator: three dots hopping in turn.
 ///
 ///     ActivityIndicator()
 ///     ActivityIndicator(tone: .danger, size: 22)
@@ -200,16 +202,19 @@ struct ActivityIndicator: View {
         let still = reduceMotion || isSnapshotting
         TimelineView(.animation(paused: still)) { context in
             let t = still ? 0.35 : context.date.timeIntervalSinceReferenceDate
+            let dot = size * 0.24
             HStack(alignment: .center, spacing: size * 0.12) {
-                ForEach(0..<4, id: \.self) { i in
-                    let h = 0.3 + 0.7 * abs(sin(t * 4.2 + Double(i) * 0.9))
-                    Capsule()
+                ForEach(0..<3, id: \.self) { i in
+                    let hop = max(0, sin(t * 6 - Double(i) * 0.9))
+                    Circle()
                         .fill(tone.color)
-                        .frame(width: size * 0.14, height: size * h)
+                        .frame(width: dot, height: dot)
+                        .offset(y: -size * 0.28 * hop)
+                        .scaleEffect(1 + 0.12 * hop)
                 }
             }
             .frame(width: size, height: size)
-            .glow(tone.color, radius: 4, intensity: 0.4)
+            .offset(y: size * 0.12)
         }
         .accessibilityElement()
         .accessibilityLabel("Working")
@@ -218,7 +223,7 @@ struct ActivityIndicator: View {
 
 // MARK: - Waveform
 
-/// A mirrored bar waveform. The played portion is lit tungsten. Pass `onSeek` to make it
+/// A mirrored bar waveform. The played portion is tangerine. Pass `onSeek` to make it
 /// scrubbable.
 ///
 ///     Waveform(samples: take.peaks, progress: player.progress)
@@ -228,10 +233,10 @@ struct Waveform: View {
     var samples: [Float]
     /// Played fraction in 0…1.
     var progress: Double = 0
-    var playedColor: Color = .tungsten
+    var playedColor: Color = .tangerine
     var onSeek: ((Double) -> Void)?
 
-    init(samples: [Float], progress: Double = 0, playedColor: Color = .tungsten, onSeek: ((Double) -> Void)? = nil) {
+    init(samples: [Float], progress: Double = 0, playedColor: Color = .tangerine, onSeek: ((Double) -> Void)? = nil) {
         self.samples = samples
         self.progress = progress
         self.playedColor = playedColor
@@ -249,14 +254,14 @@ struct Waveform: View {
                 let x = CGFloat(i) * (barWidth + gap)
                 let h = max(1.5, CGFloat(min(max(s, 0), 1)) * size.height)
                 let rect = CGRect(x: x, y: mid - h / 2, width: barWidth, height: h)
-                let color: Color = x + barWidth / 2 <= playedX ? playedColor : Color.textTertiary.opacity(0.7)
+                let color: Color = x + barWidth / 2 <= playedX ? playedColor : Color.textTertiary.opacity(0.45)
                 ctx.fill(Path(roundedRect: rect, cornerRadius: barWidth / 2), with: .color(color))
             }
         }
         .overlay(alignment: .leading) {
             GeometryReader { geo in
                 if progress > 0 && progress < 1 {
-                    Rectangle().fill(Color.textPrimary).frame(width: 1.5)
+                    Capsule().fill(Color.textPrimary).frame(width: 2)
                         .offset(x: geo.size.width * progress)
                 }
             }
@@ -290,8 +295,8 @@ struct Waveform: View {
 
 // MARK: - Count badge
 
-/// A small count set apart from the label it belongs to: a dim mono numeral in a pill. Neutral unless
-/// `isEmphasized`, which lights it tungsten.
+/// A small count set apart from the label it belongs to: a tabular numeral in a pill. Neutral unless
+/// `isEmphasized`, which turns it peach.
 ///
 ///     HStack { Text("Auditions").textRole(.heading); CountBadge(6) }
 ///     SegmentedControl(selection: $kind, options: kinds, count: { model.count($0) }) { $0.title }
@@ -310,10 +315,10 @@ struct CountBadge: View {
         Text(value.formatted())
             .font(TextRole.monoSmall.font)
             .monospacedDigit()
-            .foregroundStyle(isEmphasized ? Color.tungsten : .textTertiary)
+            .foregroundStyle(isEmphasized ? Color.tangerineInk : .textSecondary)
             .padding(.horizontal, small ? 5 : 6)
             .frame(minWidth: small ? 16 : 18, minHeight: small ? 14 : 16)
-            .background(Capsule().fill(isEmphasized ? Color.tungsten.opacity(0.14) : Color.textPrimary.opacity(0.06)))
+            .background(Capsule().fill(isEmphasized ? Color.peachLight : Color.textPrimary.opacity(0.07)))
             .fixedSize()
             .accessibilityLabel("\(value)")
     }

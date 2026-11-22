@@ -233,7 +233,7 @@ private struct PronunciationRow: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .background(RoundedRectangle(cornerRadius: Theme.Radius.xs).fill(focus == which ? Color.surfaceSunken : .clear))
-            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.xs).strokeBorder(focus == which ? Color.tungsten.opacity(0.6) : .clear, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.xs).strokeBorder(focus == which ? Color.tangerine.opacity(0.6) : .clear, lineWidth: 1))
     }
 
     private func commit() {

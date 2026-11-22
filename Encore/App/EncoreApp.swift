@@ -7,6 +7,7 @@ import SwiftUI
 @main
 enum Main {
     static func main() {
+        AlloFont.register()  // Allo, before anything draws (Design/Typography.swift)
         #if DEBUG
         if StudioHeadless.isRequested { StudioHeadless.run() }  // Features/Studio/StudioHeadless.swift
         if VoiceHeadless.isRequested { VoiceHeadless.run() }  // Clone/Design/Voices proofs: Features/Voices/VoiceHeadless.swift
@@ -49,8 +50,8 @@ struct EncoreApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
-        // One authored theme: the stage after dark.
-        NSApp.appearance = NSAppearance(named: .darkAqua)
+        // One authored theme: fresh cream.
+        NSApp.appearance = NSAppearance(named: .aqua)
     }
 }
 

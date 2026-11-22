@@ -85,7 +85,7 @@ enum SnapshotRunner {
     static func run(_ config: SnapshotConfig) {
         let app = NSApplication.shared
         app.setActivationPolicy(.prohibited)
-        app.appearance = NSAppearance(named: .darkAqua)
+        app.appearance = NSAppearance(named: .aqua)
         let delegate = SnapshotDelegate(config: config)
         self.delegate = delegate
         app.delegate = delegate
@@ -199,7 +199,7 @@ private final class SnapshotDelegate: NSObject, NSApplicationDelegate {
         let root = view
             .environment(\.isSnapshotting, true)
             .environment(\.hidesDebugChrome, CommandLine.arguments.contains("--as-shipped"))
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(.light)
             .frame(width: size.width, height: size.height)
         let hosting = NSHostingView(rootView: root)
         hosting.frame = CGRect(origin: .zero, size: size)
@@ -207,7 +207,7 @@ private final class SnapshotDelegate: NSObject, NSApplicationDelegate {
         let window = NSWindow(contentRect: CGRect(x: -20_000, y: -20_000, width: size.width, height: size.height),
                               styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        window.appearance = NSAppearance(named: .darkAqua)
+        window.appearance = NSAppearance(named: .aqua)
         window.backgroundColor = NSColor(Color.backdrop)
         window.contentView = hosting
         window.orderFrontRegardless()

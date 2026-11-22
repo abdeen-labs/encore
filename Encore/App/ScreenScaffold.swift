@@ -8,7 +8,7 @@ extension EnvironmentValues {
     @Entry var scaffoldScrollAnchor: UnitPoint? = nil
 }
 
-/// The standard screen frame: a one-row header (display-serif title, the tagline on its baseline, trailing
+/// The standard screen frame: a one-row header (round display title, the tagline on its baseline, trailing
 /// actions; about 70pt tall) above scrolling content. The tagline hides, whole, when there's no room for it
 /// beside the actions.
 ///

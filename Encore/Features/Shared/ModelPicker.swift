@@ -264,7 +264,7 @@ struct ModelPickerPanel: View {
                         .padding(.horizontal, 9)
                         .frame(height: 22)
                         .background(Capsule().fill(selected ? Color.surface : .clear))
-                        .overlay(Capsule().strokeBorder(selected ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
+                        .overlay(Capsule().inset(by: 0.5).stroke(selected ? Color.hairlineStrong : Color.hairline, lineWidth: 1))
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)

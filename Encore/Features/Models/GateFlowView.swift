@@ -141,7 +141,7 @@ struct GateFlowView: View {
                 HStack(spacing: 6) {
                     Image(systemName: page.isSecure ? "lock.fill" : "lock.open")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(page.isSecure ? Color.textTertiary : .velvetText)
+                        .foregroundStyle(page.isSecure ? Color.textTertiary : .cherryInk)
                     Text(page.host).textRole(.mono, color: .textSecondary).lineLimit(1)
                     if page.isLoading { ActivityIndicator(size: 11) }
                 }
@@ -164,7 +164,7 @@ struct GateFlowView: View {
             ZStack {
                 HubWebView(page: page)
                 if let popup = page.popup {
-                    Color.black.opacity(0.45)
+                    Color.shadow.opacity(0.22)
                     VStack(spacing: 0) {
                         HStack {
                             Text("Sign-in window").textRole(.label, color: .textSecondary)
