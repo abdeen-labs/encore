@@ -16,8 +16,9 @@ packages, and publishes it.
   `SUPublicEDKey` never changes: copies with it can't verify anything signed with another key.
 - Gatekeeper's side is Apple's: Xcode signs the app with Developer ID, notarizes it, and staples the ticket. The
   DMG around it isn't notarized.
-- Homebrew installs the same DMG through the tap `abdeen-labs/homebrew-tap` once it has `Casks/encore.rb`, which
-  pins the version and the DMG's SHA-256. Until then the script skips the cask.
+- Homebrew installs the same DMG through the tap `abdeen-labs/homebrew-tap`
+  (`brew install --cask abdeen-labs/tap/encore`). `Casks/encore.rb` pins the version and the DMG's SHA-256, and
+  the script moves both on each release. Sparkle updates copies installed this way like any other.
 
 ## What's in the app
 
@@ -66,15 +67,18 @@ dark mode, so they sit on mid-tone capsules that read in both.
    what will ship.
 2. **Version**: raise `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in the Encore target (General ▸
    Identity). The build number must be higher than every published one; Sparkle compares it.
-3. **Commit and push** `main`.
-4. **Archive**: Product ▸ Archive. The first time, macOS asks to let `codesign` use the Developer ID key: Always
+3. **Download link**: the README's "Download for Mac" names the DMG by version
+   (`https://updates.abdeen.industries/encore/Encore-<version>.dmg`); point it at the new one. It works once
+   step 7 has uploaded the DMG.
+4. **Commit and push** `main`.
+5. **Archive**: Product ▸ Archive. The first time, macOS asks to let `codesign` use the Developer ID key: Always
    Allow.
-5. **Export**: in the Organizer, Distribute App ▸ Direct Distribution. Xcode notarizes and staples the app. Put the
+6. **Export**: in the Organizer, Distribute App ▸ Direct Distribution. Xcode notarizes and staples the app. Put the
    exported `Encore.app` at the checkout's root (it's ignored by git).
-6. **Publish**: `scripts/publish-release.sh`. The first release runs with `FIRST_RELEASE=1`, since the feed has
+7. **Publish**: `scripts/publish-release.sh`. The first release runs with `FIRST_RELEASE=1`, since the feed has
    no appcast yet. `UPLOAD=0` stops after making `dist/Encore-<version>.dmg` and the signed `dist/appcast.xml`,
    to look at them first.
-7. **Check**: an installed older release finds the update with Check for Updates…, shows the notes, installs it,
+8. **Check**: an installed older release finds the update with Check for Updates…, shows the notes, installs it,
    and relaunches.
 
 ## What the script checks

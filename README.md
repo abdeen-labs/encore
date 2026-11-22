@@ -10,6 +10,16 @@
 </p>
 
 <p align="center">
+  <a href="https://updates.abdeen.industries/encore/Encore-1.0.dmg"><b>Download for Mac</b></a>
+  &nbsp;&middot;&nbsp;
+  <a href="CHANGELOG.md">What's New</a>
+</p>
+
+<p align="center">
+  Or with Homebrew: <code>brew install --cask abdeen-labs/tap/encore</code>
+</p>
+
+<p align="center">
   <sub>macOS 27 or later · Apple Silicon · Free and open source under the MIT license</sub>
 </p>
 
@@ -118,7 +128,7 @@ Models are stored in the standard Hugging Face cache (`~/.cache/huggingface`), s
 
 ## Build it
 
-There is no download yet; Encore is built from source. You need an Apple Silicon Mac, macOS 27 and Xcode 27.2.
+To build Encore yourself instead of downloading it, you need an Apple Silicon Mac, macOS 27 and Xcode 27.2.
 
 1. Install Apple's Metal Toolchain once (MLX's shaders don't compile without it):
 
