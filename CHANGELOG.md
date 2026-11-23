@@ -14,12 +14,21 @@ the update.
      "## [x.y] - YYYY-MM-DD" heading just below, so the entries fall under it; then repoint the [Unreleased] link
      and add a link for the new version at the bottom. -->
 
+## [1.3] - 2026-11-22
+
+Scripts and AI agents on your Mac can now use Encore, through a local API and an MCP server you turn on in Settings.
+
 ### Added
 
 - A local API, off until you turn it on in Settings. While Encore is open, scripts and AI agents on your Mac can
   make speech, perform scripts, transcribe and change voices with your models and voices. Add Encore to Claude Code
   or another MCP client as an MCP server, or point any app built for OpenAI's speech and transcription API at it.
   Only apps on this Mac can connect, and web pages can't reach it.
+
+### Changed
+
+- A sound tag like `[laugh]` is now flagged as a warning when the chosen model has no sound tags, since the model
+  may read it out loud instead.
 
 ## [1.2] - 2026-11-22
 
@@ -78,7 +87,8 @@ The first release of Encore: local voice AI for Apple Silicon Macs. Everything r
 - Choose from sixteen speech, transcription and voice-changer models, downloaded as you need them.
 - Encore checks for updates and installs them for you.
 
-[Unreleased]: https://github.com/abdeen-labs/encore/compare/v1.2...HEAD
+[Unreleased]: https://github.com/abdeen-labs/encore/compare/v1.3...HEAD
+[1.3]: https://github.com/abdeen-labs/encore/compare/v1.2...v1.3
 [1.2]: https://github.com/abdeen-labs/encore/compare/v1.1...v1.2
 [1.1]: https://github.com/abdeen-labs/encore/compare/v1.0...v1.1
 [1.0]: https://github.com/abdeen-labs/encore/tree/v1.0
