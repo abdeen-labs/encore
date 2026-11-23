@@ -1,6 +1,6 @@
 #!/bin/bash
 # Publishes a release from the Encore.app Xcode exported (Distribute App ▸ Direct Distribution, which notarizes
-# and staples it) to the checkout's root: checks the app and its bundled Python helper, puts the app in a DMG,
+# and staples it) to ~/Developer/exports: checks the app and its bundled Python helper, puts the app in a DMG,
 # adds the DMG to the appcast, signed with Sparkle's key, uploads the DMG and then the appcast to the update bucket,
 # reads both back through updates.abdeen.industries, tags the release, and moves the Homebrew cask to it.
 # docs/RELEASING.md has the whole release.
@@ -39,9 +39,10 @@ fail() {
   exit 1
 }
 
-app="$root/Encore.app"
+exports="$HOME/Developer/exports"
+app="$exports/Encore.app"
 [[ -f "$app/Contents/Info.plist" ]] ||
-  fail "no Encore.app in $root. Export it with Distribute App ▸ Direct Distribution and put it there."
+  fail "no Encore.app in $exports. Export it there with Distribute App ▸ Direct Distribution."
 
 work="$(mktemp -d)"
 mount="$work/mount"

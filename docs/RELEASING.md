@@ -72,8 +72,8 @@ dark mode, so they sit on mid-tone capsules that read in both.
 3. **Commit and push** `main`.
 4. **Archive**: Product ▸ Archive. The first time, macOS asks to let `codesign` use the Developer ID key: Always
    Allow.
-5. **Export**: in the Organizer, Distribute App ▸ Direct Distribution. Xcode notarizes and staples the app. Put the
-   exported `Encore.app` at the checkout's root (it's ignored by git).
+5. **Export**: in the Organizer, Distribute App ▸ Direct Distribution. Xcode notarizes and staples the app. Export
+   `Encore.app` to `~/Developer/exports`.
 6. **Publish**: `scripts/publish-release.sh`. The first release runs with `FIRST_RELEASE=1`, since the feed has
    no appcast yet. `UPLOAD=0` stops after making `dist/Encore-<version>.dmg` and the signed `dist/appcast.xml`,
    to look at them first.
