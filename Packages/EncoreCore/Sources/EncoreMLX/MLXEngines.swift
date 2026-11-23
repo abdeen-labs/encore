@@ -156,7 +156,13 @@ final class VoxCPM2Engine: MLXSpeechEngine {
 
 final class OmniVoiceEngine: MLXSpeechEngine {
     let model: OmniVoiceModel
-    init(_ model: OmniVoiceModel) { self.model = model }
+    init(_ model: OmniVoiceModel) {
+        // Without this, sound tags such as [sigh] are read out as words.
+        if let tokenizer = model.tokenizer, !(tokenizer is OmniVoiceTagTokenizer) {
+            model.tokenizer = OmniVoiceTagTokenizer(base: tokenizer)
+        }
+        self.model = model
+    }
     var sampleRate: Int { model.sampleRate }
 
     func synthesize(_ job: SynthesisJob, reference: MaterializedArray?, parameters: ResolvedParameters) async throws -> MLXArray {

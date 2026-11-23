@@ -16,6 +16,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/Neywa-Labs/mlx-audio-swift.git", from: "0.2.1"),
+        .package(url: "https://github.com/huggingface/swift-transformers.git", from: "1.4.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.12.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.1"),
     ],
@@ -34,6 +35,7 @@ let package = Package(
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
             ]
         ),
         .target(

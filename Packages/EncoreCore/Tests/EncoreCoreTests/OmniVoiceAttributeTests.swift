@@ -21,4 +21,22 @@ import Testing
         await #expect(throws: ServiceError.self) { _ = try await collect(w.service.designVoice(r)) }
         #expect(backend.synthCalls.isEmpty)
     }
+
+    @Test func soundTagsAreCutOutOfTheText() {
+        let text = "<|text_start|>a brief update. [sigh]\nThe fan [laughter].[Sigh] [sniff]<|text_end|>"
+        let segments = OmniVoiceTags.segments(text).map(String.init)
+        #expect(segments == ["<|text_start|>a brief update. ", "[sigh]", "\nThe fan ", "[laughter]",
+                             ".[Sigh] [sniff]<|text_end|>"])
+        #expect(segments.joined() == text)
+        #expect(OmniVoiceTags.segments("[sigh][laughter]").map(String.init) == ["[sigh]", "[laughter]"])
+        #expect(OmniVoiceTags.segments("No tags here.").map(String.init) == ["No tags here."])
+        #expect(OmniVoiceTags.segments("").isEmpty)
+    }
+
+    @Test func everyOmniVoiceManifestTagIsCutOut() throws {
+        let manifest = try #require(ModelCatalog.bundled().catalog.models.first { $0.engine == "omnivoice" })
+        for tag in manifest.expressiveTags.map(\.tag) {
+            #expect(OmniVoiceTags.all.contains(tag), "\(tag) would be tokenized with the words around it")
+        }
+    }
 }
