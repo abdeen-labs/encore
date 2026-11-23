@@ -79,7 +79,8 @@ final class LocalAPIController {
             _ = settings.localAPIEnabled
             _ = settings.localAPIPort
         } onChange: { [weak self] in
-            Task { @MainActor in
+            // Copy the weak reference into the task; capturing the closure's own `self` var isn't safe across threads.
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.apply()
                 self.observeSettings()
