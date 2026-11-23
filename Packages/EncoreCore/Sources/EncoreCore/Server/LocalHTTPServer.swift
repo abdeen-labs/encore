@@ -48,7 +48,12 @@ public final class LocalHTTPServer: @unchecked Sendable {
         do { listener = try NWListener(using: parameters) } catch { throw Self.startError(error, port: requestedPort) }
 
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            queue.async {
+            // Weak throughout: the listener's handlers live on the listener, which this server holds.
+            queue.async { [weak self] in
+                guard let self else {
+                    continuation.resume(throwing: StartError.failed("It was stopped."))
+                    return
+                }
                 var resumed = false
                 let finish = { (result: Result<Void, Error>) in
                     guard !resumed else { return }
