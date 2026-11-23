@@ -94,7 +94,7 @@ struct FeatureFixture {
                            sheet: { _, _ in AnyView(RootView().environment(\.forcesShortcutHints, true)) }),
             FeatureFixture(name: "Rail-ShortcutHints-Min", section: .studio, size: minimum, prepare: { _ in Overrides() },
                            sheet: { _, _ in AnyView(RootView().environment(\.forcesShortcutHints, true)) }),
-        ] + HistoryFixtures.all + VoiceFixtures.inspectorFixtures + ResetFixtures.all  // Features/History/HistoryFixtures.swift, Features/Voices/VoiceFixtures.swift, Features/Settings/ResetFixtures.swift
+        ] + HistoryFixtures.all + VoiceFixtures.inspectorFixtures + ResetFixtures.all + LocalAPIFixtures.all  // Features/History/HistoryFixtures.swift, Features/Voices/VoiceFixtures.swift, Features/Settings/ResetFixtures.swift
     }
 
     // MARK: Data

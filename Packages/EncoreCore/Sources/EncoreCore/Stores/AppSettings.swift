@@ -46,6 +46,11 @@ public final class AppSettings {
         /// Feature → last model id used for it.
         public var lastUsedModels: [Feature: String] = [:]
         public var appIcon: AppIcon = .bubble
+        /// Serve the local API and MCP server on 127.0.0.1 while the app is open.
+        public var localAPIEnabled: Bool = false
+        public var localAPIPort: Int = Values.defaultLocalAPIPort
+
+        public static let defaultLocalAPIPort = 7171
 
         public init() {}
 
@@ -62,6 +67,8 @@ public final class AppSettings {
             let last = (try? c.decodeIfPresent([String: String].self, forKey: .lastUsedModels)) ?? [:]
             lastUsedModels = Dictionary(uniqueKeysWithValues: last.compactMap { k, v in Feature(rawValue: k).map { ($0, v) } })
             appIcon = (try? c.decodeIfPresent(AppIcon.self, forKey: .appIcon)) ?? d.appIcon
+            localAPIEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .localAPIEnabled)) ?? d.localAPIEnabled
+            localAPIPort = (try? c.decodeIfPresent(Int.self, forKey: .localAPIPort)).flatMap { $0 } ?? d.localAPIPort
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -73,10 +80,13 @@ public final class AppSettings {
             try c.encode(preferredRuntimes.mapValues(\.rawValue), forKey: .preferredRuntimes)
             try c.encode(Dictionary(uniqueKeysWithValues: lastUsedModels.map { ($0.key.rawValue, $0.value) }), forKey: .lastUsedModels)
             try c.encode(appIcon, forKey: .appIcon)
+            try c.encode(localAPIEnabled, forKey: .localAPIEnabled)
+            try c.encode(localAPIPort, forKey: .localAPIPort)
         }
 
         enum CodingKeys: String, CodingKey {
             case idleUnloadMinutes, defaultExportFormat, ffmpegPath, postProcessing, preferredRuntimes, lastUsedModels, appIcon
+            case localAPIEnabled, localAPIPort
         }
 
         public static let defaults = Values()
@@ -93,6 +103,13 @@ public final class AppSettings {
     public var preferredRuntimes: [String: RuntimePreference] { didSet { save() } }
     public var lastUsedModels: [Feature: String] { didSet { save() } }
     public var appIcon: AppIcon { didSet { save() } }
+    public var localAPIEnabled: Bool { didSet { save() } }
+    /// 1024…65535; anything else is put back to the default.
+    public var localAPIPort: Int {
+        didSet {
+            if !(1024...65535).contains(localAPIPort) { localAPIPort = Values.defaultLocalAPIPort } else { save() }
+        }
+    }
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored public nonisolated let key: String
@@ -112,6 +129,8 @@ public final class AppSettings {
         preferredRuntimes = v.preferredRuntimes
         lastUsedModels = v.lastUsedModels
         appIcon = v.appIcon
+        localAPIEnabled = v.localAPIEnabled
+        localAPIPort = (1024...65535).contains(v.localAPIPort) ? v.localAPIPort : Values.defaultLocalAPIPort
         current.withLock { $0 = v }
         mirrorFFmpegPath()
     }
@@ -133,6 +152,8 @@ public final class AppSettings {
         v.preferredRuntimes = preferredRuntimes.filter { $0.value != .automatic }
         v.lastUsedModels = lastUsedModels
         v.appIcon = appIcon
+        v.localAPIEnabled = localAPIEnabled
+        v.localAPIPort = localAPIPort
         return v
     }
 
@@ -147,6 +168,7 @@ public final class AppSettings {
         idleUnloadMinutes = d.idleUnloadMinutes; defaultExportFormat = d.defaultExportFormat; ffmpegPath = d.ffmpegPath
         postProcessing = d.postProcessing; preferredRuntimes = d.preferredRuntimes; lastUsedModels = d.lastUsedModels
         appIcon = d.appIcon
+        localAPIEnabled = d.localAPIEnabled; localAPIPort = d.localAPIPort
     }
 
     private func save() {

@@ -14,6 +14,13 @@ the update.
      "## [x.y] - YYYY-MM-DD" heading just below, so the entries fall under it; then repoint the [Unreleased] link
      and add a link for the new version at the bottom. -->
 
+### Added
+
+- A local API, off until you turn it on in Settings. While Encore is open, scripts and AI agents on your Mac can
+  make speech, perform scripts, transcribe and change voices with your models and voices. Add Encore to Claude Code
+  or another MCP client as an MCP server, or point any app built for OpenAI's speech and transcription API at it.
+  Only apps on this Mac can connect, and web pages can't reach it.
+
 ## [1.2] - 2026-11-22
 
 A whole new look: cream, cocoa and tangerine, set in the round, friendly Allo typeface, with an app icon you can pick.

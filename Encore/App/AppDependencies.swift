@@ -25,6 +25,8 @@ import SwiftUI
     let downloads: ModelDownloadCenter
     let runtimeStatus: RuntimeStatus
     let service: EncoreService
+    /// The local API and MCP server (Settings → Local API). Never listens in snapshots or isolated runs.
+    let localAPI: LocalAPIController
     /// Things that went wrong while starting (a damaged history database, manifests that didn't decode), for the UI to show.
     let startupProblems: [String]
     /// Where screens keep drafts that survive relaunch (`.standard` in the app; nil in snapshots).
@@ -97,6 +99,7 @@ import SwiftUI
         service = EncoreService(catalog: catalog, history: database, voices: voices, pronunciations: pronunciations,
                                 settings: settings, hub: hubStore, backends: backends, runtime: runtime,
                                 scratchDirectory: locations.scratch)
+        localAPI = LocalAPIController(service: service, settings: settings, isLive: !isolated)
         startupProblems = problems
         appDataReset = AppDataReset(history: database, voices: voices, presets: presets, pronunciations: pronunciations,
                                     settings: settings, defaults: defaults, defaultsDomain: defaultsDomain, tokenStore: tokens,
@@ -187,5 +190,6 @@ extension View {
             .environment(deps.downloads)
             .environment(deps.runtimeStatus)
             .environment(deps.service)
+            .environment(deps.localAPI)
     }
 }

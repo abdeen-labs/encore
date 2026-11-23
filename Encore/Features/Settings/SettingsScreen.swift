@@ -4,7 +4,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Preferences, in sections separated by a hairline: the Hugging Face account, memory, output, pronunciations,
-/// storage, the plumbing (ffmpeg, the Python helper, where the token is kept) behind Advanced, about, and the two
+/// the local API, storage, the plumbing (ffmpeg, the Python helper, where the token is kept) behind Advanced, about, and the two
 /// reset actions at the very bottom.
 struct SettingsScreen: View {
     @Environment(AppSettings.self) private var settings
@@ -26,6 +26,7 @@ struct SettingsScreen: View {
                 OutputSection(ffmpegFound: model.ffmpeg != nil || !model.ffmpegChecked)
                 AppIconSection()
                 PronunciationsSection()
+                LocalAPISection()
                 StorageSection(model: model)
                 AdvancedSection(model: model)
                 AboutSection()
@@ -725,7 +726,7 @@ private struct PythonGroup: View {
 }
 
 /// A one-line shell command with a copy button.
-private struct ShellCommandRow: View {
+struct ShellCommandRow: View {
     let command: String
     var body: some View {
         HStack {

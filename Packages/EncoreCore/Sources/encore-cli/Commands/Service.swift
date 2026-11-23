@@ -27,7 +27,7 @@ import Foundation
 @MainActor
 func runServiceCommand(_ args: [String]) async throws {
     guard let sub = args.first else {
-        print("usage: encore-cli service <speak|transcribe|reference|convert|design|conversation|add-voice|voices|history|status|sequence> …")
+        print("usage: encore-cli service <speak|transcribe|reference|convert|design|conversation|add-voice|voices|history|status|sequence|serve> …")
         exit(2)
     }
     let o = ServiceCLIOptions(Array(args.dropFirst()))
@@ -239,6 +239,24 @@ func runServiceCommand(_ args: [String]) async throws {
                 await env.printStatus()
             }
         }
+
+    case "serve":
+        // The local API and MCP server, as the app runs them, until Ctrl-C. --port N (default 7171; 0 picks one).
+        let api = LocalAPI(service: env.service, version: "cli", play: { url, title in await APIPlayback.play(url, title: title) })
+        let server = LocalHTTPServer(port: Int(o["port"] ?? "7171") ?? 7171) { await api.handle($0) }
+        try await server.start()
+        print("Encore's local API is at http://127.0.0.1:\(server.boundPort ?? 0) (MCP at /mcp). Ctrl-C stops it.")
+        signal(SIGINT, SIG_IGN)
+        let interrupt = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
+        interrupt.setEventHandler {
+            MainActor.assumeIsolated {
+                server.stop()
+                env.tearDown()
+                exit(0)
+            }
+        }
+        interrupt.resume()
+        while true { try await Task.sleep(for: .seconds(3600)) }
 
     default:
         print("unknown service subcommand: \(sub)")

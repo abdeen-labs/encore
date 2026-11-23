@@ -84,7 +84,7 @@
 
 ## It stays on your Mac
 
-Nothing you type, record or generate leaves your computer. There is no account and no cloud. Encore goes online for two things only: Hugging Face, to download the models you pick and, if you add a token for a gated model, to check that it works; and updates.abdeen.industries, to check for a new version of Encore. It asks before checking for updates automatically, and the check sends only Encore's version.
+Nothing you type, record or generate leaves your computer. There is no account and no cloud. Encore goes online for two things only: Hugging Face, to download the models you pick and, if you add a token for a gated model, to check that it works; and updates.abdeen.industries, to check for a new version of Encore. It asks before checking for updates automatically, and the check sends only Encore's version. The optional local API (below) only answers apps on this Mac.
 
 ## Writing for a voice
 
@@ -104,6 +104,53 @@ Ladies and gentlemen, [pause 0.6s] tonight's performance begins.
 | `[laugh]`, `[sigh]`, `[cough]` and others | A sound, on models that have them |
 
 A pronunciation list fixes names, jargon and acronyms for every voice. Takes can be leveled to a target loudness, have their silences tightened, and be exported as WAV, M4A or MP3.
+
+## Use it from other apps and AI agents
+
+Turn on **Settings → Local API** and, while Encore is open, scripts and AI agents on your Mac can use it too. It listens on `127.0.0.1:7171` (you can change the port) and turns away anything from outside your Mac and any web page. It's off until you turn it on. Takes made this way show up in History like any other.
+
+**As an MCP server.** Add Encore to Claude Code:
+
+```bash
+claude mcp add --transport http encore http://127.0.0.1:7171/mcp
+```
+
+Other MCP clients that speak streamable HTTP can use the same address. The tools are `speak`, `perform_script`, `transcribe`, `change_voice`, `list_voices` and `list_models`. Cloning and designing voices stay in the app, where you confirm consent and pick the audition you like.
+
+**Like OpenAI's API.** Point an OpenAI client at `http://127.0.0.1:7171/v1` with any API key:
+
+```bash
+curl http://127.0.0.1:7171/v1/audio/speech -H "Content-Type: application/json" \
+  -d '{"input": "Hello from Encore.", "voice": "Mira", "response_format": "wav"}' -o hello.wav
+```
+
+```bash
+curl http://127.0.0.1:7171/v1/audio/transcriptions -F file=@talk.m4a -F response_format=srt
+```
+
+`voice` is one of your voices by name, or a model's built-in voice. `model` is a model id from `GET /v1/models`; leave it out (or send an OpenAI name like `tts-1`) to use the model you last used. Speech comes back as `wav`, `mp3` (needs ffmpeg), `aac` or `pcm`; transcripts as `json`, `text`, `srt`, `vtt` or `verbose_json`.
+
+<details>
+<summary><b>Every endpoint</b></summary>
+
+<br>
+
+| Endpoint | What it does |
+|---|---|
+| `GET /health` | Whether it's running, and Encore's version |
+| `GET /v1/models` | Every model, whether it's downloaded and what it can do |
+| `GET /v1/voices` | Your voice library |
+| `POST /v1/audio/speech` | OpenAI-style text to speech. Extra fields: `language`, `parameters` (the model's own), `save_to_history` |
+| `POST /v1/audio/transcriptions` | OpenAI-style transcription of an uploaded file |
+| `POST /v1/speech` | Encore's own `SpeechRequest`; streams progress as NDJSON, ending with the take's record |
+| `POST /v1/transcriptions` | A `TranscriptionRequest` for a file path; NDJSON |
+| `POST /v1/voice-changes` | A `VoiceConversionRequest`; NDJSON |
+| `POST /v1/conversations` | A `ConversationRequest` (a cast script); NDJSON |
+| `POST /mcp` | The MCP server |
+
+The request types are in `Packages/EncoreCore/Sources/EncoreCore/Service/Requests.swift`. Errors come back as `{"error": {"message", "type", "code"}}`. Generation runs one job at a time, so requests wait their turn.
+
+</details>
 
 ## Models
 
@@ -174,6 +221,8 @@ cd Packages/EncoreCore && xcodebuild -scheme encore-cli -configuration Debug -de
 ```bash
 build/cli/Build/Products/Debug/encore-cli service speak --model soprano --text "Hello from Encore." --out hello.wav --root /tmp/encore-test
 ```
+
+`encore-cli service serve --port 7171 --root /tmp/encore-test` runs the local API and MCP server without the app.
 
 Run `encore-cli` with no arguments for the other commands. `--root` keeps history and voices out of the app's real folders.
 
