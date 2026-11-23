@@ -103,6 +103,9 @@ private struct RailItem: View {
                 Text(title)
                     .textRole(isSelected ? .headline : .body,
                               color: isSelected || isHovered ? .textPrimary : .textSecondary)
+                    // SwiftUI can't interpolate between Allo's weights: under the pill's spring the label
+                    // flickers to an in-between cut and snaps at the end. Switch the weight instantly instead.
+                    .animation(nil, value: isSelected)
                 Spacer(minLength: 0)
                 // Both live in the row's fixed height, so neither shifts the rail.
                 if showsKey {

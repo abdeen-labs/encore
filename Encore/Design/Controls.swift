@@ -335,6 +335,8 @@ struct SegmentedControl<Option: Hashable>: View {
                     HStack(spacing: 6) {
                         Text(title(option))
                             .textRole(selected ? .headline : .label, color: selected ? .textPrimary : .textSecondary)
+                            // Allo's weights don't interpolate; animating the swap flickers (see SidebarRail).
+                            .animation(nil, value: selected)
                         if let n = count?(option) {
                             CountBadge(n)
                         }
